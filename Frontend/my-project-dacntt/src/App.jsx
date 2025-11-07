@@ -1,0 +1,59 @@
+import {
+  Route,
+  Routes,
+  Navigate,
+  BrowserRouter as Router,
+} from "react-router-dom";
+import LoginPage from "./pages/LoginPage";
+import HomePage from "./pages/HomePage";
+import { UserProvider } from "./components/UserProvider";
+import { GoogleOAuthProvider } from "@react-oauth/google";
+import { Toaster } from "react-hot-toast";
+import BoardDetail from "./pages/BoardDetail";
+
+function App() {
+  return (
+    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
+      <UserProvider>
+        <Router>
+          {/* Toaster đặt ở đây, ngoài Routes */}
+          <Toaster
+            position="top-right"
+            reverseOrder={false}
+            toastOptions={{
+              success: {
+                duration: 4000,
+                style: {
+                  marginTop: "40px",
+                  background: "#4ade80",
+                  color: "#fff",
+                },
+              },
+              error: {
+                style: {
+                  duration: 4000,
+                  marginTop: "40px",
+                  background: "#ef4444",
+                  color: "#fff",
+                },
+              },
+            }}
+          />
+
+          <Routes>
+            <Route path="/" element={<LoginPage />} />
+            <Route path="/home" element={<HomePage />} />
+            <Route path="/boards/:boardId/:title" element={<BoardDetail />} />
+            <Route path="/login" element={<LoginPage />} />
+            
+            {/* <Route path="/recovery-password" element={<RecoveryPassword />} />
+            <Route path="/register" element={<RegisterPage />} /> */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Router>
+      </UserProvider>
+    </GoogleOAuthProvider>
+  );
+}
+
+export default App;
