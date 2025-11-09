@@ -13,7 +13,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 model_path = BASE_DIR  # load ngay trong cùng thư mục
 
 # print(" Đang load model từ:", model_path)
-
+ 
 tokenizer = T5Tokenizer.from_pretrained(model_path)
 model = T5ForConditionalGeneration.from_pretrained(model_path)
 

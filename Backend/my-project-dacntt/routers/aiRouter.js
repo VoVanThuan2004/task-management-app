@@ -15,7 +15,7 @@ router.post("/checklist", async (req, res) => {
     title,
     description
     ]);
-
+ 
     let output = "";
     py.stdout.on("data", (data) => (output += data.toString()));
     py.stderr.on("data", (err) => console.error("Python Error:", err.toString()));
@@ -30,3 +30,4 @@ router.post("/checklist", async (req, res) => {
 });
 
 module.exports = router;
+ 
