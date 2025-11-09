@@ -15,6 +15,9 @@ const cors = require("cors");
 const http = require("http");
 // const { connectRabbitMQ } = require("./config/rabbitmq")
 
+const aiRouter = require("./routers/aiRouter.js");
+
+
 const PORT = process.env.PORT;
 
 app.use(cors());
@@ -44,6 +47,7 @@ app.use(columnRouter);
 app.use(taskRouter);
 app.use(labelRouter);
 app.use(commentRouter);
+app.use("/api/ai", aiRouter);
 
 server.listen(PORT, () => {
   console.log(`http://localhost:${PORT}`);
