@@ -19,7 +19,7 @@ router.put("/api/v1/tasks/:taskId/deadline", auth, taskController.updateDeadline
 router.put("/api/v1/tasks/:taskId/description", auth, taskController.updateTaskDescription);
 
 // Cập nhật vị trí task
-router.put("/api/v1/tasks/:taskId/position", auth, taskController.movePosition);
+router.put("/api/v1/tasks/:taskId/position", auth, taskController.moveTask);
 
 // Xóa task
 router.delete("/api/v1/tasks/:taskId", auth, taskController.deleteTask);
@@ -32,5 +32,8 @@ router.post("/api/v1/tasks-attachment", auth, upload.single("file"), taskControl
 
 // Xóa file đính kèm cho task
 router.delete("/api/v1/tasks-attachment/:attachmentId", auth, taskController.deleteFile);
+
+// Lấy thông tin chi tiết task
+router.get("/api/v1/tasks/:taskId", auth, taskController.getTaskDetail);
 
 module.exports = router;

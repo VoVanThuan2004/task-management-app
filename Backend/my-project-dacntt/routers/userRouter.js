@@ -15,4 +15,7 @@ router.get("/api/v1/users/profile", auth, userController.getProfile);
 // Cập nhật thông tin profile
 router.put("/api/v1/users", upload.single("avatar"), auth, userController.updateProfile);
 
+// Tìm kiếm thông tin email user
+router.get("/api/v1/users/search", auth, userController.searchEmailUser);
+
 module.exports = router;

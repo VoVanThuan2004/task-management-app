@@ -228,9 +228,9 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className="text-sm text-gray-400 text-center">
+        {/* <div className="text-sm text-gray-400 text-center">
           © {new Date().getFullYear()} My Trello Clone
-        </div>
+        </div> */}
       </aside>
 
       {/* Main Content */}
@@ -254,7 +254,7 @@ export default function HomePage() {
                     </p>
                   </div>
                   <img
-                    src={user?.avatar || "https://i.pravatar.cc/40"}
+                    src={user?.avatar || "https://cdn-icons-png.flaticon.com/512/149/149071.png"}
                     alt="avatar"
                     className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
                   />

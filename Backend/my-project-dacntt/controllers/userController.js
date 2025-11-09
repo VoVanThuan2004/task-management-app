@@ -157,8 +157,46 @@ const deleteUploadedFile = async (file) => {
   }
 };
 
+const searchEmailUser = async (req, res) => {
+  try {
+    const { query } = req.query;
+    if (!query) {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Vui lòng nhập địa chỉ email hoặc tên",
+      });
+    }
+
+    // 1. Lấy ra role admin
+    const roleAdmin = await Role.findOne({ roleName: "ADMIN" });
+
+    // 2. Query lấy dữ liệu
+    const users = await User.find({
+      $or: [
+        { email: { $regex: query, $options: "i" } },
+        { name: { $regex: query, $options: "i" } },
+      ],
+      roleId: { $ne: roleAdmin._id },
+    }).select("_id name email avatar").limit(10);
+
+    return res.status(200).json({
+      status: "success",
+      code: 200,
+      data: users,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      code: 500,
+      message: "Lỗi hệ thống: " + error.message,
+    });
+  }
+};
+
 module.exports = {
   getAllUsers,
   getProfile,
   updateProfile,
+  searchEmailUser,
 };

@@ -21,7 +21,6 @@ const boardMemberSchema = new mongoose.Schema({
   },
   role: { type: String },
   status: { type: String, default: "Đang chờ" },
-  inviteToken: { type: String, default: null },
   invitedAt: { type: Date },
   acceptedAt: { type: Date, default: null }
 });

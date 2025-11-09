@@ -10,6 +10,8 @@ import { UserProvider } from "./components/UserProvider";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { Toaster } from "react-hot-toast";
 import BoardDetail from "./pages/BoardDetail";
+import RecoveryPassword from "./pages/RecoveryPassword";
+import Register from "./pages/Register";
 
 function App() {
   return (
@@ -41,11 +43,13 @@ function App() {
           />
 
           <Routes>
-            <Route path="/" element={<LoginPage />} />
+            <Route path="/" element={<HomePage />} />
             <Route path="/home" element={<HomePage />} />
             <Route path="/boards/:boardId/:title" element={<BoardDetail />} />
             <Route path="/login" element={<LoginPage />} />
-            
+            <Route path="/recovery-password" element={<RecoveryPassword />} />
+            <Route path="/register" element={<Register />} />
+
             {/* <Route path="/recovery-password" element={<RecoveryPassword />} />
             <Route path="/register" element={<RegisterPage />} /> */}
             <Route path="*" element={<Navigate to="/" replace />} />

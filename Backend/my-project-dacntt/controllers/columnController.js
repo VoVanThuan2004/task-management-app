@@ -69,7 +69,7 @@ const addColumn = async (req, res) => {
         _id: column._id,
         boardId: column.boardId,
         title,
-        position: count + 1,
+        position: column.position,
       },
     });
   } catch (error) {
@@ -185,7 +185,7 @@ const moveColumn = async (req, res) => {
     column.position = newPosition;
     await column.save();
 
-    // ✅ Kiểm tra spacing nhỏ quá
+    // Kiểm tra spacing nhỏ quá
     const minSpacing = 1; // nếu hai cột gần nhau < 1 đơn vị thì coi là quá nhỏ
     let needReindex = false;
 
@@ -197,7 +197,7 @@ const moveColumn = async (req, res) => {
       }
     }
 
-    // ✅ Reset lại position nếu spacing quá nhỏ
+    // Reset lại position nếu spacing quá nhỏ
     if (needReindex) {
       let spacing = 1000;
       for (let i = 0; i < allColumns.length; i++) {
@@ -207,7 +207,7 @@ const moveColumn = async (req, res) => {
       console.log("⚙️ Re-index lại position cho columns trong board:", boardId);
     }
 
-    // ✅ Trả về dữ liệu chi tiết
+    // Trả về dữ liệu chi tiết
     const updatedColumns = await Column.find({
       boardId,
       isArchived: false,
@@ -394,6 +394,7 @@ const getAllColumns = async (req, res) => {
                 title: 1,
                 position: 1,
                 isCompleted: 1,
+                boardId: 1,
                 totalChecklists: 1,
                 totalChecklistItems: 1,
                 totalComments: 1,

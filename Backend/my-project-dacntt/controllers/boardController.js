@@ -1,12 +1,14 @@
 require("dotenv").config();
 const mongoose = require("mongoose");
-const User = require("../models/user");
 const Board = require("../models/board");
 const BoardPosition = require("../models/boardPosition");
 const BoardMember = require("../models/boardMember");
+const User = require("../models/user");
 const ActivityLog = require("../models/activityLog");
 const Notification = require("../models/notification");
 const { getIO } = require("../config/socket");
+const cloudinary = require("../config/cloudinary");
+const { sendShareBoardEmail } = require("../config/mailConfig");
 // const { getChannel } = require("../config/rabbitmq");
 
 const createBoard = async (req, res) => {
@@ -77,12 +79,17 @@ const updateBoard = async (req, res) => {
     }
 
     // 2. Kiểm tra xem người chỉnh sửa bảng có phải là owner không
-    if (!board.ownerId.equals(userId)) {
-      return res.status(400).json({
-        status: "error",
-        code: 400,
-        message: "Người dùng không có quyền chỉnh sửa bảng",
-      });
+    // if (!board.ownerId.equals(userId)) {
+    //   return res.status(400).json({
+    //     status: "error",
+    //     code: 400,
+    //     message: "Người dùng không có quyền chỉnh sửa bảng",
+    //   });
+    // }
+
+    if (board.backgroundPublicId) {
+      await cloudinary.uploader.destroy(board.backgroundPublicId);
+      board.backgroundPublicId = null;
     }
 
     // 3. Cập nhật bảng
@@ -125,6 +132,152 @@ const updateBoard = async (req, res) => {
   }
 };
 
+const updateBoardBackground = async (req, res) => {
+  try {
+    const boardId = req.params.boardId;
+
+    // Kiểm tra có upload file hay không
+    if (!req.file) {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Vui lòng upload ảnh",
+      });
+    }
+
+    // Kiểm tra định dạng file
+    const allowedMimeTypes = [
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/gif",
+      "image/webp",
+    ];
+    if (!allowedMimeTypes.includes(req.file.mimetype)) {
+      await deleteUploadedFileCloudinary(req.file);
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Chỉ chấp nhận file ảnh (JPEG, PNG, GIF, WebP)",
+      });
+    }
+
+    // Kiểm tra kích thước file (tối đa 5MB)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (req.file.size > maxSize) {
+      await deleteUploadedFileCloudinary(req.file);
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Kích thước ảnh không được vượt quá 5MB",
+      });
+    }
+
+    // 1. Kiểm tra board có tồn tại không
+    const board = await Board.findById(boardId);
+    if (!board) {
+      await deleteUploadedFileCloudinary(req.file);
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Board không tồn tại",
+      });
+    }
+
+    // 3. Nếu có background cũ, xóa trên Cloudinary
+    if (board.backgroundPublicId) {
+      try {
+        await cloudinary.uploader.destroy(board.backgroundPublicId);
+      } catch (cloudinaryError) {
+        console.error("Lỗi xóa ảnh cũ trên Cloudinary:", cloudinaryError);
+      }
+    }
+
+    // 5. Cập nhật board với background mới
+    board.background = req.file.path;
+    board.backgroundPublicId = req.file.filename;
+    await board.save();
+
+    // 6. Gửi socket notification
+    const io = getIO();
+    io.to(board._id.toString()).emit("boardBackgroundUpdated", {
+      boardId: boardId,
+      background: board.background,
+    });
+
+    return res.status(200).json({
+      status: "success",
+      code: 200,
+      message: "Cập nhật background thành công",
+      data: {
+        boardId: boardId,
+        background: board.background,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      code: 500,
+      message: "Lỗi hệ thống: " + error.message,
+    });
+  }
+};
+
+const deleteBoardBackground = async (req, res) => {
+  try {
+    const boardId = req.params.boardId;
+
+    // 1. Kiểm tra board
+    const board = await Board.findById(boardId);
+    if (!board) {
+      await deleteUploadedFileCloudinary(req.file);
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Board không tồn tại",
+      });
+    }
+
+    // 2. Xóa file ảnh background cũ trên cloudinary
+    await cloudinary.uploader.destroy(board.backgroundPublicId);
+
+    // 3. Cập nhật lại màu mặc định cho board
+    board.background = "#026aa7";
+    board.backgroundPublicId = null;
+    await board.save();
+
+    // 4. Gửi lên Socket - cập nhật realtime
+    const io = getIO();
+    io.to(board._id.toString()).emit("boardBackgroundDeleted", {
+      boardId: boardId,
+      background: board.background,
+    });
+
+    return res.status(200).json({
+      status: "success",
+      code: 200,
+      message: "Xóa background thành công",
+      data: {
+        boardId: boardId,
+        background: board.background,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      code: 500,
+      message: "Lỗi hệ thống: " + error.message,
+    });
+  }
+};
+
+// Function xóa ảnh upload cloudinary
+const deleteUploadedFileCloudinary = async (file) => {
+  if (file && file.filename) {
+    await cloudinary.uploader.destroy(file.filename);
+  }
+};
+
 const deleteBoard = async (req, res) => {
   const userId = req.user.userId;
 
@@ -153,23 +306,6 @@ const deleteBoard = async (req, res) => {
     // 3. Xóa mềm board
     board.isArchived = true;
     await board.save();
-
-    // 4. Xoá vị trí khỏi danh sách BoardPosition của user
-    const deletedPosition = await BoardPosition.findOneAndDelete({
-      boardId: boardId,
-      userId: userId,
-    });
-
-    // 5. Cập nhật lại position các board phía sau
-    if (deletedPosition) {
-      await BoardPosition.updateMany(
-        {
-          userId: userId,
-          position: { $gt: deletedPosition.position },
-        },
-        { $inc: { position: -1 } } // Giảm 1
-      );
-    }
 
     return res.status(200).json({
       status: "success",
@@ -378,15 +514,21 @@ const shareBoard = async (req, res) => {
   try {
     const sharerId = req.user.userId;
     const { boardId, userIds, message } = req.body;
-    if (!boardId || !userIds || userIds.length === 0) {
+
+    if (
+      !boardId ||
+      !userIds ||
+      !Array.isArray(userIds) ||
+      userIds.length === 0
+    ) {
       return res.status(400).json({
         status: "error",
         code: 400,
-        message: "Thiếu boardId hoặc userIds",
+        message: "Thiếu boardId hoặc danh sách userIds hợp lệ",
       });
     }
 
-    // 1. Tìm board có tồn tại
+    // 1️. Tìm bảng
     const existingBoard = await Board.findById(boardId);
     if (!existingBoard) {
       return res.status(404).json({
@@ -396,22 +538,65 @@ const shareBoard = async (req, res) => {
       });
     }
 
-    // 2. Thêm BoardMember mới hoặc update nếu đã có
-    const boardMembers = await Promise.all(
-      userIds.map(async (uid) => {
-        const existing = await BoardMember.findOne({ boardId, userId: uid });
-        if (existing) return existing; // đã là member
-        return BoardMember.create({
+    // 2️. Lặp qua từng userId để thêm vào board nếu chưa có
+    const results = [];
+    for (const uid of userIds) {
+      let member = await BoardMember.findOne({ boardId, userId: uid });
+      if (!member) {
+        member = await BoardMember.create({
           boardId,
           userId: uid,
-          invitedBy: sharerId,
-          role,
+          inviterId: sharerId,
+          role: "member", // role mặc định
           status: "accepted",
           invitedAt: new Date(),
         });
-      })
-    );
+      }
+      results.push(member);
+    }
+
+    // 3️. Gửi email mời 
+    const sharer = await User.findById(sharerId);
+    const invitedUsers = await User.find({ _id: { $in: userIds } });
+
+    const frontendUrl = process.env.FE_URL;
+    const boardLink = `${frontendUrl}/boards/${boardId}/${existingBoard.title}`;
+
+    for (const user of invitedUsers) {
+      // Giả lập gửi mail (chừa sẵn phần này để tích hợp sau)
+      console.log(
+        `[EMAIL MỜI] Gửi tới ${user.email} từ ${sharer.email} để tham gia bảng "${existingBoard.title}"`
+      );
+
+      await sendShareBoardEmail(
+        user.email,
+        sharer.fullName,
+        existingBoard.title,
+        message,
+        boardLink
+      );
+    }
+
+
+    // Gửi lên Socket - thông báo realtime
+
+    // 4️. Ghi thông báo mời vào bảng notifications
+    // ===================================================
+    // Bạn có thể thêm Notification.create({
+    //   userId: uid,
+    //   type: "board_invite",
+    //   message: `${sharer.name} đã mời bạn tham gia bảng "${existingBoard.title}"`,
+    //   createdAt: new Date(),
+    // });
+
+    return res.status(200).json({
+      status: "success",
+      code: 200,
+      message: "Đã chia sẻ bảng và gửi lời mời thành công",
+      data: results,
+    });
   } catch (error) {
+    console.error("❌ shareBoard error:", error);
     return res.status(500).json({
       status: "error",
       code: 500,
@@ -452,6 +637,8 @@ const getBoardDetail = async (req, res) => {
 module.exports = {
   createBoard,
   updateBoard,
+  updateBoardBackground,
+  deleteBoardBackground,
   deleteBoard,
   restoreBoard,
   getAllBoards,

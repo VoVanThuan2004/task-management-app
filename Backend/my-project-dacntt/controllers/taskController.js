@@ -5,6 +5,7 @@ const TaskLabel = require("../models/taskLabel");
 const Attachment = require("../models/attachment");
 const { getIO } = require("../config/socket");
 const cloudinary = require("../config/cloudinary");
+const { ObjectId } = require("mongodb");
 
 const addTask = async (req, res) => {
   try {
@@ -62,7 +63,7 @@ const addTask = async (req, res) => {
       boardId: task.boardId,
       title,
       position,
-      isCompleted: task.isCompleted
+      isCompleted: task.isCompleted,
     });
 
     // 7. Gửi lên Socket - thông báo
@@ -77,7 +78,7 @@ const addTask = async (req, res) => {
         boardId,
         title,
         position,
-        isCompleted: task.isCompleted
+        isCompleted: task.isCompleted,
       },
     });
   } catch (error) {
@@ -124,6 +125,7 @@ const updateTaskTitle = async (req, res) => {
       boardId: task.boardId,
       title,
       position: taskId.position,
+      description: task.description,
     });
 
     // 4. Gửi lên Socket - thông báo
@@ -145,43 +147,145 @@ const updateTaskTitle = async (req, res) => {
   }
 };
 
-const movePosition = async (req, res) => {
+const moveTask = async (req, res) => {
   try {
     const taskId = req.params.taskId;
+    let { destinationColumnId, destinationIndex } = req.body;
 
-    const { destinationColumnId, destinationIndex } = req.body;
-    const destTasks = await Task.find({
-      columnId: destinationColumnId,
-      isArchived: false,
-    }).sort({
-      position: 1,
-    });
-    const task = await Task.findById(taskId);
-    if (!task) return res.status(404).json({ message: "Task không tồn tại" });
+    destinationIndex = Number(destinationIndex);
+    if (Number.isNaN(destinationIndex)) destinationIndex = undefined;
 
+    // 1. Lấy task và tất cả task ở cột ĐÍCH
+    // Dùng Promise.all để chạy song song 2 query
+    const [task, tasksInDestCol] = await Promise.all([
+      Task.findById(taskId),
+      Task.find({
+        columnId: destinationColumnId,
+        isArchived: false,
+      }).sort({ position: 1 }),
+    ]);
+
+    if (!task) {
+      return res.status(404).json({
+        status: "error",
+        message: "Task không tồn tại",
+      });
+    }
+
+    // Lọc task đang di chuyển ra khỏi danh sách đích (chỉ có tác dụng nếu di chuyển trong cùng 1 column)
+    const allTasks = tasksInDestCol.filter(
+      (t) => t._id.toString() !== taskId.toString()
+    );
+
+    // 2. Chuẩn hóa destinationIndex
+    if (destinationIndex === undefined) {
+      destinationIndex = allTasks.length;
+    }
+    if (destinationIndex < 0) destinationIndex = 0;
+    if (destinationIndex > allTasks.length) destinationIndex = allTasks.length;
+
+    // 3. Tính toán vị trí mới (Logic fractional indexing của bạn đã rất chuẩn)
     let newPosition;
-    if (destTasks.length === 0) {
+    if (allTasks.length === 0) {
       newPosition = 1000;
     } else if (destinationIndex === 0) {
-      newPosition = destTasks[0].position / 2;
-    } else if (destinationIndex > destTasks.length) {
-      newPosition = destTasks[destTasks.length - 1].position + 1000;
+      newPosition = allTasks[0].position / 2;
+    } else if (destinationIndex === allTasks.length) {
+      newPosition = allTasks[allTasks.length - 1].position + 1000;
     } else {
-      const prev = destTasks[destinationIndex - 1];
-      const next = destTasks[destinationIndex];
+      const prev = allTasks[destinationIndex - 1];
+      const next = allTasks[destinationIndex];
       newPosition = (prev.position + next.position) / 2;
     }
+
+    // 4. Cập nhật task và lưu
+    const oldColumnId = task.columnId;
+
     task.columnId = destinationColumnId;
     task.position = newPosition;
+    task.isArchived = false; // Đảm bảo task "sống lại"
     await task.save();
+
+    // 5. Kiểm tra Re-index
+    // Thêm task vừa cập nhật vào danh sách (đúng vị trí) để kiểm tra
+    let updatedTasks = [...allTasks];
+    updatedTasks.splice(destinationIndex, 0, task);
+
+    const minSpacing = 1;
+    let needReindex = false;
+    for (let i = 1; i < updatedTasks.length; i++) {
+      const diff = updatedTasks[i].position - updatedTasks[i - 1].position;
+      if (diff < minSpacing) {
+        needReindex = true;
+        break;
+      }
+    }
+
+    // 6. XỬ LÝ RE-INDEX (TỐI ƯU HÓA)
+    if (needReindex) {
+      console.log(
+        "⚙️ Re-index lại position cho tasks trong column:",
+        destinationColumnId
+      );
+      const spacing = 1000;
+
+      // Tạo một mảng các thao tác "update"
+      const bulkOps = updatedTasks.map((t, i) => ({
+        updateOne: {
+          filter: { _id: t._id },
+          update: { $set: { position: (i + 1) * spacing } },
+        },
+      }));
+
+      // Chạy 1 lệnh bulkWrite duy nhất
+      await Task.bulkWrite(bulkOps);
+
+      // Tải lại danh sách task LẦN CUỐI (vì position đã thay đổi hoàn toàn)
+      updatedTasks = await Task.find({
+        columnId: destinationColumnId,
+        isArchived: false,
+      }).sort({ position: 1 });
+    }
+
+    // 7. Emit Socket
+    const io = getIO();
+    io.to(task.boardId.toString()).emit("taskMoved", {
+      boardId: task.boardId,
+      sourceColumnId: oldColumnId.toString(),
+      destinationColumnId: destinationColumnId,
+      movedTaskId: task._id,
+      reindexed: needReindex,
+
+      // Gửi danh sách tasks đã được re-index của cột ĐÍCH
+      tasksInDestination: updatedTasks.map((t) => ({
+        id: t._id,
+        title: t.title,
+        position: t.position,
+        columnId: t.columnId,
+      })),
+    });
+
+    // 8. Trả về Response
     return res.status(200).json({
-      message: "Cập nhật vị trí thành công",
-      position: newPosition,
+      status: "success",
+      message: "Cập nhật vị trí task thành công",
+      data: {
+        taskId: task._id,
+        newPosition: task.position,
+        destinationColumnId,
+        reindexed: needReindex,
+        tasks: updatedTasks.map((t) => ({
+          // Trả về danh sách đã re-index (nếu có)
+          id: t._id,
+          title: t.title,
+          position: t.position,
+        })),
+      },
     });
   } catch (error) {
+    console.error("moveTask error:", error);
     return res.status(500).json({
       status: "error",
-      code: 500,
       message: "Lỗi hệ thống: " + error.message,
     });
   }
@@ -190,7 +294,7 @@ const movePosition = async (req, res) => {
 const updateDeadlineTask = async (req, res) => {
   try {
     const taskId = req.params.taskId;
-    const { dueDate } = req.body;
+    const { startDate, dueDate, reminderEnabled, reminderTime } = req.body;
 
     // Validate taskId
     if (!taskId) {
@@ -201,32 +305,56 @@ const updateDeadlineTask = async (req, res) => {
       });
     }
 
-    // Validate dueDate
-    if (!dueDate) {
+    // Validate ít nhất phải có startDate hoặc dueDate
+    if (!startDate && !dueDate) {
       return res.status(400).json({
         status: "error",
         code: 400,
-        message: "Chọn thời hạn hết hạn là bắt buộc",
+        message: "Phải có ít nhất ngày bắt đầu hoặc ngày kết thúc",
       });
     }
 
-    // Validate date format
-    const parsedDueDate = new Date(dueDate);
-    if (isNaN(parsedDueDate.getTime())) {
+    // Parse dates
+    const parsedStartDate = startDate ? new Date(startDate) : null;
+    const parsedDueDate = dueDate ? new Date(dueDate) : null;
+
+    // Validate date formats
+    if (startDate && isNaN(parsedStartDate.getTime())) {
       return res.status(400).json({
         status: "error",
         code: 400,
-        message: "Định dạng ngày không hợp lệ",
+        message: "Định dạng ngày bắt đầu không hợp lệ",
       });
     }
 
-    // Kiểm tra due date phải lớn hơn thời gian hiện tại
-    const currentDate = new Date();
-    if (parsedDueDate <= currentDate) {
+    if (dueDate && isNaN(parsedDueDate.getTime())) {
       return res.status(400).json({
         status: "error",
         code: 400,
-        message: "Ngày hết hạn phải lớn hơn thời điểm hiện tại",
+        message: "Định dạng ngày kết thúc không hợp lệ",
+      });
+    }
+
+    // Validate logic: startDate <= dueDate
+    if (parsedStartDate && parsedDueDate && parsedStartDate > parsedDueDate) {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Ngày bắt đầu không thể sau ngày kết thúc",
+      });
+    }
+
+    // Validate reminder time
+    const validReminderTimes = [5, 15, 30, 60, 120, 1440]; // 5ph, 15ph, 30ph, 1h, 2h, 24h
+    if (
+      reminderEnabled &&
+      reminderTime &&
+      !validReminderTimes.includes(reminderTime)
+    ) {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Thời gian nhắc nhở không hợp lệ",
       });
     }
 
@@ -241,30 +369,56 @@ const updateDeadlineTask = async (req, res) => {
     }
 
     // 2. Cập nhật task
-    existingTask.dueDate = parsedDueDate;
-    await existingTask.save();
+    const updateData = {};
+    if (startDate !== undefined) updateData.startDate = parsedStartDate;
+    if (dueDate !== undefined) updateData.dueDate = parsedDueDate;
+    if (reminderEnabled !== undefined)
+      updateData.reminderEnabled = reminderEnabled;
+    if (reminderTime !== undefined) updateData.reminderTime = reminderTime;
 
-    // 3. Gửi lên Socket
-    const io = getIO();
-    io.to(existingTask.boardId.toString()).emit("deadlineTaskUpdated", {
-      _id: taskId,
-      columnId: existingTask.columnId,
-      boardId: existingTask.boardId,
-      title: existingTask.title,
-      position: existingTask.position,
-      dueDate: existingTask.dueDate,
+    // Reset reminder sent status if due date changed
+    if (dueDate) {
+      updateData.reminderSent = false;
+    }
+
+    const updatedTask = await Task.findByIdAndUpdate(taskId, updateData, {
+      new: true,
     });
 
-    // 4. Gửi lên Socket - thông báo
+    // 3. Gửi socket
+    const io = getIO();
+    io.to(updatedTask.boardId.toString()).emit("deadlineTaskUpdated", {
+      _id: taskId,
+      columnId: updatedTask.columnId,
+      boardId: updatedTask.boardId,
+      title: updatedTask.title,
+      position: updatedTask.position,
+      startDate: updatedTask.startDate,
+      dueDate: updatedTask.dueDate,
+      reminderEnabled: updatedTask.reminderEnabled,
+      reminderTime: updatedTask.reminderTime,
+    });
+
+    // 4. Gửi socket thông báo (nếu cần)
+    io.to(updatedTask.boardId.toString()).emit("taskNotification", {
+      type: "DEADLINE_UPDATED",
+      taskId: taskId,
+      taskTitle: updatedTask.title,
+      message: `Đã cập nhật thời hạn cho task "${updatedTask.title}"`,
+      timestamp: new Date(),
+    });
 
     return res.status(200).json({
       status: "success",
       code: 200,
-      message: "Cập nhật thời gian hết hạn của task thành công",
+      message: "Cập nhật thời hạn task thành công",
       data: {
         _id: taskId,
-        title: existingTask.title,
-        dueDate: parsedDueDate,
+        title: updatedTask.title,
+        startDate: updatedTask.startDate,
+        dueDate: updatedTask.dueDate,
+        reminderEnabled: updatedTask.reminderEnabled,
+        reminderTime: updatedTask.reminderTime,
       },
     });
   } catch (error) {
@@ -280,11 +434,12 @@ const updateTaskDescription = async (req, res) => {
   try {
     const taskId = req.params.taskId;
     const { description } = req.body;
-    if (!description) {
+    // Kiểm tra chỉ khi description === undefined (nghĩa là không gửi field)
+    if (description === undefined) {
       return res.status(400).json({
         status: "error",
         code: 400,
-        message: "Vui lòng nhập mô tả cho task",
+        message: "Thiếu trường mô tả (description)",
       });
     }
 
@@ -302,13 +457,14 @@ const updateTaskDescription = async (req, res) => {
 
     // Gửi lên Socket - update data
     const io = getIO();
-    io.to(existingTask.boardId.toString()).emit("deadlineTaskUpdated", {
+    io.to(existingTask.boardId.toString()).emit("descriptionTaskUpdated", {
       _id: taskId,
       columnId: existingTask.columnId,
       boardId: existingTask.boardId,
       title: existingTask.title,
       position: existingTask.position,
       dueDate: existingTask.dueDate,
+      description: existingTask.description,
     });
 
     // Gửi lên Socket - thông báo
@@ -577,14 +733,173 @@ const deleteFile = async (req, res) => {
   }
 };
 
+const getTaskDetail = async (req, res) => {
+  try {
+    const { taskId } = req.params;
+
+    // 1️⃣ Kiểm tra task tồn tại
+    const task = await Task.findById(taskId);
+    if (!task) {
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Task không tồn tại",
+      });
+    }
+
+    // 2️⃣ Lấy chi tiết Task kèm các thông tin liên quan
+    const [taskDetail] = await Task.aggregate([
+      { $match: { _id: new ObjectId(taskId) } },
+
+      // 🎨 Labels
+      {
+        $lookup: {
+          from: "tasklabels",
+          localField: "_id",
+          foreignField: "taskId",
+          as: "labels",
+          pipeline: [
+            {
+              $lookup: {
+                from: "labels",
+                localField: "labelId",
+                foreignField: "_id",
+                as: "labelInfo",
+              },
+            },
+            { $unwind: "$labelInfo" },
+            {
+              $project: {
+                _id: 0,
+                labelId: "$labelId",
+                title: "$labelInfo.title",
+                color: "$labelInfo.color",
+              },
+            },
+          ],
+        },
+      },
+
+      // 🧾 Checklists và Items
+      {
+        $lookup: {
+          from: "checklists",
+          localField: "_id",
+          foreignField: "taskId",
+          as: "checklists",
+          pipeline: [
+            {
+              $lookup: {
+                from: "checklistitems",
+                localField: "_id",
+                foreignField: "checklistId",
+                as: "items",
+                pipeline: [
+                  {
+                    $lookup: {
+                      from: "users",
+                      localField: "assignedTo",
+                      foreignField: "_id",
+                      as: "assignedUser",
+                    },
+                  },
+                  {
+                    $unwind: {
+                      path: "$assignedUser",
+                      preserveNullAndEmptyArrays: true,
+                    },
+                  },
+                  {
+                    $project: {
+                      _id: 1,
+                      title: 1,
+                      isCompleted: 1,
+                      position: 1,
+                      dueDate: 1,
+                      assignedTo: {
+                        _id: "$assignedUser._id",
+                        fullName: "$assignedUser.fullName",
+                        avatar: "$assignedUser.avatar",
+                      },
+                      createdAt: 1,
+                      updatedAt: 1,
+                    },
+                  },
+                  { $sort: { position: 1 } }, // Sắp xếp items theo position
+                ],
+              },
+            },
+            {
+              $addFields: {
+                totalItems: { $size: "$items" },
+                completedItems: {
+                  $size: {
+                    $filter: {
+                      input: "$items",
+                      as: "item",
+                      cond: { $eq: ["$$item.isCompleted", true] },
+                    },
+                  },
+                },
+              },
+            },
+            { $sort: { position: 1 } }, // Sắp xếp checklists theo position
+          ],
+        },
+      },
+
+      // 📎 Attachments
+      {
+        $lookup: {
+          from: "attachments",
+          localField: "_id",
+          foreignField: "taskId",
+          as: "attachments",
+        },
+      },
+
+      // 🎯 Projection cuối cùng
+      {
+        $project: {
+          title: 1,
+          description: 1,
+          dueDate: 1,
+          isCompleted: 1,
+          position: 1,
+          labels: 1,
+          checklists: 1,
+          attachments: 1,
+          totalChecklistItems: 1,
+          completedChecklistItems: 1,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      },
+    ]);
+
+    return res.status(200).json({
+      status: "success",
+      code: 200,
+      data: taskDetail,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      code: 500,
+      message: "Lỗi hệ thống: " + error.message,
+    });
+  }
+};
+
 module.exports = {
   addTask,
   updateTaskTitle,
-  movePosition,
+  moveTask,
   updateDeadlineTask,
   updateTaskDescription,
   deleteTask,
   toggleLabelOnTask,
   uploadFile,
   deleteFile,
+  getTaskDetail,
 };
