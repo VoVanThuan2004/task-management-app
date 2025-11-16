@@ -7,7 +7,7 @@ const storage = new CloudinaryStorage({
     folder: "DACNTT",
     // Rất quan trọng: Tự động phát hiện loại file
     resource_type: "auto",
-
+    access_mode: "public",
     // Thêm các định dạng file văn phòng
     allowed_formats: [
       // Ảnh

@@ -32,6 +32,11 @@ const initSocket = (server) => {
     socket.on("disconnect", () => {
       console.log("❌ Client disconnected:", socket.id);
     });
+
+    socket.on("login", (userId) => {
+      socket.join(userId); // room riêng cho từng user
+      console.log(`User ${socket.id} joined personal room ${userId}`);
+    });
   });
 
   console.log("🚀 Socket.io initialized!");
@@ -40,7 +45,9 @@ const initSocket = (server) => {
 // 3️⃣ Hàm lấy io instance để dùng ở controller
 const getIO = () => {
   if (!io) {
-    throw new Error("Socket.io chưa được khởi tạo! Hãy gọi initSocket(server) trước.");
+    throw new Error(
+      "Socket.io chưa được khởi tạo! Hãy gọi initSocket(server) trước."
+    );
   }
   return io;
 };

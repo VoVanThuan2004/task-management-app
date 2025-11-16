@@ -1,46 +1,23 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { io } from "socket.io-client";
-import { Editor } from "@tinymce/tinymce-react";
-// import { getFileIcon } from "../components/GetFileIcon";
-
-// Biểu tượng (bạn có thể thay thế bằng react-icons)
-const CheckIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 20 20"
-    fill="currentColor"
-    className="w-5 h-5 text-green-600"
-  >
-    <path
-      fillRule="evenodd"
-      d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z"
-      clipRule="evenodd"
-    />
-  </svg>
-);
-
-const LabelIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 20 20"
-    fill="currentColor"
-    className="w-5 h-5"
-  >
-    <path d="M3.25 4A2.25 2.25 0 0 0 1 6.25v3.5A2.25 2.25 0 0 0 3.25 12h11.5A2.25 2.25 0 0 0 17 9.75v-3.5A2.25 2.25 0 0 0 14.75 4H3.25ZM9 7.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM5.5 6A.5.5 0 0 1 6 5.5h1.5a.5.5 0 0 1 0 1H6A.5.5 0 0 1 5.5 6Z" />
-    <path d="M18.25 6.25A2.25 2.25 0 0 1 16 8.5v1.25a2.25 2.25 0 0 1 2.25 2.25h.5a.75.75 0 0 0 0-1.5h-.5a.75.75 0 0 0-.75-.75V8.5a.75.75 0 0 0 .75-.75h.5a.75.75 0 0 0 0-1.5h-.5Z" />
-  </svg>
-);
+import { ClockIcon, UserIcon } from "lucide-react"; // icon ví dụ
+import TaskHeader from "./TaskModal/TaskHeader";
+import TaskDatePickerPopup from "./TaskModal/TaskDatePickerPopup";
+import TaskDescription from "./TaskModal/TaskDescription";
+import TaskMembersPopup from "./TaskModal/TaskMemberPopup";
+import TaskActivityPanel from "./TaskModal/TaskActivityPanel";
+import AttachmentItem from "./TaskModal/AttachmentItem";
 
 const TaskModal = ({ task, isOpen, onClose, onTaskUpdate }) => {
   const [editedTask, setEditedTask] = useState(null);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [loading, setLoading] = useState(false);
-  // const [comment, setComment] = useState(""); // State cho comment mới
+  const [socket, setSocket] = useState(null);
 
   const editorRef = useRef(null); // Ref cho editor MÔ TẢ
-  const commentEditorRef = useRef(null); // Ref cho editor COMMENT
+  // const commentEditorRef = useRef(null); // Ref cho editor COMMENT
 
   const httpUrl = import.meta.env.VITE_API_URL;
   const accessToken = localStorage.getItem("accessToken");
@@ -50,6 +27,20 @@ const TaskModal = ({ task, isOpen, onClose, onTaskUpdate }) => {
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadingFileName, setUploadingFileName] = useState("");
   const [toast, setToast] = useState({ show: false, message: "", type: "" });
+
+  const [showPopup, setShowPopup] = useState(false);
+  const [reminderEnabled, setReminderEnabled] = useState(true);
+  const [reminderMinutes, setReminderMinutes] = useState(5);
+  const [startDate, setStartDate] = useState(null);
+  const [dueDate, setDueDate] = useState(null);
+
+  // State cho popup gán thành viên
+  const [showMembersPopup, setShowMembersPopup] = useState(false);
+  const membersButtonRef = useRef(null);
+
+  // State cho comment (thảo luận)
+  // const [comments, setComments] = useState([]);
+  const [activities] = useState([]); // Nếu có API
 
   // Khi task thay đổi => gọi API lấy chi tiết task
   useEffect(() => {
@@ -75,17 +66,22 @@ const TaskModal = ({ task, isOpen, onClose, onTaskUpdate }) => {
     fetchTaskDetail();
   }, [task, isOpen]);
 
+  // let socket;
   useEffect(() => {
     if (!isOpen || !task?._id) return;
 
-    const socket = io(httpUrl, {
+    // Khởi tạo socket mới
+    const newSocket = io(httpUrl, {
+      // ⬅️ Đổi thành 'const newSocket'
       transports: ["websocket"],
       auth: { token: accessToken },
     });
 
-    socket.emit("joinBoard", task.boardId);
+    setSocket(newSocket); // ✅ CẬP NHẬT STATE
 
-    socket.on("descriptionTaskUpdated", (data) => {
+    newSocket.emit("joinBoard", task.boardId);
+
+    newSocket.on("descriptionTaskUpdated", (data) => {
       console.log("📝 TaskModal received description update:", data);
       if (data._id === task._id) {
         setEditedTask((prev) =>
@@ -94,18 +90,67 @@ const TaskModal = ({ task, isOpen, onClose, onTaskUpdate }) => {
       }
     });
 
-    socket.on("taskTitleUpdated", (data) => {
+    newSocket.on("taskTitleUpdated", (data) => {
       console.log("📝 TaskModal received title update:", data);
       if (data._id === task._id) {
         setEditedTask((prev) => (prev ? { ...prev, title: data.title } : null));
       }
     });
 
-    return () => {
-      socket.emit("leaveTask", task._id);
-      socket.disconnect();
+    newSocket.on("deadlineTaskUpdated", (data) => {
+      console.log("📝 TaskModal received deadline update:", data);
+      if (data._id === task._id) {
+        setEditedTask((prev) =>
+          prev
+            ? {
+                ...prev,
+                startDate: data.startDate,
+                dueDate: data.dueDate,
+                reminderEnabled: data.reminderEnabled,
+                reminderTime: data.reminderTime,
+              }
+            : null
+        );
+      }
+    });
+
+    const handleNewAttachment = (data) => {
+      if (data.taskId === task._id) {
+        setEditedTask((prev) => ({
+          ...prev,
+          attachments: [data.attachment, ...prev.attachments],
+        }));
+      }
     };
-  }, [isOpen, task?._id, accessToken]);
+
+    newSocket.on("attachment:new", handleNewAttachment);
+
+    // Upload comment
+    const handleCommentAttachment = (data) => {
+      if (data.taskId !== task._id || !Array.isArray(data.attachments)) return;
+      const valid = data.attachments.filter((a) => a?._id);
+      if (valid.length === 0) return;
+      setEditedTask((prev) => ({
+        ...prev,
+        attachments: [...valid, ...(prev.attachments || [])],
+      }));
+    };
+
+    newSocket.on("comment:attachment:new", handleCommentAttachment);
+
+    const handleDelete = (data) => {
+      if (data.taskId === task._id) {
+        handleDeleteAttachment(data.attachmentId);
+      }
+    };
+
+    newSocket.on("attachment:deleted", handleDelete);
+
+    return () => {
+      newSocket.emit("leaveBoard", task.boardId);
+      newSocket.disconnect();
+    };
+  }, [isOpen, task?._id, task?.boardId, accessToken]);
 
   // ============ API FUNCTIONS ============
 
@@ -134,23 +179,23 @@ const TaskModal = ({ task, isOpen, onClose, onTaskUpdate }) => {
     return res.data;
   };
 
-  const uploadAttachment = async (file) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("taskId", task._id);
+  // const uploadAttachment = async (file) => {
+  //   const formData = new FormData();
+  //   formData.append("file", file);
+  //   formData.append("taskId", task._id);
 
-    const res = await axios.post(
-      `${httpUrl}/api/v1/tasks-attachment`,
-      formData,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "multipart/form-data",
-        },
-      }
-    );
-    return res.data;
-  };
+  //   const res = await axios.post(
+  //     `${httpUrl}/api/v1/tasks-attachment`,
+  //     formData,
+  //     {
+  //       headers: {
+  //         Authorization: `Bearer ${accessToken}`,
+  //         "Content-Type": "multipart/form-data",
+  //       },
+  //     }
+  //   );
+  //   return res.data;
+  // };
 
   // ============ HANDLERS ============
 
@@ -168,36 +213,47 @@ const TaskModal = ({ task, isOpen, onClose, onTaskUpdate }) => {
     }
   };
 
-  const handleSaveDescription = async () => {
+  const handleSaveDescription = async (content = null) => {
     setLoading(true);
     try {
-      let content = "";
-      if (editorRef.current) {
-        content = editorRef.current.getContent().trim();
-      } else {
-        content = editedTask.description?.trim() || "";
+      let descriptionContent = content;
+
+      // Nếu không có content từ prop, thử lấy từ editorRef (nếu có)
+      if (!descriptionContent && editorRef.current) {
+        descriptionContent = editorRef.current.getContent().trim();
       }
 
-      const plainText = content
-        .replace(/<[^>]*>/g, "") // bỏ hết HTML tags
-        .replace(/&nbsp;/g, "") // bỏ khoảng trắng đặc biệt
-        .trim();
+      // Validate content
+      if (descriptionContent) {
+        const plainText = descriptionContent
+          .replace(/<[^>]*>/g, "")
+          .replace(/&nbsp;/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
 
-      if (!plainText) {
-        content = ""; // nếu rỗng thật sự, đặt thành ""
+        if (!plainText) {
+          descriptionContent = "";
+        }
       }
 
-      await updateTaskDescription(content);
+      console.log("📝 Saving description:", descriptionContent);
 
+      // Gọi API cập nhật
+      await updateTaskDescription(descriptionContent || "");
+
+      // Cập nhật state local
       setEditedTask((prev) => ({
         ...prev,
-        description: content,
+        description: descriptionContent || "",
       }));
 
       setIsEditingDescription(false);
       onTaskUpdate();
-    } catch (e) {
-      console.error("❌ Lỗi khi lưu mô tả:", e);
+
+      showToast("Mô tả đã được cập nhật", "success");
+    } catch (error) {
+      console.error("❌ Lỗi khi lưu mô tả:", error);
+      showToast("Lỗi khi cập nhật mô tả", "error");
     } finally {
       setLoading(false);
     }
@@ -255,10 +311,10 @@ const TaskModal = ({ task, isOpen, onClose, onTaskUpdate }) => {
     return (bytes / 1048576).toFixed(1) + " MB";
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return "";
-    return new Date(dateString).toLocaleDateString("vi-VN");
-  };
+  // const formatDate = (dateString) => {
+  //   if (!dateString) return "";
+  //   return new Date(dateString).toLocaleDateString("vi-VN");
+  // };
 
   // Show toast function
   const showToast = (message, type = "info") => {
@@ -274,17 +330,26 @@ const TaskModal = ({ task, isOpen, onClose, onTaskUpdate }) => {
     setUploadingFile(true);
     setUploadingFileName(file.name);
 
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("taskId", editedTask._id);
+
     try {
-      await uploadAttachment(file);
+      await axios.post(`${httpUrl}/api/v1/tasks-attachment`, formData, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
       showToast("Tệp đã được tải lên thành công", "success");
-      onTaskUpdate();
+      // Không cần onTaskUpdate() → socket sẽ tự cập nhật
     } catch (error) {
       console.error("Lỗi khi tải lên tệp:", error);
       showToast("Lỗi khi tải lên tệp", "error");
     } finally {
       setUploadingFile(false);
       setUploadingFileName("");
-      // Reset input để có thể chọn lại cùng file
       e.target.value = "";
     }
   };
@@ -368,6 +433,55 @@ const TaskModal = ({ task, isOpen, onClose, onTaskUpdate }) => {
     elementpath: false,
   };
 
+  // API CẬP NHẬT DEADLINE
+  const handleSaveDate = async () => {
+    setShowPopup(false);
+    setLoading(true);
+
+    try {
+      const payload = {
+        startDate: startDate ? startDate.toISOString() : null,
+        dueDate: dueDate ? dueDate.toISOString() : null,
+        reminderEnabled,
+        reminderTime: reminderMinutes,
+      };
+
+      // Gọi API update deadline
+      const response = await axios.put(
+        `${httpUrl}/api/v1/tasks/${task._id}/deadline`,
+        payload,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+
+      const updatedTask = response.data.data;
+
+      // Cập nhật state local ngay lập tức
+      setEditedTask((prev) => ({
+        ...prev,
+        ...updatedTask,
+      }));
+
+      showToast("Ngày giờ đã được cập nhật", "success");
+    } catch (error) {
+      console.error("❌ Cập nhật ngày giờ thất bại:", error);
+      showToast("Cập nhật ngày giờ thất bại", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOpenMembers = () => {
+    setShowMembersPopup(true);
+  };
+
+  // === XÓA FILE ===
+  const handleDeleteAttachment = (attachmentId) => {
+    setEditedTask((prev) => ({
+      ...prev,
+      attachments: prev.attachments.filter((a) => a._id !== attachmentId),
+    }));
+  };
+
   if (!isOpen) return null;
 
   if (!editedTask) {
@@ -384,115 +498,201 @@ const TaskModal = ({ task, isOpen, onClose, onTaskUpdate }) => {
   // ============ RENDER (Bố cục 2 cột) ============
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col h-full">
         {/* Header */}
-        <div className="flex justify-between items-start p-6 border-b border-gray-200">
-          <div className="flex-1 flex items-center gap-3">
-            <CheckIcon />
-            <div>
-              {isEditingTitle ? (
-                <input
-                  type="text"
-                  value={editedTask.title}
-                  onChange={(e) =>
-                    setEditedTask({ ...editedTask, title: e.target.value })
-                  }
-                  className="text-xl font-bold w-full px-2 py-1 border border-blue-500 rounded"
-                  autoFocus
-                  onBlur={handleSaveTitle}
-                  onKeyDown={(e) => e.key === "Enter" && handleSaveTitle()}
-                />
-              ) : (
-                <div
-                  className="text-xl font-bold text-gray-800 cursor-pointer hover:bg-gray-100 px-2 py-1 rounded"
-                  onClick={() => setIsEditingTitle(true)}
-                >
-                  {editedTask.title}
-                </div>
-              )}
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 p-2"
-          >
-            ✕
-          </button>
-        </div>
+        <TaskHeader
+          title={editedTask.title}
+          isEditingTitle={isEditingTitle}
+          onTitleChange={(e) =>
+            setEditedTask((prev) => ({ ...prev, title: e.target.value }))
+          }
+          onSaveTitle={handleSaveTitle}
+          onEditTitle={() => setIsEditingTitle(true)}
+          onClose={onClose} // ✅ Sửa thành onClose
+          startDate={editedTask.startDate}
+          dueDate={editedTask.dueDate}
+          onStartDateChange={(date) =>
+            setEditedTask((prev) => ({ ...prev, startDate: date }))
+          }
+          onDueDateChange={(date) =>
+            setEditedTask((prev) => ({ ...prev, dueDate: date }))
+          }
+        />
 
         {/* Thân modal chia 2 cột */}
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex-1 flex overflow-hidden min-h-0">
           {/* ============ CỘT TRÁI (Nội dung) ============ */}
-          <div className="flex-1 p-6 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto p-6 min-w-0">
             {/* --- Các nút hành động (Placeholder) --- */}
-            <div className="flex flex-wrap gap-2 mb-6">
+            <div className="flex flex-wrap gap-2 mb-6 relative">
+              <button
+                className="flex items-center gap-1 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded text-sm"
+                onClick={() => setShowPopup(!showPopup)}
+              >
+                <ClockIcon /> Thời gian
+              </button>
               <button className="flex items-center gap-1 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded text-sm">
-                <LabelIcon /> Nhãn
+                Nhãn
               </button>
               <button className="bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded text-sm">
                 Việc cần làm
               </button>
-              <button className="bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded text-sm">
-                Thành viên
+              <button
+                ref={membersButtonRef}
+                className="flex items-center gap-1 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded text-sm"
+                onClick={handleOpenMembers}
+              >
+                <UserIcon className="w-4 h-4" /> Thành viên
               </button>
+
+              {/* Popup */}
+              {showMembersPopup && (
+                <TaskMembersPopup
+                  boardId={task.boardId}
+                  taskId={task._id}
+                  onClose={() => setShowMembersPopup(false)}
+                  triggerRect={membersButtonRef.current?.getBoundingClientRect()}
+                  onMemberAssign={() => {
+                    // Cập nhật lại task hoặc toast
+                    setToast({
+                      show: true,
+                      type: "success",
+                      message: "Đã gán thành viên",
+                    });
+                  }}
+                  onMemberUnassign={() => {
+                    setToast({
+                      show: true,
+                      type: "success",
+                      message: "Đã bỏ gán thành viên",
+                    });
+                  }}
+                />
+              )}
+
+              {/* Nút thời gian */}
+              {showPopup && (
+                <TaskDatePickerPopup
+                  startDate={startDate}
+                  dueDate={dueDate}
+                  onStartDateChange={setStartDate}
+                  onDueDateChange={setDueDate}
+                  reminderEnabled={reminderEnabled}
+                  onReminderToggle={(e) => setReminderEnabled(e.target.checked)}
+                  reminderMinutes={reminderMinutes}
+                  onReminderMinutesChange={(e) =>
+                    setReminderMinutes(Number(e.target.value))
+                  }
+                  onClose={() => setShowPopup(false)}
+                  onSave={handleSaveDate}
+                />
+              )}
             </div>
 
-            {/* --- Ngày (Placeholder) --- */}
+            {/* --- Ngày & Trạng thái --- */}
             <div className="mb-6">
               <h3 className="text-xs font-semibold text-gray-500 mb-1">Ngày</h3>
-              <div className="flex items-center gap-2">
-                <span className="text-sm">4 thg 11 - 10:30 6 thg 11</span>
-                <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-sm">
-                  Hoàn tất
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm">
+                  {editedTask.startDate
+                    ? new Date(editedTask.startDate).toLocaleString("vi-VN", {
+                        day: "numeric",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : "Chưa có ngày bắt đầu"}{" "}
+                  -{" "}
+                  {editedTask.dueDate
+                    ? new Date(editedTask.dueDate).toLocaleString("vi-VN", {
+                        day: "numeric",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : "Chưa có ngày kết thúc"}
                 </span>
+
+                {/* === Trạng thái theo Trello === */}
+                {editedTask.status && (
+                  <span
+                    className={`
+          text-xs px-2 py-0.5 rounded-sm font-medium flex items-center gap-1
+          ${
+            editedTask.isCompleted === true
+              ? "bg-green-100 text-green-700"
+              : editedTask.status === "Quá hạn"
+              ? "bg-red-100 text-red-700"
+              : editedTask.status === "Gần tới hạn"
+              ? "bg-yellow-100 text-yellow-700"
+              : ""
+          }
+        `}
+                  >
+                    {editedTask.isCompleted === true && (
+                      <>
+                        <svg
+                          className="w-3 h-3"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        Hoàn tất
+                      </>
+                    )}
+                    {editedTask.status === "Quá hạn" && (
+                      <>
+                        <svg
+                          className="w-3 h-3"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        Quá hạn
+                      </>
+                    )}
+                    {editedTask.status === "Gần tới hạn" && (
+                      <>
+                        <svg
+                          className="w-3 h-3"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.414-1.414L11 9.586V6z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        Gần tới hạn
+                      </>
+                    )}
+                  </span>
+                )}
               </div>
             </div>
 
             {/* --- Mô tả (Giữ nguyên logic) --- */}
-            <div className="mb-6">
-              <h3 className="font-semibold text-gray-700 mb-2">Mô tả</h3>
-              {isEditingDescription ? (
-                <div className="border border-gray-300 rounded-lg overflow-hidden">
-                  <Editor
-                    apiKey={tinyApiKey}
-                    onInit={(evt, editor) => (editorRef.current = editor)}
-                    initialValue={editedTask.description || ""}
-                    init={descriptionEditorConfig}
-                  />
-                  <div className="flex gap-2 mt-2 p-3 bg-gray-50 border-t">
-                    <button
-                      onClick={handleSaveDescription}
-                      disabled={loading}
-                      className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      {loading ? "Đang lưu..." : "Lưu"}
-                    </button>
-                    <button
-                      onClick={handleCancelDescription}
-                      className="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded"
-                    >
-                      Hủy
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div
-                  className="min-h-12 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100"
-                  onClick={() => setIsEditingDescription(true)}
-                >
-                  {editedTask.description ? (
-                    <div
-                      className="text-gray-700 prose prose-sm max-w-none"
-                      dangerouslySetInnerHTML={{
-                        __html: editedTask.description,
-                      }}
-                    />
-                  ) : (
-                    <p className="text-gray-500">Thêm mô tả chi tiết hơn...</p>
-                  )}
-                </div>
-              )}
-            </div>
+            <TaskDescription
+              description={editedTask?.description || ""}
+              isEditingDescription={isEditingDescription}
+              onEditDescription={setIsEditingDescription}
+              onSaveDescription={handleSaveDescription} // Truyền hàm xử lý lưu
+              onCancelDescription={handleCancelDescription}
+              loading={loading}
+              tinyApiKey={tinyApiKey}
+              descriptionEditorConfig={descriptionEditorConfig}
+            />
 
             {/* --- Tệp đính kèm --- */}
             <div className="mb-6">
@@ -511,7 +711,7 @@ const TaskModal = ({ task, isOpen, onClose, onTaskUpdate }) => {
                 </label>
               </div>
 
-              {/* Uploading file indicator */}
+              {/* Uploading indicator */}
               {uploadingFile && (
                 <div className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg mb-2">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
@@ -521,64 +721,23 @@ const TaskModal = ({ task, isOpen, onClose, onTaskUpdate }) => {
                     </p>
                     <p className="text-xs text-blue-600">{uploadingFileName}</p>
                   </div>
-                  <div className="w-20 bg-blue-200 rounded-full h-1.5">
-                    <div className="bg-blue-600 h-1.5 rounded-full animate-pulse"></div>
-                  </div>
                 </div>
               )}
 
               {/* File list */}
               {editedTask.attachments?.length > 0 ? (
-                <ul className="space-y-2">
+                <div className="grid grid-cols-2 gap-3">
                   {editedTask.attachments.map((file) => (
-                    <li key={file._id} className="group">
-                      <div className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg transition-colors">
-                        {/* File icon based on type */}
-                        <div className="flex-shrink-0 w-8 h-8 bg-gray-100 rounded flex items-center justify-center">
-                          {getFileIcon(file.fileName)}
-                        </div>
-
-                        {/* File info */}
-                        <div className="flex-1 min-w-0">
-                          <a
-                            href={file.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm font-medium text-gray-700 hover:text-blue-600 block truncate"
-                          >
-                            {file.fileName}
-                          </a>
-                          <p className="text-xs text-gray-500">
-                            {formatFileSize(file.size)} •{" "}
-                            {formatDate(file.createdAt)}
-                          </p>
-                        </div>
-
-                        {/* Download button */}
-                        <a
-                          href={file.url}
-                          download={file.fileName}
-                          className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-blue-600 transition-opacity"
-                          title="Tải xuống"
-                        >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                            />
-                          </svg>
-                        </a>
-                      </div>
-                    </li>
+                    <AttachmentItem
+                      key={file._id}
+                      file={file}
+                      getFileIcon={getFileIcon}
+                      formatFileSize={formatFileSize}
+                      onDelete={handleDeleteAttachment}
+                      accessToken={accessToken}
+                    />
                   ))}
-                </ul>
+                </div>
               ) : (
                 !uploadingFile && (
                   <p className="text-sm text-gray-500 py-2">
@@ -609,65 +768,16 @@ const TaskModal = ({ task, isOpen, onClose, onTaskUpdate }) => {
           </div>
 
           {/* ============ CỘT PHẢI (Nhận xét / Hoạt động) ============ */}
-          <div className="w-2/5 p-6 bg-gray-50 border-l border-gray-200 overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-semibold text-gray-700">
-                Nhận xét và hoạt động
-              </h3>
-              <button className="text-sm bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded">
-                Hiện chi tiết
-              </button>
-            </div>
-
-            {/* --- Viết bình luận --- */}
-            <div className="mb-6">
-              <Editor
-                apiKey={tinyApiKey}
-                onInit={(evt, editor) => (commentEditorRef.current = editor)}
-                initialValue={""}
-                init={commentEditorConfig}
-              />
-              <div className="flex items-center gap-4 mt-2">
-                <button
-                  className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                  onClick={() => {
-                    // TODO: Gọi API lưu comment
-                    // const commentContent = commentEditorRef.current.getContent();
-                    console.log(
-                      "Lưu comment:",
-                      commentEditorRef.current.getContent()
-                    );
-                    // Sau khi lưu, bạn có thể muốn xóa nội dung editor
-                    // commentEditorRef.current.setContent('');
-                    // Và tải lại danh sách hoạt động/comment
-                  }}
-                >
-                  Lưu
-                </button>
-                <label className="flex items-center gap-1 text-sm text-gray-600">
-                  <input type="checkbox" defaultChecked /> Theo dõi
-                </label>
-              </div>
-            </div>
-
-            {/* --- Luồng hoạt động (Placeholder) --- */}
-            <div className="space-y-4">
-              {/* Đây là nơi bạn sẽ map qua mảng comments/activities */}
-              <div className="flex gap-2">
-                <span className="flex-shrink-0 flex items-center justify-center h-8 w-8 rounded-full bg-green-600 text-white font-bold text-sm">
-                  V
-                </span>
-                <div>
-                  <p className="text-sm">
-                    <span className="font-semibold">vũ</span> đã thêm thẻ này
-                    vào danh sách Thêm task mới
-                  </p>
-                  <span className="text-xs text-gray-500">
-                    10:30 4 thg 11, 2025
-                  </span>
-                </div>
-              </div>
-            </div>
+          <div className="w-2/5 min-w-0 flex flex-col bg-gray-50 border-l border-gray-200">
+            <TaskActivityPanel
+              taskId={editedTask._id}
+              boardId={task.boardId}
+              tinyApiKey={tinyApiKey}
+              commentEditorConfig={commentEditorConfig}
+              accessToken={accessToken}
+              socket={socket}
+              activities={activities}
+            />
           </div>
         </div>
       </div>
