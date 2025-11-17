@@ -3,9 +3,22 @@ import { useParams } from "react-router-dom";
 import { io } from "socket.io-client";
 import axios from "axios";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
-import { Plus, X, Trash2 } from "lucide-react";
+import {
+  Plus,
+  X,
+  Trash2,
+  CheckCircle2,
+  Circle,
+  MessageSquare,
+  Paperclip,
+  CheckSquare,
+  Clock,
+  AlertCircle,
+  Tag,
+} from "lucide-react";
 import TaskModal from "../components/TaskModal";
 import HeaderBoard from "../components/HeaderBoard";
+import { format } from "date-fns";
 
 const httpUrl = import.meta.env.VITE_API_URL;
 
@@ -166,42 +179,32 @@ export default function BoardDetail() {
       );
     });
 
-    // Xử lý taskMoved đúng cách
-
+    // Xử lý khi di chuyển task
     socket.on("taskMoved", (data) => {
-      console.log("🚀 Task moved, applying server state:", data);
+      console.log("Task moved - FULL DATA:", data);
 
-      setColumns((prevColumns) => {
-        // Ánh xạ qua các cột để tạo state mới
-        return prevColumns.map((col) => {
-          // 1. Nếu cột này là CỘT ĐÍCH (destination)
-          // Cập nhật nó bằng danh sách MỚI NHẤT từ server.
-          // Đây là "Nguồn chân lý" (Single Source of Truth).
+      setColumns((prev) => {
+        return prev.map((col) => {
           if (col._id === data.destinationColumnId) {
             return {
               ...col,
-              // Thay thế hoàn toàn tasks bằng danh sách server gửi
-              // (data.tasksInDestination đã được sắp xếp sẵn)
               tasks: data.tasksInDestination.map((task) => ({
                 ...task,
-                _id: task.id, // Đảm bảo _id nhất quán nếu backend gửi 'id'
+                _id: task._id,
               })),
             };
           }
 
-          // 2. Nếu cột này là CỘT NGUỒN (source) (và không phải cột đích)
-          // Chỉ cần LỌC BỎ task đã bị di chuyển đi.
           if (
             col._id === data.sourceColumnId &&
             data.sourceColumnId !== data.destinationColumnId
           ) {
             return {
               ...col,
-              tasks: col.tasks.filter((task) => task._id !== data.movedTaskId),
+              tasks: col.tasks.filter((t) => t._id !== data.movedTaskId),
             };
           }
 
-          // 3. Nếu không phải cả hai, giữ nguyên cột
           return col;
         });
       });
@@ -220,6 +223,87 @@ export default function BoardDetail() {
         }))
       );
     });
+
+    // xử lý task khi status = Gần tới
+    socket.on("taskNearDeadline", (data) => {
+      console.log("✅ Task's deadline is upcomming:", data);
+      setColumns((prevColumns) =>
+        prevColumns.map((col) => ({
+          ...col,
+          tasks: col.tasks.map((task) =>
+            task._id === data.taskId ? { ...task, status: data.status } : task
+          ),
+        }))
+      );
+    });
+
+    // Xử lý khi comment mới
+    socket.on("comment:new", (data) => {
+      setColumns((prev) =>
+        prev.map((col) => ({
+          ...col,
+          tasks: col.tasks.map((t) =>
+            t._id === data.taskId
+              ? { ...t, totalComments: data.totalComments }
+              : t
+          ),
+        }))
+      );
+    });
+
+    socket.on("comment:deleted", (data) => {
+      setColumns((prev) =>
+        prev.map((col) => ({
+          ...col,
+          tasks: col.tasks.map((t) =>
+            t._id === data.taskId
+              ? { ...t, totalComments: data.totalComments }
+              : t
+          ),
+        }))
+      );
+    });
+
+
+    // Xử lý khi có file đính kèm mới
+    socket.on("attachment:new", (data) => {
+      setColumns((prev) => 
+        prev.map((col) => ({
+          ...col,
+          tasks: col.tasks.map((t) =>
+            t._id === data.taskId
+              ? { ...t, totalAttachments: data.totalAttachments }
+              : t
+          ),
+        }))
+      )
+    })
+
+    socket.on("comment:attachment:new", (data) => {
+      setColumns((prev) => 
+        prev.map((col) => ({
+          ...col,
+          tasks: col.tasks.map((t) =>
+            t._id === data.taskId
+              ? { ...t, totalAttachments: data.totalAttachments }
+              : t
+          ),
+        }))
+      )
+    })
+
+    socket.on("attachment:deleted", (data) => {
+      setColumns((prev) => 
+        prev.map((col) => ({
+          ...col,
+          tasks: col.tasks.map((t) =>
+            t._id === data.taskId
+              ? { ...t, totalAttachments: data.totalAttachments }
+              : t
+          ),
+        }))
+      )
+    })
 
     return () => {
       socket.emit("leaveBoard", boardId);
@@ -463,9 +547,28 @@ export default function BoardDetail() {
     return { backgroundColor: "#f0f2f5" };
   };
 
+  // Helper: Xác định trạng thái hạn
+  const getDueDateStatus = (dueDate, isCompleted) => {
+    if (isCompleted || !dueDate) return null;
+    const today = new Date();
+    const due = new Date(dueDate);
+    const diffTime = due.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0)
+      return { text: "Quá hạn", color: "bg-red-100 text-red-700" };
+    if (diffDays <= 1)
+      return { text: "Gần tới hạn", color: "bg-yellow-100 text-yellow-700" };
+    return null;
+  };
+
   return (
     <div className="flex flex-col h-screen overflow-hidden">
-      <HeaderBoard board={board} boardTitle={boardTitle} onBoardUpdate={handleBoardUpdate}/>
+      <HeaderBoard
+        board={board}
+        boardTitle={boardTitle}
+        onBoardUpdate={handleBoardUpdate}
+      />
 
       <main
         className="flex-1 flex gap-4 overflow-x-auto p-4"
@@ -530,72 +633,98 @@ export default function BoardDetail() {
                           </div>
 
                           {/* Tasks List */}
+                          {/* Tasks List */}
                           <Droppable droppableId={col._id} type="TASK">
                             {(provided, snapshot) => (
                               <div
                                 ref={provided.innerRef}
                                 {...provided.droppableProps}
                                 className={`min-h-[100px] transition-colors duration-200 rounded-lg ${
-                                  snapshot.isDraggingOver ? "bg-blue-50" : ""
+                                  snapshot.isDraggingOver ? "bg-blue-50/50" : ""
                                 }`}
                               >
-                                {(col.tasks || []).map((task, index) => (
-                                  <Draggable
-                                    key={task._id}
-                                    draggableId={task._id}
-                                    index={index}
-                                  >
-                                    {(provided, snapshot) => (
-                                      <div
-                                        ref={provided.innerRef}
-                                        {...provided.draggableProps}
-                                        {...provided.dragHandleProps}
-                                        className={`mb-2 cursor-grab active:cursor-grabbing ${
-                                          snapshot.isDragging
-                                            ? "rotate-3 shadow-lg"
-                                            : ""
-                                        } transition-transform duration-200`}
-                                      >
+                                {(col.tasks || []).map((task, index) => {
+                                  const dueStatus = getDueDateStatus(
+                                    task.dueDate,
+                                    task.isCompleted
+                                  );
+                                  const hasChecklist = task.totalChecklists > 0;
+                                  const completedItems =
+                                    task.totalChecklistItems || 0;
+                                  const totalItems = task.totalChecklists || 0;
+
+                                  return (
+                                    <Draggable
+                                      key={task._id}
+                                      draggableId={task._id}
+                                      index={index}
+                                    >
+                                      {(provided, snapshot) => (
                                         <div
-                                          onClick={() => handleTaskClick(task)}
-                                          className={`bg-white rounded-lg shadow-sm p-3 cursor-pointer hover:shadow-md transition-all duration-200 border border-gray-200 ${
-                                            task.isCompleted ? "bg-gray-50" : ""
+                                          ref={provided.innerRef}
+                                          {...provided.draggableProps}
+                                          {...provided.dragHandleProps}
+                                          className={`mb-2 cursor-grab active:cursor-grabbing transition-all duration-200 ${
+                                            snapshot.isDragging
+                                              ? "rotate-3 shadow-xl scale-105"
+                                              : ""
                                           }`}
                                         >
-                                          <div className="flex items-start gap-3">
-                                            <button
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleToggleTaskComplete(
-                                                  task._id,
-                                                  !task.isCompleted
-                                                );
-                                              }}
-                                              className={`flex-shrink-0 w-5 h-5 rounded-full border-2 mt-0.5 transition-all duration-200 flex items-center justify-center ${
-                                                task.isCompleted
-                                                  ? "bg-green-500 border-green-500"
-                                                  : "border-gray-300 hover:border-green-400 hover:bg-green-50"
-                                              }`}
-                                            >
-                                              {task.isCompleted && (
-                                                <svg
-                                                  className="w-3 h-3 text-white"
-                                                  fill="none"
-                                                  stroke="currentColor"
-                                                  viewBox="0 0 24 24"
-                                                >
-                                                  <path
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    strokeWidth={3}
-                                                    d="M5 13l4 4L19 7"
-                                                  />
-                                                </svg>
+                                          <div
+                                            onClick={() =>
+                                              handleTaskClick(task)
+                                            }
+                                            className={`group bg-white rounded-lg shadow-sm p-3 cursor-pointer hover:shadow-lg transition-all duration-200 border border-gray-200/80 ${
+                                              task.isCompleted
+                                                ? "opacity-75 bg-gray-50"
+                                                : ""
+                                            }`}
+                                          >
+                                            {/* Labels */}
+                                            {task.taskLabels &&
+                                              task.taskLabels.length > 0 && (
+                                                <div className="flex flex-wrap gap-1 mb-2">
+                                                  {task.taskLabels.map(
+                                                    (label) => (
+                                                      <span
+                                                        key={label._id}
+                                                        className="px-2 py-0.5 rounded-full text-[10px] font-semibold text-white"
+                                                        style={{
+                                                          backgroundColor:
+                                                            label.color,
+                                                        }}
+                                                      >
+                                                        {label.title}
+                                                      </span>
+                                                    )
+                                                  )}
+                                                </div>
                                               )}
-                                            </button>
-                                            <div className="flex-1 min-w-0">
+
+                                            {/* Title + Checkbox */}
+                                            <div className="flex items-start gap-2">
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleToggleTaskComplete(
+                                                    task._id,
+                                                    !task.isCompleted
+                                                  );
+                                                }}
+                                                className={`flex-shrink-0 w-5 h-5 rounded-full border-2 mt-0.5 transition-all duration-200 flex items-center justify-center ${
+                                                  task.isCompleted
+                                                    ? "bg-green-500 border-green-500"
+                                                    : "border-gray-300 hover:border-green-400 hover:bg-green-50"
+                                                }`}
+                                              >
+                                                {task.isCompleted ? (
+                                                  <CheckCircle2 className="w-3 h-3 text-white" />
+                                                ) : (
+                                                  <Circle className="w-3.5 h-3.5 text-gray-400" />
+                                                )}
+                                              </button>
                                               <p
-                                                className={`text-sm font-medium text-gray-800 ${
+                                                className={`flex-1 text-sm font-medium text-gray-800 leading-tight ${
                                                   task.isCompleted
                                                     ? "line-through text-gray-500"
                                                     : ""
@@ -604,16 +733,85 @@ export default function BoardDetail() {
                                                 {task.title}
                                               </p>
                                             </div>
+
+                                            {/* Due Date & Status Badge */}
+                                            {(task.dueDate || dueStatus) && (
+                                              <div className="flex items-center gap-1 mt-2 text-xs">
+                                                <Clock className="w-3.5 h-3.5 text-gray-500" />
+                                                <span className="text-gray-600">
+                                                  {task.dueDate
+                                                    ? format(
+                                                        new Date(task.dueDate),
+                                                        "dd MMM"
+                                                      )
+                                                    : ""}
+                                                </span>
+                                                {dueStatus && (
+                                                  <span
+                                                    className={`ml-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${dueStatus.color}`}
+                                                  >
+                                                    {dueStatus.text}
+                                                  </span>
+                                                )}
+                                              </div>
+                                            )}
+
+                                            {/* Footer: Checklist, Comments, Attachments */}
+                                            {(hasChecklist ||
+                                              task.totalComments > 0 ||
+                                              task.totalAttachments > 0) && (
+                                              <div className="flex items-center gap-3 mt-3 text-xs text-gray-500">
+                                                {/* Checklist */}
+                                                {hasChecklist && (
+                                                  <div className="flex items-center gap-1">
+                                                    <CheckSquare className="w-4 h-4 text-gray-500" />
+                                                    <span
+                                                      className={
+                                                        completedItems ===
+                                                        totalItems
+                                                          ? "text-green-600 font-medium"
+                                                          : ""
+                                                      }
+                                                    >
+                                                      {completedItems}/
+                                                      {totalItems}
+                                                    </span>
+                                                  </div>
+                                                )}
+
+                                                {/* Comments */}
+                                                {task.totalComments > 0 && (
+                                                  <div className="flex items-center gap-1">
+                                                    <MessageSquare className="w-4 h-4" />
+                                                    <span>
+                                                      {task.totalComments}
+                                                    </span>
+                                                  </div>
+                                                )}
+
+                                                {/* Attachments */}
+                                                {task.totalAttachments > 0 && (
+                                                  <div className="flex items-center gap-1">
+                                                    <Paperclip className="w-4 h-4" />
+                                                    <span>
+                                                      {task.totalAttachments}
+                                                    </span>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            )}
                                           </div>
                                         </div>
-                                      </div>
-                                    )}
-                                  </Draggable>
-                                ))}
+                                      )}
+                                    </Draggable>
+                                  );
+                                })}
                                 {provided.placeholder}
+
+                                {/* Empty state */}
                                 {(col.tasks || []).length === 0 && (
-                                  <div className="text-center py-4 text-gray-400 text-sm">
-                                    (Chưa có thẻ)
+                                  <div className="text-center py-6 text-gray-400 text-sm italic">
+                                    (Chưa có thẻ nào)
                                   </div>
                                 )}
                               </div>

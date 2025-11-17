@@ -10,6 +10,7 @@ const columnRouter = require("./routers/columnRouter");
 const taskRouter = require("./routers/taskRouter");
 const labelRouter = require("./routers/labelRouter");
 const commentRouter = require("./routers/commentRouter");
+const taskAssigneeRouter = require("./routers/taskAssigneeRouter");
 const { initSocket } = require("./config/socket");
 const cors = require("cors");
 const http = require("http");
@@ -47,7 +48,11 @@ app.use(columnRouter);
 app.use(taskRouter);
 app.use(labelRouter);
 app.use(commentRouter);
+<<<<<<< HEAD
 app.use("/api/ai", aiRouter);
+=======
+app.use(taskAssigneeRouter);
+>>>>>>> e8369edc18b8af4a9b2a5ec42d99e028abb237eb
 
 server.listen(PORT, () => {
   console.log(`http://localhost:${PORT}`);

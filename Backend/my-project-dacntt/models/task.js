@@ -32,6 +32,7 @@ const taskSchema = new mongoose.Schema(
     position: { type: Number, required: true },
     isArchived: { type: Boolean, default: false },
     isCompleted: { type: Boolean, default: false },
+    status: { type: String, default: null },
   },
   {
     timestamps: true,

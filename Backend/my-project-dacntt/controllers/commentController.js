@@ -16,18 +16,9 @@ const deleteUploadedFileCloudinary = async (file) => {
 
 const sendMessage = async (req, res) => {
   try {
-    const userId = req.user.userId; // người nhắn
+    const userId = req.user.userId;
     const { taskId, message } = req.body;
 
-    if (!message && !req.file) {
-      return res.status(400).json({
-        status: "error",
-        code: 400,
-        message: "Cần nhập nội dung hoặc file đính kèm",
-      });
-    }
-
-    // Kiểm tra user để lấy fullName, avatar
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({
@@ -37,7 +28,6 @@ const sendMessage = async (req, res) => {
       });
     }
 
-    // 1. Kiểm tra task
     const task = await Task.findById(taskId);
     if (!task) {
       await deleteUploadedFileCloudinary(req.file);
@@ -48,7 +38,7 @@ const sendMessage = async (req, res) => {
       });
     }
 
-    // 2. Tạo comment
+    // Tạo comment
     const newComment = await Comment.create({
       taskId,
       userId,
@@ -56,12 +46,14 @@ const sendMessage = async (req, res) => {
       isEdited: false,
     });
 
-    // 3. Nếu có gửi file upload
+    const io = getIO();
     let attachments = [];
+
+    // Xử lý file
     if (req.files && req.files.length > 0) {
       const createdAttachments = await Promise.all(
         req.files.map(async (file) => {
-          return await Attachment.create({
+          const attachment = await Attachment.create({
             taskId,
             commentId: newComment._id,
             uploadedBy: userId,
@@ -72,38 +64,76 @@ const sendMessage = async (req, res) => {
             fileSize: file.size,
             uploadedAt: new Date(),
           });
+          return attachment.toObject(); // ĐẢM BẢO _id
         })
       );
       attachments = createdAttachments;
+
+      // Cập nhật totalAttachments
+      const totalAttachments = await Attachment.countDocuments({ taskId });
+      io.to(task.boardId.toString()).emit("comment:attachment:new", {
+        taskId,
+        totalAttachments,
+        attachments
+      });
     }
 
-    // 4. Gửi lên Socket - cập nhật realtime
-    const io = getIO();
-    io.to(task.boardId.toString()).emit("comment:new", {
+    // Tổng comment
+    const totalComments = await Comment.countDocuments({ taskId });
+
+    // === SOCKET EMIT – ĐẦY ĐỦ _id ===
+    const payload = {
       taskId,
       comment: {
         _id: newComment._id,
         message: newComment.message,
         createdAt: newComment.createdAt,
-        userId,
-        fullName: user.fullName,
-        avatar: user.avatar,
-        attachments,
+        isEdited: false,
+        user: {
+          _id: userId,
+          fullName: user.fullName,
+          avatar: user.avatar,
+        },
+        attachments: attachments.map(att => ({
+          _id: att._id,
+          fileName: att.fileName,
+          fileUrl: att.fileUrl,
+          fileSize: att.fileSize,
+          fileType: att.fileType,
+        })),
+        emojiSummary: [],
       },
-    });
+      totalComments,
+    };
 
+    io.to(task.boardId.toString()).emit("comment:new", payload);
+
+    // === HTTP RESPONSE ===
     return res.status(201).json({
       status: "success",
       code: 201,
       message: "Gửi bình luận thành công",
       data: {
+        userId,
         fullName: user.fullName,
         avatar: user.avatar,
-        comment: newComment,
-        attachments,
+        comment: {
+          _id: newComment._id,
+          message: newComment.message,
+          createdAt: newComment.createdAt,
+          isEdited: false,
+        },
+        attachments: attachments.map(att => ({
+          _id: att._id,
+          fileName: att.fileName,
+          fileUrl: att.fileUrl,
+          fileSize: att.fileSize,
+          fileType: att.fileType,
+        })),
       },
     });
   } catch (error) {
+    console.error("sendMessage error:", error);
     return res.status(500).json({
       status: "error",
       code: 500,
@@ -122,6 +152,11 @@ const getAllComments = async (req, res) => {
     limit = parseInt(limit) || 10;
 
     const skip = (page - 1) * limit;
+
+    // Đếm tổng số comment TRƯỚC khi phân trang
+    const totalComments = await Comment.countDocuments({
+      taskId: new mongoose.Types.ObjectId(taskId),
+    });
 
     const comments = await Comment.aggregate([
       {
@@ -222,14 +257,15 @@ const getAllComments = async (req, res) => {
       },
     ]);
 
-    const totalComments = comments.length;
+    const totalPages = Math.ceil(totalComments / limit);
+
     return res.status(200).json({
       status: "success",
       code: 200,
       message: "Danh sách thảo luận trong task",
       page,
       limit,
-      totalPages: Math.ceil(totalComments / limit),
+      totalPages,
       totalComments,
       data: comments,
     });
@@ -276,35 +312,33 @@ const deleteComment = async (req, res) => {
       });
     }
 
-    // 4. Xử lý xóa toàn bộ attachment của comment
+    // 4. GỠ LIÊN KẾT attachment khỏi comment (không xóa file)
     const attachments = await Attachment.find({ commentId });
 
     if (attachments.length > 0) {
-      // Xóa file trên Cloudinary
-      for (const att of attachments) {
-        try {
-          await cloudinary.uploader.destroy(att.filePublicId);
-        } catch (err) {
-          console.warn(
-            "Không thể xóa file Cloudinary:",
-            att.filePublicId,
-            err.message
-          );
-        }
-      }
-
-      // Xóa trong DB
-      await Attachment.deleteMany({ commentId });
+      await Attachment.updateMany(
+        { _id: { $in: attachments.map((att) => att._id) } },
+        { $set: { commentId: null } }
+      );
     }
+
+    // Xóa các emoji có trong comment
+    await EmojiReaction.deleteMany({ commentId });
 
     // 5. Xóa comment
     await Comment.deleteOne({ _id: comment._id });
+
+    // Tính lại tổng số comments hiện có
+    const totalComments = await Comment.countDocuments({
+      taskId: comment.taskId,
+    });
 
     // 6. Gửi realtime qua socket
     const io = getIO();
     io.to(task.boardId.toString()).emit("comment:deleted", {
       taskId: task._id,
       commentId,
+      totalComments,
     });
 
     return res.status(200).json({

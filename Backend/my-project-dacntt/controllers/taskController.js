@@ -3,9 +3,12 @@ const Column = require("../models/column");
 const Label = require("../models/label");
 const TaskLabel = require("../models/taskLabel");
 const Attachment = require("../models/attachment");
+const Comment = require("../models/comment");
+const Checklist = require("../models/checklist");
 const { getIO } = require("../config/socket");
 const cloudinary = require("../config/cloudinary");
 const { ObjectId } = require("mongodb");
+const reminderQueue = require("../services/reminderQueue");
 
 const addTask = async (req, res) => {
   try {
@@ -147,6 +150,80 @@ const updateTaskTitle = async (req, res) => {
   }
 };
 
+const getFullTaskWithTotals = async (taskId) => {
+  const task = await Task.findById(taskId);
+  if (!task) return null;
+
+  // Lấy checklists + items
+  const checklists = await Checklist.aggregate([
+    { $match: { taskId: new ObjectId(taskId) } },
+    {
+      $lookup: {
+        from: "checklistitems",
+        localField: "_id",
+        foreignField: "checklistId",
+        as: "checklistitems",
+      },
+    },
+    {
+      $addFields: {
+        totalItems: { $size: "$checklistitems" },
+        completedItems: {
+          $size: {
+            $filter: {
+              input: "$checklistitems",
+              as: "item",
+              cond: { $eq: ["$$item.isCompleted", true] },
+            },
+          },
+        },
+      },
+    },
+  ]);
+
+  // Lấy comments
+  const comments = await Comment.find({ taskId: new ObjectId(taskId) });
+
+  // Lấy attachments
+  const attachments = await Attachment.find({ taskId: new ObjectId(taskId) });
+
+  // Lấy labels
+  const taskLabels = await TaskLabel.aggregate([
+    { $match: { taskId: new ObjectId(taskId) } },
+    {
+      $lookup: {
+        from: "labels",
+        localField: "labelId",
+        foreignField: "_id",
+        as: "labelDetails",
+      },
+    },
+    { $unwind: "$labelDetails" },
+    {
+      $project: {
+        _id: 0,
+        labelId: "$labelId",
+        title: "$labelDetails.title",
+        color: "$labelDetails.color",
+      },
+    },
+  ]);
+
+  return {
+    _id: task._id,
+    title: task.title,
+    position: task.position,
+    isCompleted: task.isCompleted,
+    dueDate: task.dueDate,
+    totalChecklists: checklists.length,
+    totalChecklistItems: checklists.reduce((sum, c) => sum + c.totalItems, 0),
+    totalComments: comments.length,
+    totalAttachments: attachments.length,
+    taskLabels,
+  };
+};
+
+
 const moveTask = async (req, res) => {
   try {
     const taskId = req.params.taskId;
@@ -155,8 +232,6 @@ const moveTask = async (req, res) => {
     destinationIndex = Number(destinationIndex);
     if (Number.isNaN(destinationIndex)) destinationIndex = undefined;
 
-    // 1. Lấy task và tất cả task ở cột ĐÍCH
-    // Dùng Promise.all để chạy song song 2 query
     const [task, tasksInDestCol] = await Promise.all([
       Task.findById(taskId),
       Task.find({
@@ -172,19 +247,16 @@ const moveTask = async (req, res) => {
       });
     }
 
-    // Lọc task đang di chuyển ra khỏi danh sách đích (chỉ có tác dụng nếu di chuyển trong cùng 1 column)
     const allTasks = tasksInDestCol.filter(
       (t) => t._id.toString() !== taskId.toString()
     );
 
-    // 2. Chuẩn hóa destinationIndex
     if (destinationIndex === undefined) {
       destinationIndex = allTasks.length;
     }
     if (destinationIndex < 0) destinationIndex = 0;
     if (destinationIndex > allTasks.length) destinationIndex = allTasks.length;
 
-    // 3. Tính toán vị trí mới (Logic fractional indexing của bạn đã rất chuẩn)
     let newPosition;
     if (allTasks.length === 0) {
       newPosition = 1000;
@@ -198,16 +270,12 @@ const moveTask = async (req, res) => {
       newPosition = (prev.position + next.position) / 2;
     }
 
-    // 4. Cập nhật task và lưu
     const oldColumnId = task.columnId;
-
     task.columnId = destinationColumnId;
     task.position = newPosition;
-    task.isArchived = false; // Đảm bảo task "sống lại"
+    task.isArchived = false;
     await task.save();
 
-    // 5. Kiểm tra Re-index
-    // Thêm task vừa cập nhật vào danh sách (đúng vị trí) để kiểm tra
     let updatedTasks = [...allTasks];
     updatedTasks.splice(destinationIndex, 0, task);
 
@@ -221,64 +289,62 @@ const moveTask = async (req, res) => {
       }
     }
 
-    // 6. XỬ LÝ RE-INDEX (TỐI ƯU HÓA)
     if (needReindex) {
-      console.log(
-        "⚙️ Re-index lại position cho tasks trong column:",
-        destinationColumnId
-      );
+      console.log("Re-index column:", destinationColumnId);
       const spacing = 1000;
-
-      // Tạo một mảng các thao tác "update"
       const bulkOps = updatedTasks.map((t, i) => ({
         updateOne: {
           filter: { _id: t._id },
           update: { $set: { position: (i + 1) * spacing } },
         },
       }));
-
-      // Chạy 1 lệnh bulkWrite duy nhất
       await Task.bulkWrite(bulkOps);
 
-      // Tải lại danh sách task LẦN CUỐI (vì position đã thay đổi hoàn toàn)
       updatedTasks = await Task.find({
         columnId: destinationColumnId,
         isArchived: false,
       }).sort({ position: 1 });
     }
 
-    // 7. Emit Socket
+    // LẤY FULL DATA CHO TẤT CẢ TASK TRONG CỘT ĐÍCH
+    const fullTasksInDestination = await Promise.all(
+      updatedTasks.map((t) => getFullTaskWithTotals(t._id))
+    );
+
+    const fullMovedTask = fullTasksInDestination.find(t => t._id.toString() === taskId);
+
+    // EMIT SOCKET
     const io = getIO();
     io.to(task.boardId.toString()).emit("taskMoved", {
-      boardId: task.boardId,
+      boardId: task.boardId.toString(),
       sourceColumnId: oldColumnId.toString(),
       destinationColumnId: destinationColumnId,
-      movedTaskId: task._id,
+      movedTaskId: task._id.toString(),
+      destinationIndex,
       reindexed: needReindex,
-
-      // Gửi danh sách tasks đã được re-index của cột ĐÍCH
-      tasksInDestination: updatedTasks.map((t) => ({
-        id: t._id,
-        title: t.title,
-        position: t.position,
-        columnId: t.columnId,
-      })),
+      tasksInDestination: fullTasksInDestination,
+      movedTask: fullMovedTask,
     });
 
-    // 8. Trả về Response
     return res.status(200).json({
       status: "success",
-      message: "Cập nhật vị trí task thành công",
+      message: "Di chuyển task thành công",
       data: {
         taskId: task._id,
         newPosition: task.position,
         destinationColumnId,
         reindexed: needReindex,
-        tasks: updatedTasks.map((t) => ({
-          // Trả về danh sách đã re-index (nếu có)
-          id: t._id,
+        tasks: fullTasksInDestination.map(t => ({
+          _id: t._id,
           title: t.title,
           position: t.position,
+          isCompleted: t.isCompleted,
+          dueDate: t.dueDate,
+          totalComments: t.totalComments,
+          totalAttachments: t.totalAttachments,
+          totalChecklists: t.totalChecklists,
+          totalChecklistItems: t.totalChecklistItems,
+          taskLabels: t.taskLabels,
         })),
       },
     });
@@ -291,12 +357,13 @@ const moveTask = async (req, res) => {
   }
 };
 
+
+
 const updateDeadlineTask = async (req, res) => {
   try {
     const taskId = req.params.taskId;
     const { startDate, dueDate, reminderEnabled, reminderTime } = req.body;
 
-    // Validate taskId
     if (!taskId) {
       return res.status(400).json({
         status: "error",
@@ -305,37 +372,10 @@ const updateDeadlineTask = async (req, res) => {
       });
     }
 
-    // Validate ít nhất phải có startDate hoặc dueDate
-    if (!startDate && !dueDate) {
-      return res.status(400).json({
-        status: "error",
-        code: 400,
-        message: "Phải có ít nhất ngày bắt đầu hoặc ngày kết thúc",
-      });
-    }
+    // Parse ngày nếu có
+    const parsedStartDate = startDate ? new Date(startDate) : undefined;
+    const parsedDueDate = dueDate ? new Date(dueDate) : undefined;
 
-    // Parse dates
-    const parsedStartDate = startDate ? new Date(startDate) : null;
-    const parsedDueDate = dueDate ? new Date(dueDate) : null;
-
-    // Validate date formats
-    if (startDate && isNaN(parsedStartDate.getTime())) {
-      return res.status(400).json({
-        status: "error",
-        code: 400,
-        message: "Định dạng ngày bắt đầu không hợp lệ",
-      });
-    }
-
-    if (dueDate && isNaN(parsedDueDate.getTime())) {
-      return res.status(400).json({
-        status: "error",
-        code: 400,
-        message: "Định dạng ngày kết thúc không hợp lệ",
-      });
-    }
-
-    // Validate logic: startDate <= dueDate
     if (parsedStartDate && parsedDueDate && parsedStartDate > parsedDueDate) {
       return res.status(400).json({
         status: "error",
@@ -344,23 +384,8 @@ const updateDeadlineTask = async (req, res) => {
       });
     }
 
-    // Validate reminder time
-    const validReminderTimes = [5, 15, 30, 60, 120, 1440]; // 5ph, 15ph, 30ph, 1h, 2h, 24h
-    if (
-      reminderEnabled &&
-      reminderTime &&
-      !validReminderTimes.includes(reminderTime)
-    ) {
-      return res.status(400).json({
-        status: "error",
-        code: 400,
-        message: "Thời gian nhắc nhở không hợp lệ",
-      });
-    }
-
-    // 1. Kiểm tra task
-    const existingTask = await Task.findById(taskId);
-    if (!existingTask) {
+    const task = await Task.findById(taskId);
+    if (!task) {
       return res.status(404).json({
         status: "error",
         code: 404,
@@ -368,60 +393,131 @@ const updateDeadlineTask = async (req, res) => {
       });
     }
 
-    // 2. Cập nhật task
-    const updateData = {};
-    if (startDate !== undefined) updateData.startDate = parsedStartDate;
-    if (dueDate !== undefined) updateData.dueDate = parsedDueDate;
-    if (reminderEnabled !== undefined)
-      updateData.reminderEnabled = reminderEnabled;
-    if (reminderTime !== undefined) updateData.reminderTime = reminderTime;
+    // Cập nhật task
+    if (parsedStartDate !== undefined) task.startDate = parsedStartDate;
+    if (parsedDueDate !== undefined) {
+      task.dueDate = parsedDueDate;
+      task.reminderSent = false; // reset reminder nếu thay đổi dueDate
+    }
+    if (reminderEnabled !== undefined) task.reminderEnabled = reminderEnabled;
+    if (reminderTime !== undefined) task.reminderTime = reminderTime;
 
-    // Reset reminder sent status if due date changed
-    if (dueDate) {
-      updateData.reminderSent = false;
+    task.status = null;
+    await task.save();
+
+    // Xóa job cũ nếu có
+    // Xóa job cũ
+    const jobIds = [
+      `${task._id}-reminder`,
+      `${task._id}-nearDeadline`,
+      `${task._id}-overdue`,
+    ];
+    for (const id of jobIds) {
+      const oldJob = await reminderQueue.getJob(id);
+      if (oldJob) {
+        await oldJob.remove();
+        console.log(`🗑️ Đã xóa job cũ: ${id}`);
+      }
     }
 
-    const updatedTask = await Task.findByIdAndUpdate(taskId, updateData, {
-      new: true,
-    });
+    // Thêm job nhắc nhở mới nếu bật reminder và có dueDate
+    if (task.reminderEnabled && task.dueDate) {
+      const now = Date.now(); // giờ UTC hiện tại server
+      const dueTime = task.dueDate.getTime();
+      const reminderMs = (task.reminderTime || 0) * 60 * 1000;
 
-    // 3. Gửi socket
+      let delay = dueTime - now - reminderMs;
+      if (delay < 0) delay = 0; // reminder quá hạn → chạy ngay
+
+      console.log(
+        `⏳ Task ${
+          task._id
+        }, dueDate: ${task.dueDate.toISOString()}, now: ${new Date(
+          now
+        ).toISOString()}, reminderTime: ${
+          task.reminderTime
+        } phút, delay: ${delay} ms`
+      );
+
+      await reminderQueue.add(
+        "sendReminder",
+        { taskId: task._id, boardId: task.boardId },
+        { delay, jobId: `${task._id}-reminder` }
+      );
+
+      console.log(`✅ Job nhắc task ${task._id} đã được thêm vào queue`);
+    }
+
+    // ===== Thêm job cập nhật trạng thái task (gần tới hạn, quá hạn) =====
+    if (task.dueDate) {
+      const now = Date.now(); // giờ UTC hiện tại server
+      const dueTime = task.dueDate.getTime();
+
+      // --- Job "Gần tới hạn" ---
+      const nearDeadlineDelay = dueTime - now - 10 * 60 * 1000;
+      await reminderQueue.add(
+        "markNearDeadline",
+        { taskId: task._id, boardId: task.boardId },
+        { delay: nearDeadlineDelay, jobId: `${task._id}-nearDeadline` }
+      );
+      console.log(
+        `⏳ [markNearDeadline] Task ${task.title} (ID: ${
+          task._id
+        }), dueDate: ${task.dueDate.toISOString()}, now: ${new Date(
+          now
+        ).toISOString()}, delay: ${nearDeadlineDelay} ms`
+      );
+
+      // --- Job "Quá hạn" ---
+      const overdueDelay = Math.max(dueTime - now, 0);
+      await reminderQueue.add(
+        "markOverdue",
+        { taskId: task._id, boardId: task.boardId },
+        { delay: overdueDelay, jobId: `${task._id}-overdue` }
+      );
+      console.log(
+        `⏳ [markOverdue] Task ${task.title} (ID: ${
+          task._id
+        }), dueDate: ${task.dueDate.toISOString()}, now: ${new Date(
+          now
+        ).toISOString()}, delay: ${overdueDelay} ms`
+      );
+    }
+
+    console.log(
+      `Đã thêm 3 job cho task ${task._id} (reminder, nearDeadline, overdue)`
+    );
+
+    // Emit socket cập nhật
     const io = getIO();
-    io.to(updatedTask.boardId.toString()).emit("deadlineTaskUpdated", {
-      _id: taskId,
-      columnId: updatedTask.columnId,
-      boardId: updatedTask.boardId,
-      title: updatedTask.title,
-      position: updatedTask.position,
-      startDate: updatedTask.startDate,
-      dueDate: updatedTask.dueDate,
-      reminderEnabled: updatedTask.reminderEnabled,
-      reminderTime: updatedTask.reminderTime,
+    io.to(task.boardId.toString()).emit("deadlineTaskUpdated", {
+      _id: task._id,
+      columnId: task.columnId,
+      boardId: task.boardId,
+      title: task.title,
+      position: task.position,
+      startDate: task.startDate,
+      dueDate: task.dueDate,
+      reminderEnabled: task.reminderEnabled,
+      reminderTime: task.reminderTime,
     });
 
-    // 4. Gửi socket thông báo (nếu cần)
-    io.to(updatedTask.boardId.toString()).emit("taskNotification", {
-      type: "DEADLINE_UPDATED",
-      taskId: taskId,
-      taskTitle: updatedTask.title,
-      message: `Đã cập nhật thời hạn cho task "${updatedTask.title}"`,
-      timestamp: new Date(),
-    });
-
+    // Trả về response
     return res.status(200).json({
       status: "success",
       code: 200,
       message: "Cập nhật thời hạn task thành công",
       data: {
-        _id: taskId,
-        title: updatedTask.title,
-        startDate: updatedTask.startDate,
-        dueDate: updatedTask.dueDate,
-        reminderEnabled: updatedTask.reminderEnabled,
-        reminderTime: updatedTask.reminderTime,
+        _id: task._id,
+        title: task.title,
+        startDate: task.startDate,
+        dueDate: task.dueDate,
+        reminderEnabled: task.reminderEnabled,
+        reminderTime: task.reminderTime,
       },
     });
   } catch (error) {
+    console.error("❌ Lỗi updateDeadlineTask:", error);
     return res.status(500).json({
       status: "error",
       code: 500,
@@ -644,11 +740,15 @@ const uploadFile = async (req, res) => {
       uploadedAt: new Date(),
     });
 
+    // 4. Đếm tổng số attachment hiện có trong task
+    const totalAttachments = await Attachment.countDocuments({ taskId });
+
     // 4. Gửi lên Socket
     const io = getIO();
     io.to(task.boardId.toString()).emit("attachment:new", {
       taskId,
       attachment,
+      totalAttachments,
       message: "File mới được tải lên trong task",
     });
 
@@ -711,11 +811,14 @@ const deleteFile = async (req, res) => {
     // 3️. Xóa bản ghi trong database
     await Attachment.deleteOne({ _id: attachment._id });
 
+    const totalAttachments = await Attachment.countDocuments({ taskId: task._id });
+
     // 4️. Phát socket event đến tất cả người trong cùng board
     const io = getIO();
     io.to(task.boardId.toString()).emit("attachment:deleted", {
       taskId: task._id,
       attachmentId: attachment._id,
+      totalAttachments,
     });
 
     // 5️. Trả về phản hồi cho client
@@ -863,8 +966,10 @@ const getTaskDetail = async (req, res) => {
         $project: {
           title: 1,
           description: 1,
+          startDate: 1,
           dueDate: 1,
           isCompleted: 1,
+          status: 1,
           position: 1,
           labels: 1,
           checklists: 1,
