@@ -29,7 +29,7 @@ export default function HomePage() {
 
   // Thêm state để chuyển tab
   const [activeSection, setActiveSection] = useState("my");
-  
+
   const httpUrl = import.meta.env.VITE_API_URL;
   const accessToken = localStorage.getItem("accessToken");
   const isLoggedIn = !!accessToken;
@@ -84,7 +84,12 @@ export default function HomePage() {
     localStorage.removeItem("refreshToken");
     localStorage.removeItem("userId");
     localStorage.removeItem("roleName");
+
+    setMyBoards([]);
+    setInvitedBoards([]);
     setUser(null);
+
+    navigate("/");
   };
 
   const handleCreateBoard = async () => {
@@ -149,6 +154,10 @@ export default function HomePage() {
       localStorage.removeItem("userId");
       localStorage.removeItem("roleName");
       setUser(null);
+
+      setMyBoards([]);
+      setInvitedBoards([]);
+      navigate("/");
     }
   };
 
