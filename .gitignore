@@ -95,3 +95,17 @@ __tests__/
 jest.config.js
 *.spec.js
 *.test.js
+
+# Ignore AI model weights
+Backend/my-project-dacntt/ai_model/checklist_generator_model/*
+Backend/my-project-dacntt/ai_model/suggest_skill_model/*
+
+# Giữ lại code Python & hướng dẫn
+!Backend/my-project-dacntt/ai_model/checklist_generator_model/generate_checklist.py
+!Backend/my-project-dacntt/ai_model/checklist_generator_model/README.md
+
+!Backend/my-project-dacntt/ai_model/suggest_skill_model/auto_assign.py
+!Backend/my-project-dacntt/ai_model/suggest_skill_model/README.md
+
+# Giữ lại router xử lý AI
+!Backend/my-project-dacntt/routers/aiRouter.js

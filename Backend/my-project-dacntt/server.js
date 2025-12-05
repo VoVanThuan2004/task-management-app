@@ -13,10 +13,11 @@ const commentRouter = require("./routers/commentRouter");
 const taskAssigneeRouter = require("./routers/taskAssigneeRouter");
 const checklistRouter = require("./routers/checklistRouter");
 const checklistItemRouter = require("./routers/checklistItemRouter");
-
 const { initSocket } = require("./config/socket");
 const cors = require("cors");
 const http = require("http");
+const aiRouter = require("./routers/aiRouter.js");
+
 
 const PORT = process.env.PORT;
 
@@ -47,9 +48,12 @@ app.use(columnRouter);
 app.use(taskRouter);
 app.use(labelRouter);
 app.use(commentRouter);
+
+app.use("/api/ai", aiRouter);
 app.use(taskAssigneeRouter);
 app.use(checklistRouter);
 app.use(checklistItemRouter);
+
 
 server.listen(PORT, () => {
   console.log(`http://localhost:${PORT}`);
