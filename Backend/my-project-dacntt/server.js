@@ -11,10 +11,12 @@ const taskRouter = require("./routers/taskRouter");
 const labelRouter = require("./routers/labelRouter");
 const commentRouter = require("./routers/commentRouter");
 const taskAssigneeRouter = require("./routers/taskAssigneeRouter");
+const checklistRouter = require("./routers/checklistRouter");
+const checklistItemRouter = require("./routers/checklistItemRouter");
+
 const { initSocket } = require("./config/socket");
 const cors = require("cors");
 const http = require("http");
-// const { connectRabbitMQ } = require("./config/rabbitmq")
 
 const PORT = process.env.PORT;
 
@@ -22,7 +24,7 @@ app.use(cors());
 app.use(express.json());
 
 const server = http.createServer(app);
-initSocket(server)  // Khởi tạo socket với server
+initSocket(server); // Khởi tạo socket với server
 
 // Kết nối mongo database
 mongoDB();
@@ -46,6 +48,8 @@ app.use(taskRouter);
 app.use(labelRouter);
 app.use(commentRouter);
 app.use(taskAssigneeRouter);
+app.use(checklistRouter);
+app.use(checklistItemRouter);
 
 server.listen(PORT, () => {
   console.log(`http://localhost:${PORT}`);
