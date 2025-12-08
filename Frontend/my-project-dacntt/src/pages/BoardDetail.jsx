@@ -1,24 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { io } from "socket.io-client";
 import axios from "axios";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
-import {
-  Plus,
-  X,
-  Trash2,
-  CheckCircle2,
-  Circle,
-  MessageSquare,
-  Paperclip,
-  CheckSquare,
-  Clock,
-  AlertCircle,
-  Tag,
-} from "lucide-react";
 import TaskModal from "../components/TaskModal";
 import HeaderBoard from "../components/HeaderBoard";
-import { format } from "date-fns";
+import Column from "../components/Board/Column";
+import AddColumnButton from "../components/Board/AddColumnButton";
 
 const httpUrl = import.meta.env.VITE_API_URL;
 
@@ -32,32 +20,60 @@ export default function BoardDetail() {
   const [editTitle, setEditTitle] = useState("");
   const [isAddingColumn, setIsAddingColumn] = useState(false);
   const [newTaskTitles, setNewTaskTitles] = useState({});
-
   const [selectedTask, setSelectedTask] = useState(null);
   const [showTaskModal, setShowTaskModal] = useState(false);
-
   const accessToken = localStorage.getItem("accessToken");
+
+  // Thêm ref để track drag state
+  const isDraggingRef = useRef(false);
+  const [editingColumnId, setEditingColumnId] = useState(null);
+  const [isMember, setIsMember] = useState(false);
+
+  const startEditColumn = (id, title) => {
+    setEditingColumnId(id);
+    setEditTitle(title);
+  };
 
   // Hàm xử lý cập nhật board
   const handleBoardUpdate = (updatedBoard) => {
     setBoard(updatedBoard);
+    editingColumn;
   };
 
-  // Fetch board details
   useEffect(() => {
     const fetchBoardDetails = async () => {
       try {
+        const headers = accessToken
+          ? { Authorization: `Bearer ${accessToken}` }
+          : {};
+
         const res = await axios.get(
           `${httpUrl}/api/v1/boards-detail/${boardId}`,
-          {
-            headers: { Authorization: `Bearer ${accessToken}` },
-          }
+          { headers }
         );
-        setBoard(res.data.data);
+
+        const { board, isMember } = res.data.data;
+
+        setBoard(board);
+        setIsMember(isMember || false); // ← quan trọng: guest → isMember = false
+
+        console.log(isMember);
       } catch (err) {
-        console.error("❌ Lỗi khi tải chi tiết board:", err);
+        const status = err.response?.status;
+
+        // Chỉ redirect khi thật sự không được phép
+        if (status === 401 || status === 403) {
+          // Nếu là public board → backend sẽ trả 200 + isMember=false → không vào đây
+          // Chỉ vào đây khi là private/workspace mà không có quyền
+          alert("Bạn không có quyền truy cập bảng này");
+          window.location.href = "/";
+        } else if (status === 404) {
+          alert("Bảng không tồn tại");
+          window.location.href = "/";
+        }
       }
     };
+
     fetchBoardDetails();
   }, [boardId, accessToken]);
 
@@ -114,6 +130,8 @@ export default function BoardDetail() {
     });
 
     socket.on("columnMoved", (data) => {
+      if (isDraggingRef.current) return;
+
       console.log("🔄 Column moved:", data);
       setColumns((prevColumns) => {
         const newOrder = data.columns.map((col) => {
@@ -181,7 +199,9 @@ export default function BoardDetail() {
 
     // Xử lý khi di chuyển task
     socket.on("taskMoved", (data) => {
-      console.log("Task moved - FULL DATA:", data);
+      if (isDraggingRef.current) return;
+
+      console.log("Task moved:", data);
 
       setColumns((prev) => {
         return prev.map((col) => {
@@ -226,7 +246,7 @@ export default function BoardDetail() {
 
     // xử lý task khi status = Gần tới
     socket.on("taskNearDeadline", (data) => {
-      console.log("✅ Task's deadline is upcomming:", data);
+      console.log("Task's deadline is upcomming:", data);
       setColumns((prevColumns) =>
         prevColumns.map((col) => ({
           ...col,
@@ -240,70 +260,162 @@ export default function BoardDetail() {
     // Xử lý khi comment mới
     socket.on("comment:new", (data) => {
       setColumns((prev) =>
-        prev.map((col) => ({
-          ...col,
-          tasks: col.tasks.map((t) =>
-            t._id === data.taskId
-              ? { ...t, totalComments: data.totalComments }
-              : t
-          ),
-        }))
+        prev.map((col) => {
+          // KHÔNG TOUCH COLUMN KHÁC
+          const hasTask = col.tasks.some((t) => t._id === data.taskId);
+          if (!hasTask) return col;
+
+          return {
+            ...col,
+            tasks: col.tasks.map((t) =>
+              t._id === data.taskId
+                ? { ...t, totalComments: data.totalComments }
+                : t
+            ),
+          };
+        })
       );
     });
 
     socket.on("comment:deleted", (data) => {
       setColumns((prev) =>
-        prev.map((col) => ({
-          ...col,
-          tasks: col.tasks.map((t) =>
-            t._id === data.taskId
-              ? { ...t, totalComments: data.totalComments }
-              : t
-          ),
-        }))
+        prev.map((col) => {
+          const hasTask = col.tasks.some((t) => t._id === data.taskId);
+          if (!hasTask) return col;
+
+          return {
+            ...col,
+            tasks: col.tasks.map((t) =>
+              t._id === data.taskId
+                ? { ...t, totalComments: data.totalComments }
+                : t
+            ),
+          };
+        })
       );
     });
 
-
     // Xử lý khi có file đính kèm mới
     socket.on("attachment:new", (data) => {
-      setColumns((prev) => 
-        prev.map((col) => ({
-          ...col,
-          tasks: col.tasks.map((t) =>
-            t._id === data.taskId
-              ? { ...t, totalAttachments: data.totalAttachments }
-              : t
-          ),
-        }))
-      )
-    })
+      setColumns((prev) =>
+        prev.map((col) => {
+          const hasTask = col.tasks.some((t) => t._id === data.taskId);
+          if (!hasTask) return col;
+
+          return {
+            ...col,
+            tasks: col.tasks.map((t) =>
+              t._id === data.taskId
+                ? { ...t, totalAttachments: data.totalAttachments }
+                : t
+            ),
+          };
+        })
+      );
+    });
 
     socket.on("comment:attachment:new", (data) => {
-      setColumns((prev) => 
-        prev.map((col) => ({
-          ...col,
-          tasks: col.tasks.map((t) =>
-            t._id === data.taskId
-              ? { ...t, totalAttachments: data.totalAttachments }
-              : t
-          ),
-        }))
-      )
-    })
+      setColumns((prev) =>
+        prev.map((col) => {
+          const hasTask = col.tasks.some((t) => t._id === data.taskId);
+          if (!hasTask) return col;
+
+          return {
+            ...col,
+            tasks: col.tasks.map((t) =>
+              t._id === data.taskId
+                ? { ...t, totalAttachments: data.totalAttachments }
+                : t
+            ),
+          };
+        })
+      );
+    });
 
     socket.on("attachment:deleted", (data) => {
-      setColumns((prev) => 
-        prev.map((col) => ({
-          ...col,
-          tasks: col.tasks.map((t) =>
-            t._id === data.taskId
-              ? { ...t, totalAttachments: data.totalAttachments }
-              : t
-          ),
-        }))
-      )
-    })
+      setColumns((prev) =>
+        prev.map((col) => {
+          const hasTask = col.tasks.some((t) => t._id === data.taskId);
+          if (!hasTask) return col;
+
+          return {
+            ...col,
+            tasks: col.tasks.map((t) =>
+              t._id === data.taskId
+                ? { ...t, totalAttachments: data.totalAttachments }
+                : t
+            ),
+          };
+        })
+      );
+    });
+
+    // Xử lý khi có check-item được click hoàn thành
+    socket.on("toggle:check-item", (data) => {
+      setColumns((prev) =>
+        prev.map((col) => {
+          const hasTask = col.tasks.some((t) => t._id === data.taskId);
+          if (!hasTask) return col;
+
+          return {
+            ...col,
+            tasks: col.tasks.map((t) =>
+              t._id === data.taskId
+                ? {
+                    ...t,
+                    totalCheckItemsCompleted: data.totalCheckItemsCompleted,
+                  }
+                : t
+            ),
+          };
+        })
+      );
+    });
+
+    socket.on("totalCheckItem", (data) => {
+      console.log(data);
+      setColumns((prev) =>
+        prev.map((col) => {
+          const hasTask = col.tasks.some((t) => t._id === data.taskId);
+          if (!hasTask) return col;
+
+          return {
+            ...col,
+            tasks: col.tasks.map((t) =>
+              t._id === data.taskId
+                ? {
+                    ...t,
+                    totalCheckItems: t.totalCheckItems + 1,
+                  }
+                : t
+            ),
+          };
+        })
+      );
+    });
+
+    // toggleTask
+    socket.on("toggleTask", (data) => {
+      console.log(data);
+      setColumns((prev) =>
+        prev.map((col) => {
+          const hasTask = col.tasks.some((t) => t._id === data.taskId);
+          if (!hasTask) return col;
+
+          return {
+            ...col,
+            tasks: col.tasks.map((t) =>
+              t._id === data.taskId
+                ? {
+                    ...t,
+                    isCompleted: t.isCompleted,
+                  }
+                : t
+            ),
+          };
+        })
+      );
+    });
 
     return () => {
       socket.emit("leaveBoard", boardId);
@@ -322,12 +434,12 @@ export default function BoardDetail() {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
 
-      console.log("📦 Columns data from API:", res.data.data); // DEBUG
+      console.log("Columns data from API:", res.data.data); // DEBUG
 
       const sortedColumns = (res.data.data || [])
         .sort((a, b) => a.position - b.position)
         .map((col) => {
-          console.log(`📝 Column ${col.title} tasks:`, col.tasks); // DEBUG
+          console.log(`Column ${col.title} tasks:`, col.tasks); // DEBUG
           return {
             ...col,
             tasks: (col.tasks || []).sort((a, b) => a.position - b.position),
@@ -407,16 +519,32 @@ export default function BoardDetail() {
     setNewTaskTitles((prev) => ({ ...prev, [columnId]: value }));
   };
 
-  const handleToggleTaskComplete = async (taskId, isCompleted) => {
+  const handleToggleTaskComplete = async (taskId) => {
     try {
-      await axios.patch(
-        `${httpUrl}/api/v1/tasks/${taskId}`,
-        { isCompleted },
+      const res = await axios.put(
+        `${httpUrl}/api/v1/tasks/${taskId}/toggle`,
+        {},
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
-      // Socket sẽ cập nhật qua event "taskCompletionUpdated"
+
+      if (res.data.status === "success") {
+        const updated = res.data.data;
+
+        // Update UI local ngay lập tức
+        setColumns((prevColumns) =>
+          prevColumns.map((col) => ({
+            ...col,
+            tasks: col.tasks.map((task) =>
+              task._id === taskId
+                ? { ...task, isCompleted: updated.isCompleted }
+                : task
+            ),
+          }))
+        );
+      }
     } catch (error) {
-      console.error("Lỗi khi cập nhật task:", error);
+      console.error("❌ Lỗi khi toggle task complete:", error);
+      // Có thể thêm toast notification ở đây
     }
   };
 
@@ -436,93 +564,109 @@ export default function BoardDetail() {
   };
 
   // Drag & drop handlers
-  const handleColumnMove = async (result) => {
-    const { source, destination, draggableId } = result;
+  const handleColumnMove = useCallback(
+    async (result) => {
+      const { source, destination, draggableId } = result;
 
-    if (!destination || source.index === destination.index) return;
+      if (!destination || source.index === destination.index) return;
 
-    // Optimistic update
-    const newColumns = Array.from(columns);
-    const [movedColumn] = newColumns.splice(source.index, 1);
-    newColumns.splice(destination.index, 0, movedColumn);
-    setColumns(newColumns);
+      isDraggingRef.current = true;
 
-    try {
-      await axios.put(
-        `${httpUrl}/api/v1/columns/${draggableId}/position`,
-        { destinationIndex: destination.index },
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
-    } catch (err) {
-      console.error("❌ Lỗi khi di chuyển column:", err);
-      fetchColumns(); // Rollback
-    }
-  };
+      // Optimistic update
+      setColumns((prevColumns) => {
+        const newColumns = Array.from(prevColumns);
+        const [movedColumn] = newColumns.splice(source.index, 1);
+        newColumns.splice(destination.index, 0, movedColumn);
+        return newColumns;
+      });
 
-  const handleTaskMove = async (result) => {
-    const { source, destination, draggableId } = result;
+      try {
+        await axios.put(
+          `${httpUrl}/api/v1/columns/${draggableId}/position`,
+          { destinationIndex: destination.index },
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+      } catch (err) {
+        console.error("❌ Lỗi khi di chuyển column:", err);
+        fetchColumns(); // Rollback
+      } finally {
+        isDraggingRef.current = false;
+      }
+    },
+    [accessToken, httpUrl]
+  );
 
-    if (
-      !destination ||
-      (source.droppableId === destination.droppableId &&
-        source.index === destination.index)
-    )
-      return;
+  const handleTaskMove = useCallback(
+    async (result) => {
+      const { source, destination, draggableId } = result;
 
-    // Optimistic update
-    const newColumns = columns.map((col) => ({
-      ...col,
-      tasks: [...(col.tasks || [])],
-    }));
+      if (
+        !destination ||
+        (source.droppableId === destination.droppableId &&
+          source.index === destination.index)
+      )
+        return;
 
-    const sourceCol = newColumns.find((col) => col._id === source.droppableId);
-    const destCol = newColumns.find(
-      (col) => col._id === destination.droppableId
-    );
+      isDraggingRef.current = true;
 
-    if (!sourceCol || !destCol) return;
+      // Optimistic update - chỉ cập nhật local state
+      setColumns((prevColumns) => {
+        const newColumns = prevColumns.map((col) => ({
+          ...col,
+          tasks: [...(col.tasks || [])],
+        }));
 
-    // Tìm và di chuyển task
-    const taskToMove = sourceCol.tasks[source.index];
-    if (!taskToMove) return;
+        const sourceCol = newColumns.find(
+          (col) => col._id === source.droppableId
+        );
+        const destCol = newColumns.find(
+          (col) => col._id === destination.droppableId
+        );
 
-    sourceCol.tasks.splice(source.index, 1);
-    destCol.tasks.splice(destination.index, 0, taskToMove);
+        if (!sourceCol || !destCol) return prevColumns;
 
-    setColumns(newColumns);
+        const taskToMove = sourceCol.tasks[source.index];
+        if (!taskToMove) return prevColumns;
 
-    try {
-      await axios.put(
-        `${httpUrl}/api/v1/tasks/${draggableId}/position`,
-        {
-          destinationColumnId: destination.droppableId,
-          destinationIndex: destination.index,
-        },
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
-    } catch (err) {
-      console.error("❌ Lỗi khi di chuyển task:", err);
-      fetchColumns(); // Rollback
-    }
-  };
+        sourceCol.tasks.splice(source.index, 1);
+        destCol.tasks.splice(destination.index, 0, taskToMove);
 
-  const handleDragEnd = async (result) => {
-    const { destination, type } = result;
+        return newColumns;
+      });
 
-    if (!destination) return;
+      try {
+        await axios.put(
+          `${httpUrl}/api/v1/tasks/${draggableId}/position`,
+          {
+            destinationColumnId: destination.droppableId,
+            destinationIndex: destination.index,
+          },
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+      } catch (err) {
+        console.error("❌ Lỗi khi di chuyển task:", err);
+        fetchColumns(); // Rollback nếu lỗi
+      } finally {
+        isDraggingRef.current = false;
+      }
+    },
+    [accessToken, httpUrl]
+  );
 
-    if (type === "COLUMN") {
-      await handleColumnMove(result);
-    } else if (type === "TASK") {
-      await handleTaskMove(result);
-    }
-  };
+  const handleDragEnd = useCallback(
+    async (result) => {
+      const { destination, type } = result;
 
-  // UI helpers
-  const startEditing = (column) => {
-    setEditingColumn(column._id);
-    setEditTitle(column.title);
-  };
+      if (!destination) return;
+
+      if (type === "COLUMN") {
+        await handleColumnMove(result);
+      } else if (type === "TASK") {
+        await handleTaskMove(result);
+      }
+    },
+    [handleColumnMove, handleTaskMove]
+  );
 
   const cancelEditing = () => {
     setEditingColumn(null);
@@ -547,21 +691,6 @@ export default function BoardDetail() {
     return { backgroundColor: "#f0f2f5" };
   };
 
-  // Helper: Xác định trạng thái hạn
-  const getDueDateStatus = (dueDate, isCompleted) => {
-    if (isCompleted || !dueDate) return null;
-    const today = new Date();
-    const due = new Date(dueDate);
-    const diffTime = due.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays < 0)
-      return { text: "Quá hạn", color: "bg-red-100 text-red-700" };
-    if (diffDays <= 1)
-      return { text: "Gần tới hạn", color: "bg-yellow-100 text-yellow-700" };
-    return null;
-  };
-
   return (
     <div className="flex flex-col h-screen overflow-hidden">
       <HeaderBoard
@@ -570,350 +699,55 @@ export default function BoardDetail() {
         onBoardUpdate={handleBoardUpdate}
       />
 
-      <main
-        className="flex-1 flex gap-4 overflow-x-auto p-4"
-        style={getBoardBackground()}
-      >
+      <main className="flex-1 overflow-x-auto p-6" style={getBoardBackground()}>
         <DragDropContext onDragEnd={handleDragEnd}>
-          <Droppable droppableId="columns" direction="horizontal" type="COLUMN">
-            {(provided) => (
-              <div
-                {...provided.droppableProps}
-                ref={provided.innerRef}
-                className="flex gap-4 items-start"
-              >
-                {columns.map((col, index) => (
-                  <Draggable key={col._id} draggableId={col._id} index={index}>
-                    {(provided, snapshot) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.draggableProps}
-                        className={`flex-shrink-0 w-72 ${
-                          snapshot.isDragging ? "shadow-2xl rotate-3" : ""
-                        } transition-transform duration-200`}
-                      >
-                        <div className="bg-gray-100 rounded-xl shadow-md p-3">
-                          {/* Column Header với drag handle */}
-                          <div
-                            {...provided.dragHandleProps}
-                            className="cursor-grab active:cursor-grabbing"
-                          >
-                            {editingColumn === col._id ? (
-                              <div className="space-y-2">
-                                <textarea
-                                  value={editTitle}
-                                  onChange={(e) => setEditTitle(e.target.value)}
-                                  className="w-full p-2 border border-blue-500 rounded-lg"
-                                  autoFocus
-                                  onBlur={() => handleUpdateColumn(col._id)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter")
-                                      handleUpdateColumn(col._id);
-                                    if (e.key === "Escape") cancelEditing();
-                                  }}
-                                />
-                              </div>
-                            ) : (
-                              <div className="flex justify-between items-center mb-3">
-                                <h2
-                                  className="text-md font-semibold text-gray-800 cursor-pointer flex-1"
-                                  onClick={() => startEditing(col)}
-                                >
-                                  {col.title}
-                                </h2>
-                                <button
-                                  onClick={() => handleDeleteColumn(col._id)}
-                                  className="text-gray-400 hover:text-red-600 p-1 rounded"
-                                  title="Xóa danh sách"
-                                >
-                                  <Trash2 size={16} />
-                                </button>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Tasks List */}
-                          {/* Tasks List */}
-                          <Droppable droppableId={col._id} type="TASK">
-                            {(provided, snapshot) => (
-                              <div
-                                ref={provided.innerRef}
-                                {...provided.droppableProps}
-                                className={`min-h-[100px] transition-colors duration-200 rounded-lg ${
-                                  snapshot.isDraggingOver ? "bg-blue-50/50" : ""
-                                }`}
-                              >
-                                {(col.tasks || []).map((task, index) => {
-                                  const dueStatus = getDueDateStatus(
-                                    task.dueDate,
-                                    task.isCompleted
-                                  );
-                                  const hasChecklist = task.totalChecklists > 0;
-                                  const completedItems =
-                                    task.totalChecklistItems || 0;
-                                  const totalItems = task.totalChecklists || 0;
-
-                                  return (
-                                    <Draggable
-                                      key={task._id}
-                                      draggableId={task._id}
-                                      index={index}
-                                    >
-                                      {(provided, snapshot) => (
-                                        <div
-                                          ref={provided.innerRef}
-                                          {...provided.draggableProps}
-                                          {...provided.dragHandleProps}
-                                          className={`mb-2 cursor-grab active:cursor-grabbing transition-all duration-200 ${
-                                            snapshot.isDragging
-                                              ? "rotate-3 shadow-xl scale-105"
-                                              : ""
-                                          }`}
-                                        >
-                                          <div
-                                            onClick={() =>
-                                              handleTaskClick(task)
-                                            }
-                                            className={`group bg-white rounded-lg shadow-sm p-3 cursor-pointer hover:shadow-lg transition-all duration-200 border border-gray-200/80 ${
-                                              task.isCompleted
-                                                ? "opacity-75 bg-gray-50"
-                                                : ""
-                                            }`}
-                                          >
-                                            {/* Labels */}
-                                            {task.taskLabels &&
-                                              task.taskLabels.length > 0 && (
-                                                <div className="flex flex-wrap gap-1 mb-2">
-                                                  {task.taskLabels.map(
-                                                    (label) => (
-                                                      <span
-                                                        key={label._id}
-                                                        className="px-2 py-0.5 rounded-full text-[10px] font-semibold text-white"
-                                                        style={{
-                                                          backgroundColor:
-                                                            label.color,
-                                                        }}
-                                                      >
-                                                        {label.title}
-                                                      </span>
-                                                    )
-                                                  )}
-                                                </div>
-                                              )}
-
-                                            {/* Title + Checkbox */}
-                                            <div className="flex items-start gap-2">
-                                              <button
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  handleToggleTaskComplete(
-                                                    task._id,
-                                                    !task.isCompleted
-                                                  );
-                                                }}
-                                                className={`flex-shrink-0 w-5 h-5 rounded-full border-2 mt-0.5 transition-all duration-200 flex items-center justify-center ${
-                                                  task.isCompleted
-                                                    ? "bg-green-500 border-green-500"
-                                                    : "border-gray-300 hover:border-green-400 hover:bg-green-50"
-                                                }`}
-                                              >
-                                                {task.isCompleted ? (
-                                                  <CheckCircle2 className="w-3 h-3 text-white" />
-                                                ) : (
-                                                  <Circle className="w-3.5 h-3.5 text-gray-400" />
-                                                )}
-                                              </button>
-                                              <p
-                                                className={`flex-1 text-sm font-medium text-gray-800 leading-tight ${
-                                                  task.isCompleted
-                                                    ? "line-through text-gray-500"
-                                                    : ""
-                                                }`}
-                                              >
-                                                {task.title}
-                                              </p>
-                                            </div>
-
-                                            {/* Due Date & Status Badge */}
-                                            {(task.dueDate || dueStatus) && (
-                                              <div className="flex items-center gap-1 mt-2 text-xs">
-                                                <Clock className="w-3.5 h-3.5 text-gray-500" />
-                                                <span className="text-gray-600">
-                                                  {task.dueDate
-                                                    ? format(
-                                                        new Date(task.dueDate),
-                                                        "dd MMM"
-                                                      )
-                                                    : ""}
-                                                </span>
-                                                {dueStatus && (
-                                                  <span
-                                                    className={`ml-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${dueStatus.color}`}
-                                                  >
-                                                    {dueStatus.text}
-                                                  </span>
-                                                )}
-                                              </div>
-                                            )}
-
-                                            {/* Footer: Checklist, Comments, Attachments */}
-                                            {(hasChecklist ||
-                                              task.totalComments > 0 ||
-                                              task.totalAttachments > 0) && (
-                                              <div className="flex items-center gap-3 mt-3 text-xs text-gray-500">
-                                                {/* Checklist */}
-                                                {hasChecklist && (
-                                                  <div className="flex items-center gap-1">
-                                                    <CheckSquare className="w-4 h-4 text-gray-500" />
-                                                    <span
-                                                      className={
-                                                        completedItems ===
-                                                        totalItems
-                                                          ? "text-green-600 font-medium"
-                                                          : ""
-                                                      }
-                                                    >
-                                                      {completedItems}/
-                                                      {totalItems}
-                                                    </span>
-                                                  </div>
-                                                )}
-
-                                                {/* Comments */}
-                                                {task.totalComments > 0 && (
-                                                  <div className="flex items-center gap-1">
-                                                    <MessageSquare className="w-4 h-4" />
-                                                    <span>
-                                                      {task.totalComments}
-                                                    </span>
-                                                  </div>
-                                                )}
-
-                                                {/* Attachments */}
-                                                {task.totalAttachments > 0 && (
-                                                  <div className="flex items-center gap-1">
-                                                    <Paperclip className="w-4 h-4" />
-                                                    <span>
-                                                      {task.totalAttachments}
-                                                    </span>
-                                                  </div>
-                                                )}
-                                              </div>
-                                            )}
-                                          </div>
-                                        </div>
-                                      )}
-                                    </Draggable>
-                                  );
-                                })}
-                                {provided.placeholder}
-
-                                {/* Empty state */}
-                                {(col.tasks || []).length === 0 && (
-                                  <div className="text-center py-6 text-gray-400 text-sm italic">
-                                    (Chưa có thẻ nào)
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </Droppable>
-
-                          {/* Add Task Form */}
-                          <div className="mt-3">
-                            <input
-                              type="text"
-                              value={newTaskTitles[col._id] || ""}
-                              onChange={(e) =>
-                                handleTaskTitleChange(col._id, e.target.value)
-                              }
-                              placeholder="Nhập tiêu đề thẻ..."
-                              className="w-full text-sm px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              onKeyPress={(e) => {
-                                if (
-                                  e.key === "Enter" &&
-                                  newTaskTitles[col._id]?.trim()
-                                ) {
-                                  handleAddTask(
-                                    col._id,
-                                    newTaskTitles[col._id].trim()
-                                  );
-                                }
-                              }}
-                            />
-                            <div className="flex gap-2 mt-2">
-                              <button
-                                onClick={() => {
-                                  if (newTaskTitles[col._id]?.trim()) {
-                                    handleAddTask(
-                                      col._id,
-                                      newTaskTitles[col._id].trim()
-                                    );
-                                  }
-                                }}
-                                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm py-2 px-3 rounded-lg transition-colors duration-200"
-                              >
-                                Thêm thẻ
-                              </button>
-                              <button
-                                onClick={() =>
-                                  setNewTaskTitles((prev) => ({
-                                    ...prev,
-                                    [col._id]: "",
-                                  }))
-                                }
-                                className="px-3 py-2 text-gray-500 hover:text-gray-700 transition-colors duration-200"
-                              >
-                                <X size={16} />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </Draggable>
-                ))}
-                {provided.placeholder}
-
-                {/* Add Column Form */}
-                <div className="flex-shrink-0 w-72">
-                  {isAddingColumn ? (
-                    <div className="bg-white rounded-xl shadow-sm p-3 space-y-2">
-                      <input
-                        type="text"
-                        value={newTitle}
-                        onChange={(e) => setNewTitle(e.target.value)}
-                        placeholder="Nhập tiêu đề danh sách..."
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        autoFocus
-                      />
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={handleAddColumn}
-                          className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700"
-                        >
-                          Thêm
-                        </button>
-                        <button
-                          onClick={cancelAddColumn}
-                          className="text-gray-500 hover:text-gray-700 p-2"
-                        >
-                          <X size={20} />
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setIsAddingColumn(true)}
-                      className="w-full p-3 bg-white/50 hover:bg-white/70 text-gray-700 font-medium rounded-xl shadow-sm transition-colors"
-                    >
-                      <Plus size={16} className="inline mr-1" />
-                      Thêm danh sách khác
-                    </button>
-                  )}
+          {/* BỌC TOÀN BỘ BẢNG + NÚT THÊM TRONG 1 FLEX CONTAINER */}
+          <div className="flex gap-4 items-start min-w-max">
+            {/* === DANH SÁCH CÁC COLUMN (có thể drag) === */}
+            <Droppable droppableId="board" type="COLUMN" direction="horizontal">
+              {(provided) => (
+                <div
+                  ref={provided.innerRef}
+                  {...provided.droppableProps}
+                  className="flex gap-4 items-start"
+                >
+                  {columns.map((col, index) => (
+                    <Column
+                      key={col._id}
+                      column={col}
+                      index={index}
+                      isEditing={editingColumnId === col._id}
+                      editTitle={editTitle}
+                      onStartEdit={startEditColumn}
+                      onEditTitle={setEditTitle}
+                      onUpdateColumn={() => handleUpdateColumn(col._id)}
+                      onDeleteColumn={handleDeleteColumn}
+                      newTaskTitle={newTaskTitles[col._id]}
+                      onNewTaskChange={handleTaskTitleChange}
+                      onAddTask={handleAddTask}
+                      onToggleTaskComplete={handleToggleTaskComplete}
+                      onTaskClick={handleTaskClick}
+                      isMember={isMember}
+                    />
+                  ))}
+                  {provided.placeholder}
                 </div>
-              </div>
-            )}
-          </Droppable>
+              )}
+            </Droppable>
+
+            {/* === NÚT THÊM COLUMN - NẰM CÙNG HÀNG VỚI CÁC COLUMN === */}
+            <div className="flex-shrink-0">
+              <AddColumnButton
+                isAdding={isAddingColumn}
+                newTitle={newTitle}
+                onStartAdding={() => setIsAddingColumn(true)}
+                onTitleChange={setNewTitle}
+                onAdd={handleAddColumn}
+                onCancel={cancelAddColumn}
+                isMember={isMember}
+              />
+            </div>
+          </div>
         </DragDropContext>
       </main>
 
@@ -922,6 +756,7 @@ export default function BoardDetail() {
         isOpen={showTaskModal}
         onClose={handleCloseModal}
         onTaskUpdate={handleTaskUpdate}
+        isMember={isMember}
       />
     </div>
   );

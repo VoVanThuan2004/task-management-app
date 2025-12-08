@@ -15,10 +15,10 @@ const connection = new Redis({
   enableReadyCheck: false,
 });
 
-// 🧠 Queue để thêm job
+// Queue để thêm job
 const reminderQueue = new Queue("taskReminderQueue", { connection });
 
-// 🧩 Worker xử lý job
+// Worker xử lý job
 const worker = new Worker(
   "taskReminderQueue",
   async (job) => {

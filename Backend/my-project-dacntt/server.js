@@ -17,6 +17,8 @@ const { initSocket } = require("./config/socket");
 const cors = require("cors");
 const http = require("http");
 const aiRouter = require("./routers/aiRouter.js");
+const checkItemRouter = require("./routers/checkItemRouter");
+const activityLogRouter = require("./routers/activityLogRouter.js");
 
 
 const PORT = process.env.PORT;
@@ -53,6 +55,8 @@ app.use("/api/ai", aiRouter);
 app.use(taskAssigneeRouter);
 app.use(checklistRouter);
 app.use(checklistItemRouter);
+app.use(checkItemRouter);
+app.use(activityLogRouter);
 
 
 server.listen(PORT, () => {

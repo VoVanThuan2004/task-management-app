@@ -11,7 +11,7 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, index: true },
     fullName: { type: String },
     password: { type: String },
-    avatar: { type: String },
+    avatar: { type: String, default: null },
     avatarId: { type: String },
     isActive: { type: Boolean },
     resetOtp: { type: String },

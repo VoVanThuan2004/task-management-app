@@ -260,60 +260,137 @@ export default function HomePage() {
           {/* Profile / Login */}
           <div className="relative">
             {isLoggedIn ? (
-              <button
-                onClick={() => setShowProfileMenu((prev) => !prev)}
-                className="flex items-center gap-3 bg-white border border-gray-200 rounded-full px-4 py-2 shadow-sm hover:shadow transition-all"
-              >
-                <div className="text-right">
-                  <p className="text-sm font-medium text-gray-700">
-                    Hello, {user?.fullName || "User"}
-                  </p>
-                </div>
-                <img
-                  src={
-                    user?.avatar ||
-                    "https://cdn-icons-png.flaticon.com/512/149/149071.png"
-                  }
-                  alt="avatar"
-                  className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
-                />
-              </button>
+              <div className="relative">
+                {/* Nút Avatar + Tên */}
+                <button
+                  onClick={() => setShowProfileMenu((prev) => !prev)}
+                  className="flex items-center gap-3 bg-white border border-gray-200 rounded-full px-4 py-2 shadow-sm hover:shadow-md hover:border-gray-300 transition-all duration-200 select-none"
+                >
+                  <div className="text-right leading-tight">
+                    <p className="text-sm font-medium text-gray-700">
+                      Hello, {user?.fullName || "User"}
+                    </p>
+                  </div>
+
+                  {/* Avatar thông minh - không bao giờ bị ảnh hỏng */}
+                  <div className="relative w-10 h-10">
+                    {/* Ảnh thật - chỉ hiện khi có URL hợp lệ */}
+                    {user?.avatar &&
+                    typeof user.avatar === "string" &&
+                    user.avatar.trim() !== "" &&
+                    user.avatar !== "null" ? (
+                      <img
+                        src={user.avatar}
+                        alt="avatar"
+                        className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
+                        onError={(e) => {
+                          // Nếu ảnh lỗi → ẩn và hiện fallback
+                          e.currentTarget.style.display = "none";
+                          e.currentTarget.nextElementSibling?.classList.remove(
+                            "hidden"
+                          );
+                        }}
+                      />
+                    ) : null}
+
+                    {/* Fallback gradient xanh tím đẹp - luôn hiện khi không có ảnh */}
+                    <div
+                      className={`absolute inset-0 w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-white font-bold text-lg flex items-center justify-center border-2 border-gray-200 shadow-md ${
+                        user?.avatar &&
+                        typeof user.avatar === "string" &&
+                        user.avatar.trim() !== "" &&
+                        user.avatar !== "null"
+                          ? "hidden"
+                          : "flex"
+                      }`}
+                    >
+                      {(user?.fullName || "U").charAt(0).toUpperCase()}
+                    </div>
+                  </div>
+                </button>
+
+                {/* Profile Menu Dropdown */}
+                {showProfileMenu && (
+                  <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden z-50">
+                    {/* Header */}
+                    <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-3">
+                      <div className="relative w-10 h-10 flex-shrink-0">
+                        {user?.avatar &&
+                        typeof user.avatar === "string" &&
+                        user.avatar.trim() !== "" &&
+                        user.avatar !== "null" ? (
+                          <img
+                            src={user.avatar}
+                            alt="avatar"
+                            className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                              e.currentTarget.nextElementSibling?.classList.remove(
+                                "hidden"
+                              );
+                            }}
+                          />
+                        ) : null}
+
+                        <div
+                          className={`absolute inset-0 w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-white font-bold text-lg flex items-center justify-center border-2 border-gray-200 ${
+                            user?.avatar &&
+                            typeof user.avatar === "string" &&
+                            user.avatar.trim() !== "" &&
+                            user.avatar !== "null"
+                              ? "hidden"
+                              : "flex"
+                          }`}
+                        >
+                          {(user?.fullName || "U").charAt(0).toUpperCase()}
+                        </div>
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-800 truncate">
+                          {user?.fullName || "User"}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">
+                          {user?.email || "user@example.com"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Menu items */}
+                    <div className="py-1">
+                      <button
+                        onClick={() => {
+                          alert("Xem hồ sơ");
+                          setShowProfileMenu(false);
+                        }}
+                        className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-gray-50 text-gray-700 transition"
+                      >
+                        <User size={16} />
+                        <span>Xem hồ sơ</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          handleLogout();
+                          setShowProfileMenu(false);
+                        }}
+                        className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-red-50 text-red-600 transition"
+                      >
+                        <LogOut size={16} />
+                        <span>Đăng xuất</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             ) : (
               <button
                 onClick={handleLogin}
-                className="flex items-center gap-2 bg-blue-600 text-white rounded-full px-6 py-2 shadow-sm hover:bg-blue-700 transition-all"
+                className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full px-6 py-2 shadow-sm hover:shadow-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 font-medium"
               >
                 <LogIn size={18} />
                 <span>Đăng nhập</span>
               </button>
-            )}
-
-            {/* Profile Menu */}
-            {showProfileMenu && isLoggedIn && (
-              <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-50">
-                <div className="px-4 py-3 border-b border-gray-100">
-                  <p className="text-sm font-medium text-gray-800 truncate">
-                    {user?.fullName || "User"}
-                  </p>
-                  <p className="text-xs text-gray-500 truncate">
-                    {user?.email || ""}
-                  </p>
-                </div>
-                <button
-                  onClick={() => alert("Xem hồ sơ")}
-                  className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-100 text-gray-700"
-                >
-                  <User size={16} />
-                  Xem hồ sơ
-                </button>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-100 text-gray-700"
-                >
-                  <LogOut size={16} />
-                  Đăng xuất
-                </button>
-              </div>
             )}
           </div>
         </div>

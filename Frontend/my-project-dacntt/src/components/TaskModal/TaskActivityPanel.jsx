@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import axios from "axios";
 import Picker from "emoji-picker-react";
+import TaskActivityLog from "../TaskModal/TaskActivityLog";
 
 const TABS = { COMMENTS: "comments", ACTIVITY: "activity" };
 
@@ -19,8 +20,8 @@ const TaskActivityPanel = ({
   tinyApiKey,
   commentEditorConfig,
   accessToken,
-  activities = [],
   socket, // Truyền socket từ modal
+  isReadOnly,
 }) => {
   const [activeTab, setActiveTab] = useState(TABS.COMMENTS);
   const [comments, setComments] = useState([]);
@@ -88,11 +89,6 @@ const TaskActivityPanel = ({
     const handleDeleteComment = (data) => {
       if (data.taskId === taskId) {
         setComments((prev) => prev.filter((c) => c._id !== data.commentId));
-
-        // setTotalPages((prev) => {
-        //   const newTotal = prev * 10 - 1;
-        //   return Math.max(1, Math.ceil(newTotal / 10));
-        // });
       }
     };
 
@@ -118,6 +114,9 @@ const TaskActivityPanel = ({
     socket.on("comment:emojiUpdated", handleEmojiUpdated);
 
     return () => {
+      socket.off("comment:new", handleNewComment);
+      socket.off("comment:deleted", handleDeleteComment);
+      socket.off("comment:emojiUpdated", handleEmojiUpdated);
       socket.emit("leaveBoard", boardId);
     };
   }, [socket, boardId, taskId, userId]);
@@ -199,17 +198,7 @@ const TaskActivityPanel = ({
         headers: { Authorization: `Bearer ${accessToken}` },
       });
 
-      // XÓA TRONG UI
-      // setComments((prev) => prev.filter((c) => c._id !== commentId));
-
-      // // CẬP NHẬT totalPages
-      // setTotalPages((prev) => {
-      //   const newTotal = prev * 10 - 1;
-      //   return Math.max(1, Math.ceil(newTotal / 10));
-      // });
-
-      // TẢI LẠI TRANG 1 ĐỂ ĐỒNG BỘ (phòng khi xóa comment ở trang khác)
-      // fetchComments(1, false);
+      setComments((prev) => prev.filter((c) => c._id !== commentId));
     } catch (err) {
       console.error("Lỗi xóa comment:", err);
       alert("Không thể xóa bình luận. Vui lòng thử lại.");
@@ -228,6 +217,14 @@ const TaskActivityPanel = ({
       console.error("Lỗi thả emoji:", err);
     }
   };
+
+  if (isReadOnly === true) {
+    return (
+      <div className="flex items-center justify-center h-full text-sm text-gray-500">
+        Bạn không có quyền xem bình luận và hoạt động
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -380,18 +377,7 @@ const TaskActivityPanel = ({
             </div>
           </>
         ) : (
-          /* === Hoạt động === */
-          <div className="space-y-4">
-            {activities.length === 0 ? (
-              <p className="text-center text-sm text-gray-500 py-8">
-                Chưa có hoạt động nào.
-              </p>
-            ) : (
-              activities.map((activity) => (
-                <ActivityItem key={activity._id} activity={activity} />
-              ))
-            )}
-          </div>
+          <TaskActivityLog taskId={taskId} socket={socket} />
         )}
       </div>
     </div>

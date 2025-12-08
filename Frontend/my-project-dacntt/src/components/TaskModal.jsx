@@ -8,8 +8,16 @@ import TaskDescription from "./TaskModal/TaskDescription";
 import TaskMembersPopup from "./TaskModal/TaskMemberPopup";
 import TaskActivityPanel from "./TaskModal/TaskActivityPanel";
 import AttachmentItem from "./TaskModal/AttachmentItem";
+import CheckItemsSection from "./TaskModal/CheckItemSection";
 
-const TaskModal = ({ task, isOpen, onClose, onTaskUpdate }) => {
+const TaskModal = ({
+  task,
+  isOpen,
+  onClose,
+  onTaskUpdate,
+  isMember = false,
+}) => {
+  const isReadOnly = !isMember;
   const [editedTask, setEditedTask] = useState(null);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
@@ -17,11 +25,10 @@ const TaskModal = ({ task, isOpen, onClose, onTaskUpdate }) => {
   const [socket, setSocket] = useState(null);
 
   const editorRef = useRef(null); // Ref cho editor MÔ TẢ
-  // const commentEditorRef = useRef(null); // Ref cho editor COMMENT
 
   const httpUrl = import.meta.env.VITE_API_URL;
   const accessToken = localStorage.getItem("accessToken");
-  const tinyApiKey = "emhcwa82lifw8ojhx436lj1rojy25bicl8d8ubfgavndvybz"; // API key của bạn
+  const tinyApiKey = import.meta.env.VITE_TINEY_APIKEY;
 
   // Thêm state cho upload
   const [uploadingFile, setUploadingFile] = useState(false);
@@ -37,10 +44,6 @@ const TaskModal = ({ task, isOpen, onClose, onTaskUpdate }) => {
   // State cho popup gán thành viên
   const [showMembersPopup, setShowMembersPopup] = useState(false);
   const membersButtonRef = useRef(null);
-
-  // State cho comment (thảo luận)
-  // const [comments, setComments] = useState([]);
-  const [activities] = useState([]); // Nếu có API
 
   // Khi task thay đổi => gọi API lấy chi tiết task
   useEffect(() => {
@@ -66,7 +69,6 @@ const TaskModal = ({ task, isOpen, onClose, onTaskUpdate }) => {
     fetchTaskDetail();
   }, [task, isOpen]);
 
-  // let socket;
   useEffect(() => {
     if (!isOpen || !task?._id) return;
 
@@ -77,7 +79,7 @@ const TaskModal = ({ task, isOpen, onClose, onTaskUpdate }) => {
       auth: { token: accessToken },
     });
 
-    setSocket(newSocket); // ✅ CẬP NHẬT STATE
+    setSocket(newSocket);
 
     newSocket.emit("joinBoard", task.boardId);
 
@@ -91,14 +93,14 @@ const TaskModal = ({ task, isOpen, onClose, onTaskUpdate }) => {
     });
 
     newSocket.on("taskTitleUpdated", (data) => {
-      console.log("📝 TaskModal received title update:", data);
+      console.log("TaskModal received title update:", data);
       if (data._id === task._id) {
         setEditedTask((prev) => (prev ? { ...prev, title: data.title } : null));
       }
     });
 
     newSocket.on("deadlineTaskUpdated", (data) => {
-      console.log("📝 TaskModal received deadline update:", data);
+      console.log("TaskModal received deadline update:", data);
       if (data._id === task._id) {
         setEditedTask((prev) =>
           prev
@@ -517,6 +519,7 @@ const TaskModal = ({ task, isOpen, onClose, onTaskUpdate }) => {
           onDueDateChange={(date) =>
             setEditedTask((prev) => ({ ...prev, dueDate: date }))
           }
+          isReadOnly={isReadOnly}
         />
 
         {/* Thân modal chia 2 cột */}
@@ -525,53 +528,47 @@ const TaskModal = ({ task, isOpen, onClose, onTaskUpdate }) => {
           <div className="flex-1 overflow-y-auto p-6 min-w-0">
             {/* --- Các nút hành động (Placeholder) --- */}
             <div className="flex flex-wrap gap-2 mb-6 relative">
+              {/* === NÚT THỜI GIAN === */}
               <button
-                className="flex items-center gap-1 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded text-sm"
-                onClick={() => setShowPopup(!showPopup)}
+                className={`flex items-center gap-1 px-3 py-2 rounded text-sm transition ${
+                  isReadOnly
+                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                    : "bg-gray-100 hover:bg-gray-200"
+                }`}
+                onClick={() => !isReadOnly && setShowPopup(!showPopup)}
+                disabled={isReadOnly}
               >
-                <ClockIcon /> Thời gian
+                <ClockIcon className="w-4 h-4" /> Thời gian
               </button>
-              <button className="flex items-center gap-1 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded text-sm">
-                Nhãn
+
+              <button
+                className={`flex items-center gap-1 px-3 py-2 rounded text-sm transition ${
+                  isReadOnly
+                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                    : "bg-gray-100 hover:bg-gray-200"
+                }`}
+                onClick={() => !isReadOnly && setShowPopup(!showPopup)}
+                disabled={isReadOnly}
+              >
+                <ClockIcon className="w-4 h-4" /> Nhãn dán
               </button>
-              <button className="bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded text-sm">
-                Việc cần làm
-              </button>
+
+              {/* === NÚT THÀNH VIÊN === */}
               <button
                 ref={membersButtonRef}
-                className="flex items-center gap-1 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded text-sm"
-                onClick={handleOpenMembers}
+                className={`flex items-center gap-1 px-3 py-2 rounded text-sm transition ${
+                  isReadOnly
+                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                    : "bg-gray-100 hover:bg-gray-200"
+                }`}
+                onClick={() => !isReadOnly && handleOpenMembers()}
+                disabled={isReadOnly}
               >
                 <UserIcon className="w-4 h-4" /> Thành viên
               </button>
 
-              {/* Popup */}
-              {showMembersPopup && (
-                <TaskMembersPopup
-                  boardId={task.boardId}
-                  taskId={task._id}
-                  onClose={() => setShowMembersPopup(false)}
-                  triggerRect={membersButtonRef.current?.getBoundingClientRect()}
-                  onMemberAssign={() => {
-                    // Cập nhật lại task hoặc toast
-                    setToast({
-                      show: true,
-                      type: "success",
-                      message: "Đã gán thành viên",
-                    });
-                  }}
-                  onMemberUnassign={() => {
-                    setToast({
-                      show: true,
-                      type: "success",
-                      message: "Đã bỏ gán thành viên",
-                    });
-                  }}
-                />
-              )}
-
-              {/* Nút thời gian */}
-              {showPopup && (
+              {/* === POPUP THỜI GIAN – CHỈ HIỆN KHI ĐƯỢC PHÉP === */}
+              {showPopup && !isReadOnly && (
                 <TaskDatePickerPopup
                   startDate={startDate}
                   dueDate={dueDate}
@@ -585,6 +582,30 @@ const TaskModal = ({ task, isOpen, onClose, onTaskUpdate }) => {
                   }
                   onClose={() => setShowPopup(false)}
                   onSave={handleSaveDate}
+                />
+              )}
+
+              {/* === POPUP THÀNH VIÊN – CHỈ HIỆN KHI ĐƯỢC PHÉP === */}
+              {showMembersPopup && !isReadOnly && (
+                <TaskMembersPopup
+                  boardId={editedTask.boardId}
+                  taskId={task._id}
+                  onClose={() => setShowMembersPopup(false)}
+                  triggerRect={membersButtonRef.current?.getBoundingClientRect()}
+                  onMemberAssign={() => {
+                    setToast({
+                      show: true,
+                      type: "success",
+                      message: "Đã gán thành viên",
+                    });
+                  }}
+                  onMemberUnassign={() => {
+                    setToast({
+                      show: true,
+                      type: "success",
+                      message: "Đã bỏ gán thành viên",
+                    });
+                  }}
                 />
               )}
             </div>
@@ -692,6 +713,7 @@ const TaskModal = ({ task, isOpen, onClose, onTaskUpdate }) => {
               loading={loading}
               tinyApiKey={tinyApiKey}
               descriptionEditorConfig={descriptionEditorConfig}
+              isReadOnly={isReadOnly}
             />
 
             {/* --- Tệp đính kèm --- */}
@@ -700,18 +722,28 @@ const TaskModal = ({ task, isOpen, onClose, onTaskUpdate }) => {
                 <h3 className="font-semibold text-gray-700">
                   Các tệp đính kèm
                 </h3>
-                <label className="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded cursor-pointer transition-colors">
-                  Thêm
-                  <input
-                    type="file"
-                    className="hidden"
-                    onChange={handleFileUpload}
-                    disabled={uploadingFile}
-                  />
-                </label>
+
+                {/* Nút "Thêm" – chỉ hiện khi ĐƯỢC PHÉP */}
+                {!isReadOnly && (
+                  <label
+                    className={`text-sm px-3 py-1.5 rounded transition-colors select-none ${
+                      uploadingFile
+                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                        : "bg-gray-100 hover:bg-gray-200 cursor-pointer"
+                    }`}
+                  >
+                    {uploadingFile ? "Đang tải lên..." : "Thêm"}
+                    <input
+                      type="file"
+                      className="hidden"
+                      onChange={handleFileUpload}
+                      disabled={uploadingFile || isReadOnly}
+                    />
+                  </label>
+                )}
               </div>
 
-              {/* Uploading indicator */}
+              {/* Uploading indicator – vẫn hiện nếu đang upload (trước khi bị khóa) */}
               {uploadingFile && (
                 <div className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg mb-2">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
@@ -724,7 +756,7 @@ const TaskModal = ({ task, isOpen, onClose, onTaskUpdate }) => {
                 </div>
               )}
 
-              {/* File list */}
+              {/* Danh sách file */}
               {editedTask.attachments?.length > 0 ? (
                 <div className="grid grid-cols-2 gap-3">
                   {editedTask.attachments.map((file) => (
@@ -733,27 +765,33 @@ const TaskModal = ({ task, isOpen, onClose, onTaskUpdate }) => {
                       file={file}
                       getFileIcon={getFileIcon}
                       formatFileSize={formatFileSize}
-                      onDelete={handleDeleteAttachment}
+                      onDelete={
+                        !isReadOnly ? handleDeleteAttachment : undefined
+                      } // ← Khóa xóa
                       accessToken={accessToken}
+                      isReadOnly={isReadOnly} // ← Truyền xuống để khóa nút xóa trong item
                     />
                   ))}
                 </div>
               ) : (
                 !uploadingFile && (
-                  <p className="text-sm text-gray-500 py-2">
-                    Chưa có tệp đính kèm nào.
+                  <p className="text-sm text-gray-500 py-3 text-center italic">
+                    {isReadOnly
+                      ? "Không có tệp đính kèm"
+                      : "Chưa có tệp đính kèm nào."}
                   </p>
                 )
               )}
             </div>
 
-            {/* --- Checklist (Placeholder) --- */}
-            <div className="mb-6">
-              <label className="flex items-center gap-2">
-                <input type="checkbox" />
-                <span>abc</span>
-              </label>
-            </div>
+            {/* --- CheckItems (Placeholder) --- */}
+            <CheckItemsSection
+              key={editedTask._id}
+              taskId={editedTask._id}
+              accessToken={accessToken}
+              socket={socket}
+              isReadOnly={isReadOnly}
+            />
 
             {/* --- Hành động (Xóa) --- */}
             <div className="mt-8 pt-4 border-t">
@@ -771,12 +809,12 @@ const TaskModal = ({ task, isOpen, onClose, onTaskUpdate }) => {
           <div className="w-2/5 min-w-0 flex flex-col bg-gray-50 border-l border-gray-200">
             <TaskActivityPanel
               taskId={editedTask._id}
-              boardId={task.boardId}
+              boardId={editedTask.boardId}
               tinyApiKey={tinyApiKey}
               commentEditorConfig={commentEditorConfig}
               accessToken={accessToken}
               socket={socket}
-              activities={activities}
+              isReadOnly={isReadOnly}
             />
           </div>
         </div>

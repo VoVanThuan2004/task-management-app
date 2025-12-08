@@ -9,10 +9,14 @@ const { getIO } = require("../config/socket");
 const cloudinary = require("../config/cloudinary");
 const { ObjectId } = require("mongodb");
 const reminderQueue = require("../services/reminderQueue");
+const actionMessage = require("../constants/actionMessage");
+const createActivityLogTask = require("../utils/createActivityLogTask");
+const User = require("../models/user");
 
 const addTask = async (req, res) => {
   try {
     const columnId = req.params.columnId;
+    const userId = req.user.userId;
 
     const { title } = req.body;
     if (!title) {
@@ -23,13 +27,25 @@ const addTask = async (req, res) => {
       });
     }
 
-    // 1. Kiểm tra column
-    const column = await Column.findById(columnId);
+    // 1. Kiểm tra column, user
+    const [column, user] = await Promise.all([
+      await Column.findById(columnId),
+      await User.findById(userId).select("fullName avatar"),
+    ]);
+
     if (!column) {
       return res.status(404).json({
         status: "error",
         code: 404,
         message: "Column không tồn tại",
+      });
+    }
+
+    if (!user) {
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Người dùng không hợp lệ",
       });
     }
 
@@ -70,9 +86,27 @@ const addTask = async (req, res) => {
     });
 
     // 7. Gửi lên Socket - thông báo
+    const activityLog = await createActivityLogTask({
+      userId,
+      boardId: task.boardId,
+      taskId: task._id,
+      action: "TASK_CREATE",
+      target: task.title,
+    });
+
+    io.to(task._id.toString()).emit("activityLogTask", {
+      userId,
+      fullName: user.fullName,
+      avatar: user.avatar,
+      taskId: activityLog.taskId,
+      boardId: activityLog.boardId,
+      action: activityLog.action,
+      description: activityLog.description,
+      createdAt: activityLog.createdAt,
+    });
 
     return res.status(201).json({
-      status: "error",
+      status: "success",
       code: 201,
       message: "Task đã được thêm vào",
       data: {
@@ -96,6 +130,7 @@ const addTask = async (req, res) => {
 const updateTaskTitle = async (req, res) => {
   try {
     const taskId = req.params.taskId;
+    const userId = req.user.userId;
 
     const { title } = req.body;
     if (!title) {
@@ -107,12 +142,23 @@ const updateTaskTitle = async (req, res) => {
     }
 
     // 1. Tìm task có tồn tại
-    const task = await Task.findById(taskId);
+    const [task, user] = await Promise.all([
+      await Task.findById(taskId),
+      await User.findById(userId).select("fullName avatar"),
+    ]);
+
     if (!task) {
       return res.status(404).json({
         status: "error",
         code: 404,
         message: "Task không tồn tại",
+      });
+    }
+    if (!user) {
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Người dùng không hợp lệ",
       });
     }
 
@@ -132,6 +178,24 @@ const updateTaskTitle = async (req, res) => {
     });
 
     // 4. Gửi lên Socket - thông báo
+    const activityLog = await createActivityLogTask({
+      userId,
+      boardId: task.boardId,
+      taskId: task._id,
+      action: "TASK_UPDATE_TITLE",
+      target: task.title,
+    });
+
+    io.to(task._id.toString()).emit("activityLogTask", {
+      userId,
+      fullName: user.fullName,
+      avatar: user.avatar,
+      taskId: activityLog.taskId,
+      boardId: activityLog.boardId,
+      action: activityLog.action,
+      description: activityLog.description,
+      createdAt: activityLog.createdAt,
+    });
 
     return res.status(201).json({
       status: "error",
@@ -223,7 +287,6 @@ const getFullTaskWithTotals = async (taskId) => {
   };
 };
 
-
 const moveTask = async (req, res) => {
   try {
     const taskId = req.params.taskId;
@@ -311,7 +374,9 @@ const moveTask = async (req, res) => {
       updatedTasks.map((t) => getFullTaskWithTotals(t._id))
     );
 
-    const fullMovedTask = fullTasksInDestination.find(t => t._id.toString() === taskId);
+    const fullMovedTask = fullTasksInDestination.find(
+      (t) => t._id.toString() === taskId
+    );
 
     // EMIT SOCKET
     const io = getIO();
@@ -334,7 +399,7 @@ const moveTask = async (req, res) => {
         newPosition: task.position,
         destinationColumnId,
         reindexed: needReindex,
-        tasks: fullTasksInDestination.map(t => ({
+        tasks: fullTasksInDestination.map((t) => ({
           _id: t._id,
           title: t.title,
           position: t.position,
@@ -357,11 +422,10 @@ const moveTask = async (req, res) => {
   }
 };
 
-
-
 const updateDeadlineTask = async (req, res) => {
   try {
     const taskId = req.params.taskId;
+    const userId = req.user.userId;
     const { startDate, dueDate, reminderEnabled, reminderTime } = req.body;
 
     if (!taskId) {
@@ -384,12 +448,22 @@ const updateDeadlineTask = async (req, res) => {
       });
     }
 
-    const task = await Task.findById(taskId);
+    const [task, user] = await Promise.all([
+      await Task.findById(taskId),
+      await User.findById(userId).select("fullName avatar"),
+    ]);
     if (!task) {
       return res.status(404).json({
         status: "error",
         code: 404,
         message: "Task không tồn tại",
+      });
+    }
+    if (!user) {
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Người dùng không hợp lệ",
       });
     }
 
@@ -406,7 +480,6 @@ const updateDeadlineTask = async (req, res) => {
     await task.save();
 
     // Xóa job cũ nếu có
-    // Xóa job cũ
     const jobIds = [
       `${task._id}-reminder`,
       `${task._id}-nearDeadline`,
@@ -500,6 +573,25 @@ const updateDeadlineTask = async (req, res) => {
       dueDate: task.dueDate,
       reminderEnabled: task.reminderEnabled,
       reminderTime: task.reminderTime,
+    });
+
+    // Cập nhật socket Activity Log (Hoạt động thông báo)
+    const activityLog = await createActivityLogTask({
+      userId,
+      boardId: task.boardId,
+      taskId: task._id,
+      action: "DEADLINE_SET",
+    });
+
+    io.to(task._id.toString()).emit("activityLogTask", {
+      userId,
+      fullName: user.fullName,
+      avatar: user.avatar,
+      taskId: activityLog.taskId,
+      boardId: activityLog.boardId,
+      action: activityLog.action,
+      description: activityLog.description,
+      createdAt: activityLog.createdAt,
     });
 
     // Trả về response
@@ -718,13 +810,26 @@ const uploadFile = async (req, res) => {
     }
 
     // 2. Kiểm tra task
-    const task = await Task.findById(taskId);
+    const [task, user] = await Promise.all([
+      await Task.findById(taskId),
+      await User.findById(userId).select("fullName avatar"),
+    ]);
+
     if (!task) {
       await deleteUploadedFileCloudinary(req.file);
       return res.status(404).json({
         status: "error",
         code: 404,
         message: "Task không tồn tại",
+      });
+    }
+
+    if (!user) {
+      await deleteUploadedFileCloudinary(req.file);
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Người dùng không hợp lệ",
       });
     }
 
@@ -753,6 +858,24 @@ const uploadFile = async (req, res) => {
     });
 
     // 5. Gửi lên Socket - thông báo các thành viên khác
+    const activityLog = await createActivityLogTask({
+      userId,
+      boardId: task.boardId,
+      taskId: task._id,
+      action: "ATTACHMENT_UPLOAD",
+      target: attachment.fileName,
+    });
+
+    io.to(task._id.toString()).emit("activityLogTask", {
+      userId,
+      fullName: user.fullName,
+      avatar: user.avatar,
+      taskId: activityLog.taskId,
+      boardId: activityLog.boardId,
+      action: activityLog.action,
+      description: activityLog.description,
+      createdAt: activityLog.createdAt,
+    });
 
     return res.status(200).json({
       status: "success",
@@ -778,19 +901,31 @@ const deleteUploadedFileCloudinary = async (file) => {
 // Xóa file đính kèm
 const deleteFile = async (req, res) => {
   try {
+    const userId = req.user.userId;
     const attachmentId = req.params.attachmentId;
 
     // 1️. Kiểm tra attachment tồn tại
-    const attachment = await Attachment.findById(attachmentId).populate({
-      path: "taskId",
-      select: "_id boardId", // populate để có boardId
-    });
+    const [attachment, user] = await Promise.all([
+      await Attachment.findById(attachmentId).populate({
+        path: "taskId",
+        select: "_id boardId", // populate để có boardId
+      }),
+      await User.findById(userId).select("fullName avatar"),
+    ]);
 
     if (!attachment) {
       return res.status(404).json({
         status: "error",
         code: 404,
         message: "File đính kèm không tồn tại",
+      });
+    }
+
+    if (!user) {
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Người dùng không hợp lệ",
       });
     }
 
@@ -811,7 +946,9 @@ const deleteFile = async (req, res) => {
     // 3️. Xóa bản ghi trong database
     await Attachment.deleteOne({ _id: attachment._id });
 
-    const totalAttachments = await Attachment.countDocuments({ taskId: task._id });
+    const totalAttachments = await Attachment.countDocuments({
+      taskId: task._id,
+    });
 
     // 4️. Phát socket event đến tất cả người trong cùng board
     const io = getIO();
@@ -819,6 +956,26 @@ const deleteFile = async (req, res) => {
       taskId: task._id,
       attachmentId: attachment._id,
       totalAttachments,
+    });
+
+    // Cập nhật thông báo socket
+    const activityLog = await createActivityLogTask({
+      userId,
+      boardId: task.boardId,
+      taskId: task._id,
+      action: "ATTACHMENT_DELETE",
+      target: attachment.fileName,
+    });
+
+    io.to(task._id.toString()).emit("activityLogTask", {
+      userId,
+      fullName: user.fullName,
+      avatar: user.avatar,
+      taskId: activityLog.taskId,
+      boardId: activityLog.boardId,
+      action: activityLog.action,
+      description: activityLog.description,
+      createdAt: activityLog.createdAt,
     });
 
     // 5️. Trả về phản hồi cho client
@@ -840,7 +997,7 @@ const getTaskDetail = async (req, res) => {
   try {
     const { taskId } = req.params;
 
-    // 1️⃣ Kiểm tra task tồn tại
+    // 1️. Kiểm tra task tồn tại
     const task = await Task.findById(taskId);
     if (!task) {
       return res.status(404).json({
@@ -850,11 +1007,11 @@ const getTaskDetail = async (req, res) => {
       });
     }
 
-    // 2️⃣ Lấy chi tiết Task kèm các thông tin liên quan
+    // 2. Lấy chi tiết Task kèm CheckItems
     const [taskDetail] = await Task.aggregate([
       { $match: { _id: new ObjectId(taskId) } },
 
-      // 🎨 Labels
+      // Labels (giữ nguyên nếu bạn còn dùng)
       {
         $lookup: {
           from: "tasklabels",
@@ -883,75 +1040,77 @@ const getTaskDetail = async (req, res) => {
         },
       },
 
-      // 🧾 Checklists và Items
+      // CheckItems (mới – thay thế hoàn toàn checklists)
       {
         $lookup: {
-          from: "checklists",
+          from: "checkitems", // tên collection (mongoose tự lowercase + thêm s)
           localField: "_id",
           foreignField: "taskId",
-          as: "checklists",
+          as: "checkItems",
           pipeline: [
+            // Lấy thông tin người được giao
             {
               $lookup: {
-                from: "checklistitems",
-                localField: "_id",
-                foreignField: "checklistId",
-                as: "items",
-                pipeline: [
-                  {
-                    $lookup: {
-                      from: "users",
-                      localField: "assignedTo",
-                      foreignField: "_id",
-                      as: "assignedUser",
-                    },
-                  },
-                  {
-                    $unwind: {
-                      path: "$assignedUser",
-                      preserveNullAndEmptyArrays: true,
-                    },
-                  },
-                  {
-                    $project: {
-                      _id: 1,
-                      title: 1,
-                      isCompleted: 1,
-                      position: 1,
-                      dueDate: 1,
-                      assignedTo: {
-                        _id: "$assignedUser._id",
-                        fullName: "$assignedUser.fullName",
-                        avatar: "$assignedUser.avatar",
-                      },
-                      createdAt: 1,
-                      updatedAt: 1,
-                    },
-                  },
-                  { $sort: { position: 1 } }, // Sắp xếp items theo position
-                ],
+                from: "users",
+                localField: "assignedTo",
+                foreignField: "_id",
+                as: "assignedUser",
               },
             },
             {
-              $addFields: {
-                totalItems: { $size: "$items" },
-                completedItems: {
-                  $size: {
-                    $filter: {
-                      input: "$items",
-                      as: "item",
-                      cond: { $eq: ["$$item.isCompleted", true] },
-                    },
-                  },
-                },
+              $unwind: {
+                path: "$assignedUser",
+                preserveNullAndEmptyArrays: true,
               },
             },
-            { $sort: { position: 1 } }, // Sắp xếp checklists theo position
+
+            // Sắp xếp theo position
+            { $sort: { position: 1 } },
+
+            // Project fields cần thiết
+            {
+              $project: {
+                _id: 1,
+                title: 1,
+                isCompleted: 1,
+                position: 1,
+                dueDate: 1,
+                assignedTo: {
+                  $cond: {
+                    if: { $ne: ["$assignedUser", []] },
+                    then: {
+                      _id: "$assignedUser._id",
+                      fullName: "$assignedUser.fullName",
+                      avatar: "$assignedUser.avatar",
+                    },
+                    else: null,
+                  },
+                },
+                createdAt: 1,
+                updatedAt: 1,
+              },
+            },
           ],
         },
       },
 
-      // 📎 Attachments
+      // Tính tổng và số hoàn thành
+      {
+        $addFields: {
+          totalCheckItems: { $size: "$checkItems" },
+          completedCheckItems: {
+            $size: {
+              $filter: {
+                input: "$checkItems",
+                as: "item",
+                cond: { $eq: ["$$item.isCompleted", true] },
+              },
+            },
+          },
+        },
+      },
+
+      // Attachments
       {
         $lookup: {
           from: "attachments",
@@ -961,9 +1120,10 @@ const getTaskDetail = async (req, res) => {
         },
       },
 
-      // 🎯 Projection cuối cùng
+      // Final projection
       {
         $project: {
+          boardId: 1,
           title: 1,
           description: 1,
           startDate: 1,
@@ -972,10 +1132,10 @@ const getTaskDetail = async (req, res) => {
           status: 1,
           position: 1,
           labels: 1,
-          checklists: 1,
+          checkItems: 1, // ← Mới: danh sách check items
+          totalCheckItems: 1, // ← Tổng số
+          completedCheckItems: 1, // ← Số đã hoàn thành
           attachments: 1,
-          totalChecklistItems: 1,
-          completedChecklistItems: 1,
           createdAt: 1,
           updatedAt: 1,
         },
@@ -996,6 +1156,90 @@ const getTaskDetail = async (req, res) => {
   }
 };
 
+const toggleTask = async (req, res) => {
+  try {
+    const taskId = req.params.taskId;
+    const userId = req.user.userId;
+    if (!taskId) {
+      await deleteUploadedFileCloudinary(req.file);
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Vui lòng nhập id task",
+      });
+    }
+
+    // 1. Kiểm tra task, user
+    const [task, user] = await Promise.all([
+      await Task.findById(taskId),
+      await User.findById(userId).select("fullName avatar"),
+    ]);
+
+    if (!task) {
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Task không tồn tại",
+      });
+    }
+
+    if (!user) {
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Người dùng không hợp lệ",
+      });
+    }
+
+    // 2. Cập nhật trạng thái
+    task.isCompleted = !task.isCompleted;
+    await task.save();
+
+    // 3. Gửi lên socket cập nhật trạng thái
+    const io = getIO();
+    io.to(task.boardId.toString()).emit("toggleTask", {
+      taskId,
+      isCompleted: task.isCompleted,
+    });
+
+    // 4. Gửi lên socket cập nhật thông báo
+    const activityLog = await createActivityLogTask({
+      userId,
+      boardId: task.boardId,
+      taskId,
+      action: task.isCompleted ? "TASK_COMPLETE" : "TASK_UNCOMPLETE",
+    });
+    io.to(task._id.toString()).emit("activityLogTask", {
+      userId,
+      fullName: user.fullName,
+      avatar: user.avatar,
+      taskId: activityLog.taskId,
+      boardId: activityLog.boardId,
+      action: activityLog.action,
+      description: activityLog.description,
+      createdAt: activityLog.createdAt,
+    });
+
+    return res.status(200).json({
+      status: "success",
+      code: 200,
+      message: task.isCompleted ? "Đã hoàn thành task" : "Chưa hoàn thành task",
+      data: {
+        _id: task._id,
+        isCompleted: task.isCompleted,
+        boardId: task.boardId,
+        columnId: task.columnId,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      code: 500,
+      message: "Lỗi hệ thống: " + error,
+    });
+  }
+};
+
 module.exports = {
   addTask,
   updateTaskTitle,
@@ -1007,4 +1251,5 @@ module.exports = {
   uploadFile,
   deleteFile,
   getTaskDetail,
+  toggleTask,
 };

@@ -34,7 +34,7 @@ router.get("/api/v1/boards-invited", auth, boardController.getAllBoardsInvited);
 router.post("/api/v1/boards/share", auth, boardController.shareBoard);
 
 // Lấy chi tiết bảng làm việc
-router.get("/api/v1/boards-detail/:boardId", auth, boardController.getBoardDetail);
+router.get("/api/v1/boards-detail/:boardId", boardController.getBoardDetail);
 
 
 module.exports = router;

@@ -204,7 +204,7 @@ const moveColumn = async (req, res) => {
         allColumns[i].position = (i + 1) * spacing;
         await allColumns[i].save();
       }
-      console.log("⚙️ Re-index lại position cho columns trong board:", boardId);
+      console.log("Re-index lại position cho columns trong board:", boardId);
     }
 
     // Trả về dữ liệu chi tiết
@@ -277,47 +277,44 @@ const getAllColumns = async (req, res) => {
           isArchived: false,
         },
       },
+
+      // ──────────────────────────────
+      // LẤY TẤT CẢ TASK TRONG COLUMN
+      // ──────────────────────────────
       {
         $lookup: {
           from: "tasks",
-          foreignField: "columnId",
           localField: "_id",
+          foreignField: "columnId",
           as: "tasks",
           pipeline: [
+            // 1. CHECKITEMS – CHỈ CÒN DÙNG CÁNH RIÊNG NÀY
             {
               $lookup: {
-                from: "checklists",
+                from: "checkitems", // collection name (mongoose tự thêm s)
                 localField: "_id",
                 foreignField: "taskId",
-                as: "checklists",
-                pipeline: [
-                  {
-                    $lookup: {
-                      from: "checklistitems",
-                      localField: "_id",
-                      foreignField: "checklistId",
-                      as: "checklistitems",
-                    },
-                  },
-                  {
-                    $addFields: {
-                      totalItems: { $size: "$checklistitems" },
-                      completedItems: {
-                        $size: {
-                          $filter: {
-                            input: "$checklistitems",
-                            as: "item",
-                            cond: { $eq: ["$$item.isCompleted", true] },
-                          },
-                        },
-                      },
-                    },
-                  },
-                ],
+                as: "checkItems",
               },
             },
 
-            // Lấy những comment thuộc task
+            // 2. TÍNH TỔNG VÀ HOÀN THÀNH
+            {
+              $addFields: {
+                totalCheckItems: { $size: "$checkItems" },
+                completedCheckItems: {
+                  $size: {
+                    $filter: {
+                      input: "$checkItems",
+                      as: "item",
+                      cond: { $eq: ["$$item.isCompleted", true] },
+                    },
+                  },
+                },
+              },
+            },
+
+            // 3. COMMENTS
             {
               $lookup: {
                 from: "comments",
@@ -327,7 +324,7 @@ const getAllColumns = async (req, res) => {
               },
             },
 
-            // Lấy những file upload trong task
+            // 4. ATTACHMENTS
             {
               $lookup: {
                 from: "attachments",
@@ -337,7 +334,7 @@ const getAllColumns = async (req, res) => {
               },
             },
 
-            // Lấy những label trong task
+            // 5. LABELS
             {
               $lookup: {
                 from: "tasklabels",
@@ -353,9 +350,7 @@ const getAllColumns = async (req, res) => {
                       as: "labelDetails",
                     },
                   },
-                  {
-                    $unwind: "$labelDetails",
-                  },
+                  { $unwind: "$labelDetails" },
                   {
                     $project: {
                       _id: 0,
@@ -368,51 +363,46 @@ const getAllColumns = async (req, res) => {
               },
             },
 
-            // Tổng hợp lại các trường tính tổng
+            // 6. TỔNG HỢP FIELD ĐỂ FRONTEND KHÔNG PHẢI SỬA GÌ CẢ
             {
               $addFields: {
-                totalChecklists: {
-                  $size: "$checklists",
-                },
-                totalChecklistItems: {
-                  $sum: "$checklists.totalItems",
-                },
-                completedChecklistItems: { $sum: "$checklists.completedItems" },
-                totalComments: {
-                  $size: "$comments",
-                },
-                totalAttachments: {
-                  $size: "$attachments",
-                },
+                // Giữ nguyên tên cũ để frontend không cần đổi
+                // totalChecklists: "$totalCheckItems",
+                totalCheckItems: "$totalCheckItems",
+                totalCheckItemsCompleted: "$completedCheckItems",
+
+                totalComments: { $size: "$comments" },
+                totalAttachments: { $size: "$attachments" },
               },
             },
 
-            // Chỉ chọn các trường cần thiết
+            // 7. CHỈ TRẢ VỀ CÁC FIELD CẦN THIẾT
             {
               $project: {
                 _id: 1,
                 title: 1,
                 position: 1,
-                background: 1,
                 isCompleted: 1,
-                starDate: 1,
+                startDate: 1,
                 dueDate: 1,
                 status: 1,
-                boardId: 1,
-                totalChecklists: 1,
-                totalChecklistItems: 1,
+
+                // Checklist fields (tương thích 100% với code cũ)
+                totalCheckItems: 1,
+                totalCheckItemsCompleted: 1,
+
                 totalComments: 1,
                 totalAttachments: 1,
-                taskLabels: 1,
+                taskLabels: "$tasklabels",
               },
             },
+
             { $sort: { position: 1 } },
           ],
         },
       },
-      {
-        $sort: { position: 1 },
-      },
+
+      { $sort: { position: 1 } },
     ]);
 
     return res.status(200).json({

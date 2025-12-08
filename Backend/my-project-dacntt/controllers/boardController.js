@@ -9,7 +9,7 @@ const Notification = require("../models/notification");
 const { getIO } = require("../config/socket");
 const cloudinary = require("../config/cloudinary");
 const { sendShareBoardEmail } = require("../config/mailConfig");
-// const { getChannel } = require("../config/rabbitmq");
+const jwt = require("jsonwebtoken");
 
 const createBoard = async (req, res) => {
   const userId = req.user.userId;
@@ -555,7 +555,7 @@ const shareBoard = async (req, res) => {
       results.push(member);
     }
 
-    // 3️. Gửi email mời 
+    // 3️. Gửi email mời
     const sharer = await User.findById(sharerId);
     const invitedUsers = await User.find({ _id: { $in: userIds } });
 
@@ -577,7 +577,6 @@ const shareBoard = async (req, res) => {
       );
     }
 
-
     // Gửi lên Socket - thông báo realtime
 
     // 4️. Ghi thông báo mời vào bảng notifications
@@ -596,7 +595,7 @@ const shareBoard = async (req, res) => {
       data: results,
     });
   } catch (error) {
-    console.error("❌ shareBoard error:", error);
+    console.error("shareBoard error:", error);
     return res.status(500).json({
       status: "error",
       code: 500,
@@ -605,31 +604,108 @@ const shareBoard = async (req, res) => {
   }
 };
 
+// controllers/boardController.js hoặc tương tự
 const getBoardDetail = async (req, res) => {
   try {
     const boardId = req.params.boardId;
+    let userId = null;
 
-    // 1. Kiểm tra board
-    const existingBoard = await Board.findById(boardId);
-    if (!existingBoard) {
+    const authHeader = req.headers.authorization;
+    if (authHeader) {
+      const token = authHeader.split(" ")[1];
+      try {
+        const decoded = jwt.verify(token, process.env.SECRET_KEY);
+        userId = decoded.userId;
+      } catch (err) {
+        // Token sai → coi như khách vãng lai
+        console.log("Token không hợp lệ:", err.message);
+      }
+    }
+
+    // 1. Tìm board
+    const board = await Board.findById(boardId);
+    if (!board) {
       return res.status(404).json({
         status: "error",
-        code: 404,
         message: "Bảng làm việc không tồn tại",
       });
     }
 
-    return res.status(200).json({
-      status: "success",
-      code: 200,
-      message: "Lấy chi tiết bảng làm việc",
-      data: existingBoard,
-    });
+    // 2. Kiểm tra quyền truy cập
+    const boardType = board.type || "private"; // mặc định là private nếu không có
+
+    // Kiểm tra người dùng có trong member hay không
+    let isMember = false;
+
+    if (userId != null) {
+      const boardMember = await BoardMember.findOne({ boardId, userId });
+      isMember = boardMember ? true : false;
+    }
+
+    // Public → ai cũng xem được
+    if (boardType === "public") {
+      if (board.ownerId.toString() === userId) {
+        isMember = true;
+      }
+      return res.status(200).json({
+        status: "success",
+        message: "Lấy chi tiết bảng làm việc thành công",
+        data: {
+          isMember,
+          board,
+        },
+      });
+    }
+
+    // Nếu không phải public → phải đăng nhập
+    if (!userId) {
+      return res.status(401).json({
+        status: "error",
+        message: "Bạn cần đăng nhập để xem bảng này",
+      });
+    }
+
+    // Private → chỉ chủ sở hữu mới được xem
+    if (boardType === "private") {
+      if (board.ownerId.toString() !== userId.toString()) {
+        return res.status(403).json({
+          status: "error",
+          message: "Bạn không có quyền truy cập bảng riêng tư này",
+        });
+      }
+      // Là owner → cho xem
+      return res.status(200).json({
+        status: "success",
+        code: 200,
+        data: { board, isMember: true },
+      });
+    }
+
+    // Workspace → kiểm tra thành viên (giả sử bạn có model BoardMember)
+    if (boardType === "workspace") {
+      const member = await BoardMember.findOne({
+        boardId,
+        userId,
+        status: { $in: ["accepted", "owner"] },
+      });
+
+      if (!member) {
+        return res.status(403).json({
+          status: "error",
+          message: "Bạn không phải thành viên của bảng nhóm này",
+        });
+      }
+      // Là member → cho xem
+      return res.status(200).json({
+        status: "success",
+        data: { board, isMember: true },
+      });
+    }
   } catch (error) {
+    console.error("Lỗi getBoardDetail:", error);
     return res.status(500).json({
       status: "error",
-      code: 500,
-      message: "Lỗi hệ thống: " + error.message,
+      message: "Lỗi hệ thống: " + error,
     });
   }
 };

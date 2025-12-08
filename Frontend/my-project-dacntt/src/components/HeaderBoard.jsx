@@ -382,30 +382,10 @@ const HeaderBoard = ({ board, boardTitle, onBoardUpdate }) => {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-5">
           {/* Members List */}
           <div className="relative" ref={membersRef}>
-            <button
-              onClick={() => setShowMembers(!showMembers)}
-              className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-            >
-              <svg
-                className="w-5 h-5 text-gray-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"
-                />
-              </svg>
-              <span className="text-sm font-medium text-gray-700">
-                Thành viên
-              </span>
-            </button>
+          
 
             {/* Members Popup */}
             {showMembers && (

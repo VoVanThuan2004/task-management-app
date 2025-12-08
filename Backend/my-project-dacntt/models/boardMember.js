@@ -20,9 +20,12 @@ const boardMemberSchema = new mongoose.Schema({
     required: true,
   },
   role: { type: String },
-  status: { type: String, default: "Đang chờ" },
+  status: { type: String, default: "pending" },
   invitedAt: { type: Date },
-  acceptedAt: { type: Date, default: null }
+  acceptedAt: { type: Date, default: null },
 });
+
+// Tạo index
+boardMemberSchema.index({ userId: 1, boardId: 1 }, { unique: true });
 
 module.exports = mongoose.model("BoardMember", boardMemberSchema);

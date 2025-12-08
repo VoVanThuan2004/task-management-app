@@ -204,7 +204,7 @@ const MemberItem = ({ user, isAssigned, onToggle }) => {
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-xs font-bold text-gray-600">
-              {user.fullName.charAt(0).toUpperCase()}
+              {user.fullName?.charAt(0)?.toUpperCase()}
             </div>
           )}
         </div>

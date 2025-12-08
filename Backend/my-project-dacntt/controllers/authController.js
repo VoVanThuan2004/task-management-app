@@ -62,7 +62,7 @@ const login = async (req, res) => {
       },
       process.env.SECRET_KEY,
       {
-        expiresIn: "7d",
+        expiresIn: "30d",
       }
     );
 
@@ -74,7 +74,7 @@ const login = async (req, res) => {
       },
       process.env.SECRET_KEY,
       {
-        expiresIn: "30d",
+        expiresIn: "60d",
       }
     );
 
@@ -83,7 +83,7 @@ const login = async (req, res) => {
       refreshToken,
       userAgent: req.headers["user-agent"],
       ipAddress: req.ip,
-      expiredAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 ngày
+      expiredAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000), // 30 ngày
     });
 
     return res.status(200).json({
@@ -185,7 +185,7 @@ const loginSocialAccount = async (req, res) => {
       },
       SECRET_KEY,
       {
-        expiresIn: "24h",
+        expiresIn: "30d",
       }
     );
 
@@ -198,7 +198,7 @@ const loginSocialAccount = async (req, res) => {
       },
       SECRET_KEY,
       {
-        expiresIn: "30d",
+        expiresIn: "60d",
       }
     );
 
@@ -207,7 +207,7 @@ const loginSocialAccount = async (req, res) => {
       refreshToken: refreshToken,
       userAgent: req.headers["user-agent"],
       ipAddress: req.ip,
-      expiredAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 ngày
+      expiredAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000), // 60 ngày
     });
 
     return res.status(200).json({
