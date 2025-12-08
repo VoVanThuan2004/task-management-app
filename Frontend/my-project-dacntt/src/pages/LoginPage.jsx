@@ -14,6 +14,7 @@ const LoginPage = () => {
 
   const navigate = useNavigate();
   const { fetchUser } = useUser();
+  const httpUrl = import.meta.env.VITE_API_URL;
 
   useEffect(() => {
     const accessToken = localStorage.getItem("accessToken");
@@ -42,7 +43,7 @@ const LoginPage = () => {
 
     try {
       const response = await axios.post(
-        "http://localhost:8080/api/v1/auth/login",
+        `${httpUrl}/api/v1/auth/login`,
         { email, password },
         { headers: { "Content-Type": "application/json" } }
       );
