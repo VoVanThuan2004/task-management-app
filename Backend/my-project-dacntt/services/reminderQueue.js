@@ -14,7 +14,6 @@ const { sendTaskDeadlineEmail } = require("../config/mailConfig");
 //   maxRetriesPerRequest: null,
 //   enableReadyCheck: false,
 // });
-
 const connection = new Redis(process.env.REDIS_URL || "", {
   maxRetriesPerRequest: null,
   enableReadyCheck: false,
