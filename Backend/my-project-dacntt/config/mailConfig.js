@@ -154,6 +154,68 @@ const sendTaskDeadlineEmail = async (to, task) => {
   await sendEmail(to, subject, html);
 };
 
+// Hàm thông báo email - xóa thành viên ra khỏi bảng làm việc
+const sendRemoveFromBoardEmail = async (to, boardTitle) => {
+  const subject = `Bạn đã bị xóa khỏi bảng "${boardTitle}"`;
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; max-width:600px; margin:0 auto;">
+      <!-- Header -->
+      <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 20px; text-align: center; border-radius: 8px 8px 0 0;">
+        <h1 style="color: #fff; margin: 0; font-size: 28px;">Cập nhật bảng làm việc</h1>
+      </div>
+
+      <!-- Content -->
+      <div style="background: #f8f9fa; padding: 40px 20px; border-radius: 0 0 8px 8px; border: 1px solid #e0e0e0; border-top: none;">
+        <div style="background: #fff; padding: 30px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+          
+          <!-- Main Message -->
+          <div style="text-align: center; margin-bottom: 30px;">
+            <div style="font-size: 48px; margin-bottom: 15px;">👋</div>
+            <p style="color: #333; font-size: 16px; line-height: 1.6; margin: 0;">
+              Xin thông báo rằng Quản trị viên đã xóa bạn khỏi bảng làm việc:
+            </p>
+          </div>
+
+          <!-- Board Info Card -->
+          <div style="background: #f0f2f5; border-left: 4px solid #667eea; padding: 20px; border-radius: 6px; margin: 25px 0;">
+            <p style="margin: 0; color: #666; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Bảng làm việc</p>
+            <h2 style="margin: 8px 0 0 0; color: #333; font-size: 22px; font-weight: 600;">
+              📋 ${boardTitle}
+            </h2>
+          </div>
+
+          <!-- Info Text -->
+          <div style="margin: 30px 0; padding: 20px; background: #e7f3ff; border-radius: 6px; border-left: 4px solid #667eea;">
+            <p style="color: #0066cc; font-size: 14px; margin: 0; line-height: 1.6;">
+              <strong>Điều này có nghĩa là:</strong>
+            </p>
+            <ul style="margin: 10px 0 0 0; padding-left: 20px; color: #0066cc; font-size: 14px;">
+              <li style="margin: 5px 0;">Bạn sẽ không còn nhìn thấy bảng này trong danh sách bảng của mình</li>
+              <li style="margin: 5px 0;">Bạn không thể truy cập hoặc chỉnh sửa các task trên bảng này</li>
+              <li style="margin: 5px 0;">Bạn sẽ không nhận được thông báo từ bảng này nữa</li>
+            </ul>
+          </div>
+
+          <!-- Footer -->
+          <div style="text-align: center; color: #999; font-size: 12px; line-height: 1.6;">
+            <p style="margin: 5px 0;">
+              Đây là email tự động từ <b>Hệ thống quản lý công việc</b>
+            </p>
+            <p style="margin: 5px 0;">
+              Nếu bạn có bất kỳ câu hỏi, vui lòng liên hệ với chúng tôi.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Brand Footer -->
+      <div style="text-align: center; padding: 20px; color: #999; font-size: 12px;">
+        <p style="margin: 0;">© 2025 Hệ thống quản lý công việc. All rights reserved.</p>
+      </div>
+    </div>
+  `;
+  await sendEmail(to, subject, html);
+};
 
 module.exports = {
   sendCreateAccount,
@@ -161,5 +223,6 @@ module.exports = {
   sendShareBoardEmail,
   sendAssignTaskEmail,
   sendTaskDeadlineEmail,
-  sendRemoveMemberEmail
+  sendRemoveMemberEmail,
+  sendRemoveFromBoardEmail,
 };

@@ -20,8 +20,8 @@ const addCheckItem = async (req, res) => {
 
     // 2. Kiểm tra task
     const [task, user] = await Promise.all([
-      await Task.findById(taskId),
-      await User.findById(userId),
+      Task.findById(taskId),
+      User.findById(userId),
     ]);
     if (!task) {
       return res.status(404).json({
@@ -376,12 +376,12 @@ const toggleCheckItemComplete = async (req, res) => {
 
     // 1. Kiểm tra checklist-item
     const [checkItem, user] = await Promise.all([
-      await CheckItem.findById(checkItemId).populate({
+      CheckItem.findById(checkItemId).populate({
         path: "taskId",
         select: "boardId",
       }),
 
-      await User.findById(userId),
+      User.findById(userId).select("fullName avatar"),
     ]);
     if (!checkItem) {
       return res.status(404).json({
@@ -392,10 +392,10 @@ const toggleCheckItemComplete = async (req, res) => {
     }
 
     // 2. Kiểm tra trạng thái hiện tại checklist-item
-    const currentStatus = checkItem.isCompleted;
+    // const currentStatus = checkItem.isCompleted;
 
     // 3. Cập nhật lại checklist-item
-    checkItem.isCompleted = !currentStatus;
+    checkItem.isCompleted = !checkItem.isCompleted;
     await checkItem.save();
 
     // 4. Gửi lên socket realtime
@@ -408,7 +408,6 @@ const toggleCheckItemComplete = async (req, res) => {
       assignedTo: checkItem.assignedTo,
       dueDate: checkItem.dueDate,
     });
-
 
     // === ActivityLogs (Gửi thông báo) ===
     const activityLog = await createActivityLogTask({
@@ -430,7 +429,6 @@ const toggleCheckItemComplete = async (req, res) => {
       description: activityLog.description,
       createdAt: activityLog.createdAt,
     });
-
 
     // 5. Gửi lên socket - cập nhật lại tổng số check-item hoàn thành
     // === Lấy tổng số check-item hoàn thành - Tổng số check-item hiện có ===
@@ -492,8 +490,8 @@ const getAllCheckItems = async (req, res) => {
 
     // 2. Lấy danh sách số lượng checkItems hoàn thành có positon tăng dần
     const [totalCheckItemsCompleted, checkItems] = await Promise.all([
-      await CheckItem.countDocuments({ isCompleted: true }),
-      await CheckItem.find({ taskId }).sort({ position: 1 }),
+      CheckItem.countDocuments({ isCompleted: true }),
+      CheckItem.find({ taskId }).sort({ position: 1 }),
     ]);
 
     return res.status(200).json({

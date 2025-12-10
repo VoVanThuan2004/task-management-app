@@ -7,18 +7,17 @@ const { getIO } = require("../config/socket");
 require("dotenv").config();
 const { sendTaskDeadlineEmail } = require("../config/mailConfig");
 
-// 🔌 Kết nối Redis
-// const connection = new Redis({
-//   host: process.env.REDIS_HOST,
-//   port: process.env.REDIS_PORT,
-//   maxRetriesPerRequest: null,
-//   enableReadyCheck: false,
-// });
-const connection = new Redis(process.env.REDIS_URL || "", {
+// Kết nối Redis
+const connection = new Redis({
+  host: process.env.REDIS_HOST,
+  port: process.env.REDIS_PORT,
   maxRetriesPerRequest: null,
   enableReadyCheck: false,
 });
-
+// const connection = new Redis(process.env.REDIS_URL || "", {
+//   maxRetriesPerRequest: null,
+//   enableReadyCheck: false,
+// });
 
 // Queue để thêm job
 const reminderQueue = new Queue("taskReminderQueue", { connection });

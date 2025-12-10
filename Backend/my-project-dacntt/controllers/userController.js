@@ -82,7 +82,7 @@ const getProfile = async (req, res) => {
     }
 
     return res.status(200).json({
-      status: "error",
+      status: "success",
       code: 200,
       message: "Lấy thông tin người dùng thành công",
       data: user,
@@ -175,10 +175,10 @@ const searchEmailUser = async (req, res) => {
     const users = await User.find({
       $or: [
         { email: { $regex: query, $options: "i" } },
-        { name: { $regex: query, $options: "i" } },
+        { fullName: { $regex: query, $options: "i" } },
       ],
       roleId: { $ne: roleAdmin._id },
-    }).select("_id name email avatar").limit(10);
+    }).select("_id fullName email avatar").limit(10);
 
     return res.status(200).json({
       status: "success",

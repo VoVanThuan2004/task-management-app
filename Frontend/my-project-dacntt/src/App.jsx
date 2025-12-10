@@ -12,6 +12,7 @@ import { Toaster } from "react-hot-toast";
 import BoardDetail from "./pages/BoardDetail";
 import RecoveryPassword from "./pages/RecoveryPassword";
 import Register from "./pages/Register";
+import ProfilePage from "./pages/ProfilePage";
 
 function App() {
   return (
@@ -49,6 +50,7 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/recovery-password" element={<RecoveryPassword />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/profile" element={<ProfilePage />} />
 
             {/* <Route path="/recovery-password" element={<RecoveryPassword />} />
             <Route path="/register" element={<RegisterPage />} /> */}

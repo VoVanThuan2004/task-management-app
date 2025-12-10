@@ -17,7 +17,7 @@ const boardMemberSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
     index: true,
-    required: true,
+    default: null
   },
   role: { type: String },
   status: { type: String, default: "pending" },

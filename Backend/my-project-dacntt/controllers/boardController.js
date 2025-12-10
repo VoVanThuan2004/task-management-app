@@ -4,12 +4,12 @@ const Board = require("../models/board");
 const BoardPosition = require("../models/boardPosition");
 const BoardMember = require("../models/boardMember");
 const User = require("../models/user");
-const ActivityLog = require("../models/activityLog");
-const Notification = require("../models/notification");
 const { getIO } = require("../config/socket");
 const cloudinary = require("../config/cloudinary");
 const { sendShareBoardEmail } = require("../config/mailConfig");
 const jwt = require("jsonwebtoken");
+const { ObjectId } = require("mongodb");
+const { sendRemoveFromBoardEmail } = require("../config/mailConfig");
 
 const createBoard = async (req, res) => {
   const userId = req.user.userId;
@@ -30,6 +30,14 @@ const createBoard = async (req, res) => {
       title,
       type: type || "private",
       background: background || "#ffff",
+    });
+
+    // 2. Tạo board-member
+    await BoardMember.create({
+      boardId: board._id,
+      userId,
+      role: "owner",
+      status: "accepted",
     });
 
     return res.status(201).json({
@@ -452,7 +460,7 @@ const getAllBoardsInvited = async (req, res) => {
 
     const boardMember = await BoardMember.aggregate([
       {
-        $match: { userId: new mongoose.Types.ObjectId(userId) },
+        $match: { userId: new mongoose.Types.ObjectId(userId), role: "member" },
       },
       {
         $lookup: {
@@ -541,7 +549,7 @@ const shareBoard = async (req, res) => {
     // 2️. Lặp qua từng userId để thêm vào board nếu chưa có
     const results = [];
     for (const uid of userIds) {
-      let member = await BoardMember.findOne({ boardId, userId: uid });
+      let member = await BoardMember.findOne({ boardId, userId: uid }).lean();
       if (!member) {
         member = await BoardMember.create({
           boardId,
@@ -604,7 +612,6 @@ const shareBoard = async (req, res) => {
   }
 };
 
-// controllers/boardController.js hoặc tương tự
 const getBoardDetail = async (req, res) => {
   try {
     const boardId = req.params.boardId;
@@ -681,7 +688,7 @@ const getBoardDetail = async (req, res) => {
       });
     }
 
-    // Workspace → kiểm tra thành viên (giả sử bạn có model BoardMember)
+    // Workspace → kiểm tra thành viên
     if (boardType === "workspace") {
       const member = await BoardMember.findOne({
         boardId,
@@ -710,6 +717,160 @@ const getBoardDetail = async (req, res) => {
   }
 };
 
+const getAllBoardMembers = async (req, res) => {
+  try {
+    const boardId = req.params.boardId;
+    if (!boardId) {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "boardId đang trống",
+      });
+    }
+
+    // 1. Kiểm tra board
+    const board = await Board.findById(boardId);
+    if (!board) {
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Bảng làm việc không tồn tại",
+      });
+    }
+
+    // 2. Lấy danh sách users có trong board-member
+    // const boardMembers = await BoardMember.find({ boardId: board._id }).populate({
+    //   path: "userId",
+    //   select: "email fullName avatar"
+    // });
+
+    const boardMembers = await BoardMember.aggregate([
+      {
+        $match: { boardId: new ObjectId(boardId) },
+      },
+
+      {
+        $lookup: {
+          from: "users",
+          localField: "userId",
+          foreignField: "_id",
+          as: "user",
+        },
+      },
+
+      {
+        $unwind: {
+          path: "$user",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+
+      {
+        $project: {
+          _id: "$user._id",
+          email: "$user.email",
+          fullName: "$user.fullName",
+          avatar: "$user.avatar",
+          role: 1,
+        },
+      },
+    ]);
+
+    return res.status(200).json({
+      status: "success",
+      code: 200,
+      message: "Lấy danh sách thành viên trong bảng làm việc",
+      data: boardMembers,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      code: 500,
+      message: "Lỗi hệ thống: " + error,
+    });
+  }
+};
+
+const deleteBoardMember = async (req, res) => {
+  try {
+    const { boardId, userId } = req.params;
+    const ownerId = req.user.userId;
+    if (!boardId || !userId) {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "params id đang bị trống",
+      });
+    }
+
+    // 1. Kiểm tra quyền xóa, chỉ có owner mới xóa được
+    const [board, user] = await Promise.all([
+        Board.findById(boardId).lean(),
+        User.findById(userId).lean()
+    ])
+    if (!board) {
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Bảng làm việc không tồn tại",
+      });
+    }
+    if (!user) {
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Thành viên không tồn tại",
+      });
+    }
+
+    if (!board.ownerId.equals(new mongoose.Types.ObjectId(ownerId))) {
+      return res.status(403).json({
+        status: "error",
+        code: 403,
+        message: "Người dùng không có quyền xóa thành viên",
+      });
+    }
+
+    // 2. Kiểm tra board-member có tồn tại
+    const boardMember = await BoardMember.findOne({ userId, boardId });
+    if (!boardMember) {
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Thành viên trong bảng làm việc không tồn tại",
+      });
+    }
+
+    // 3. Xóa thành viên
+    await BoardMember.deleteOne({ _id: boardMember._id });
+
+    // 4. Emit socket
+    const io = getIO();
+    io.to(board._id.toString()).emit("memberRemoved", {
+      boardId,
+      userId,
+    });
+
+    // 5. Gửi email thông báo đến thành viên đã xóa
+    await sendRemoveFromBoardEmail(user.email, board.title);
+
+    return res.status(200).json({
+      status: "success",
+      code: 200,
+      message: "Xóa thành viên ra khỏi bảng làm việc thành công",
+      data: {
+        userId: boardMember.userId,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      code: 500,
+      message: "Lỗi hệ thống: " + error,
+    });
+  }
+};
+
 module.exports = {
   createBoard,
   updateBoard,
@@ -721,4 +882,6 @@ module.exports = {
   getAllBoardsInvited,
   shareBoard,
   getBoardDetail,
+  getAllBoardMembers,
+  deleteBoardMember,
 };

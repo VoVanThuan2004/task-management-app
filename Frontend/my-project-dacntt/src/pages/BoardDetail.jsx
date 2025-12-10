@@ -12,7 +12,6 @@ const httpUrl = import.meta.env.VITE_API_URL;
 
 export default function BoardDetail() {
   const { boardId, title: boardTitle } = useParams();
-
   const [board, setBoard] = useState(null);
   const [columns, setColumns] = useState([]);
   const [newTitle, setNewTitle] = useState("");
@@ -23,6 +22,7 @@ export default function BoardDetail() {
   const [selectedTask, setSelectedTask] = useState(null);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const accessToken = localStorage.getItem("accessToken");
+  const [loading, setLoading] = useState(false);
 
   // Thêm ref để track drag state
   const isDraggingRef = useRef(false);
@@ -78,10 +78,11 @@ export default function BoardDetail() {
   }, [boardId, accessToken]);
 
   // Socket connection
+  let socket;
   useEffect(() => {
     if (!boardId) return;
 
-    const socket = io(httpUrl, {
+    socket = io(httpUrl, {
       transports: ["websocket"],
       auth: { token: accessToken },
     });
@@ -456,6 +457,7 @@ export default function BoardDetail() {
   const handleAddColumn = async () => {
     if (!newTitle.trim()) return;
     try {
+      setLoading(true);
       await axios.post(
         `${httpUrl}/api/v1/columns`,
         { boardId, title: newTitle },
@@ -465,6 +467,8 @@ export default function BoardDetail() {
       setIsAddingColumn(false);
     } catch (err) {
       console.error("❌ Lỗi khi thêm column:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -501,6 +505,7 @@ export default function BoardDetail() {
   const handleAddTask = async (columnId, taskTitle) => {
     if (!taskTitle.trim()) return;
     try {
+      setLoading(true);
       await axios.post(
         `${httpUrl}/api/v1/tasks/${columnId}`,
         { title: taskTitle },
@@ -512,6 +517,8 @@ export default function BoardDetail() {
       }));
     } catch (err) {
       console.error("❌ Lỗi khi thêm task:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -697,6 +704,8 @@ export default function BoardDetail() {
         board={board}
         boardTitle={boardTitle}
         onBoardUpdate={handleBoardUpdate}
+        isMember={isMember}
+        socket={socket}
       />
 
       <main className="flex-1 overflow-x-auto p-6" style={getBoardBackground()}>
@@ -728,6 +737,7 @@ export default function BoardDetail() {
                       onToggleTaskComplete={handleToggleTaskComplete}
                       onTaskClick={handleTaskClick}
                       isMember={isMember}
+                      loading={loading}
                     />
                   ))}
                   {provided.placeholder}
@@ -745,6 +755,7 @@ export default function BoardDetail() {
                 onAdd={handleAddColumn}
                 onCancel={cancelAddColumn}
                 isMember={isMember}
+                loading={loading}
               />
             </div>
           </div>

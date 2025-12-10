@@ -10,9 +10,12 @@ import {
   Plus,
   X,
   LogIn,
+  Settings,
+  KeyRoundIcon
 } from "lucide-react";
 import { useUser } from "../components/useUser";
 import { AnimatePresence, motion as Motion } from "framer-motion";
+import Avatar from "../components/Avatar";
 
 export default function HomePage() {
   const [myBoards, setMyBoards] = useState([]);
@@ -272,111 +275,72 @@ export default function HomePage() {
                     </p>
                   </div>
 
-                  {/* Avatar thông minh - không bao giờ bị ảnh hỏng */}
-                  <div className="relative w-10 h-10">
-                    {/* Ảnh thật - chỉ hiện khi có URL hợp lệ */}
-                    {user?.avatar &&
-                    typeof user.avatar === "string" &&
-                    user.avatar.trim() !== "" &&
-                    user.avatar !== "null" ? (
-                      <img
-                        src={user.avatar}
-                        alt="avatar"
-                        className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
-                        onError={(e) => {
-                          // Nếu ảnh lỗi → ẩn và hiện fallback
-                          e.currentTarget.style.display = "none";
-                          e.currentTarget.nextElementSibling?.classList.remove(
-                            "hidden"
-                          );
-                        }}
-                      />
-                    ) : null}
-
-                    {/* Fallback gradient xanh tím đẹp - luôn hiện khi không có ảnh */}
-                    <div
-                      className={`absolute inset-0 w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-white font-bold text-lg flex items-center justify-center border-2 border-gray-200 shadow-md ${
-                        user?.avatar &&
-                        typeof user.avatar === "string" &&
-                        user.avatar.trim() !== "" &&
-                        user.avatar !== "null"
-                          ? "hidden"
-                          : "flex"
-                      }`}
-                    >
-                      {(user?.fullName || "U").charAt(0).toUpperCase()}
-                    </div>
-                  </div>
+                  {/* Avatar chuẩn Trello 2025 */}
+                  <Avatar user={user} size="w-10 h-10" />
                 </button>
 
                 {/* Profile Menu Dropdown */}
                 {showProfileMenu && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden z-50">
+                  <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden z-50">
                     {/* Header */}
-                    <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-3">
-                      <div className="relative w-10 h-10 flex-shrink-0">
-                        {user?.avatar &&
-                        typeof user.avatar === "string" &&
-                        user.avatar.trim() !== "" &&
-                        user.avatar !== "null" ? (
-                          <img
-                            src={user.avatar}
-                            alt="avatar"
-                            className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
-                            onError={(e) => {
-                              e.currentTarget.style.display = "none";
-                              e.currentTarget.nextElementSibling?.classList.remove(
-                                "hidden"
-                              );
-                            }}
-                          />
-                        ) : null}
-
-                        <div
-                          className={`absolute inset-0 w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-white font-bold text-lg flex items-center justify-center border-2 border-gray-200 ${
-                            user?.avatar &&
-                            typeof user.avatar === "string" &&
-                            user.avatar.trim() !== "" &&
-                            user.avatar !== "null"
-                              ? "hidden"
-                              : "flex"
-                          }`}
-                        >
-                          {(user?.fullName || "U").charAt(0).toUpperCase()}
-                        </div>
-                      </div>
-
+                    <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-4 bg-gradient-to-r from-blue-50 to-indigo-50">
+                      <Avatar
+                        user={user}
+                        size="w-12 h-12"
+                        className="ring-4 ring-white shadow-lg"
+                      />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-800 truncate">
+                        <p className="font-semibold text-gray-900 truncate">
                           {user?.fullName || "User"}
                         </p>
-                        <p className="text-xs text-gray-500 truncate">
+                        <p className="text-sm text-gray-600 truncate">
                           {user?.email || "user@example.com"}
                         </p>
                       </div>
                     </div>
 
                     {/* Menu items */}
-                    <div className="py-1">
+                    <div className="py-2">
+                      <button
+                        onClick={() => navigate("/profile")}
+                        className="flex items-center gap-3 w-full px-5 py-3 hover:bg-gray-50 text-gray-700 transition"
+                      >
+                        <User size={18} />
+                        <span>Hồ sơ cá nhân</span>
+                      </button>
+
                       <button
                         onClick={() => {
-                          alert("Xem hồ sơ");
+                          alert("Tính năng đang phát triển");
                           setShowProfileMenu(false);
                         }}
-                        className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-gray-50 text-gray-700 transition"
+                        className="flex items-center gap-3 w-full px-5 py-3 hover:bg-gray-50 text-gray-700 transition"
                       >
-                        <User size={16} />
-                        <span>Xem hồ sơ</span>
+                        <Settings size={18} />
+                        <span>Cài đặt</span>
                       </button>
+
+                      <button
+                        onClick={() => {
+                          alert("Tính năng đang phát triển");
+                          setShowProfileMenu(false);
+                        }}
+                        className="flex items-center gap-3 w-full px-5 py-3 hover:bg-gray-50 text-gray-700 transition"
+                      >
+                        <KeyRoundIcon size={18} />
+                        <span>Thay đổi mật khẩu</span>
+                      </button>
+
+                      <hr className="my-2 border-gray-200" />
 
                       <button
                         onClick={() => {
                           handleLogout();
                           setShowProfileMenu(false);
                         }}
-                        className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-red-50 text-red-600 transition"
+                        className="flex items-center gap-3 w-full px-5 py-3 hover:bg-red-50 text-red-600 transition font-medium"
                       >
-                        <LogOut size={16} />
+                        <LogOut size={18} />
                         <span>Đăng xuất</span>
                       </button>
                     </div>
@@ -386,7 +350,7 @@ export default function HomePage() {
             ) : (
               <button
                 onClick={handleLogin}
-                className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full px-6 py-2 shadow-sm hover:shadow-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 font-medium"
+                className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full px-6 py-2.5 shadow-lg hover:shadow-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 font-medium"
               >
                 <LogIn size={18} />
                 <span>Đăng nhập</span>

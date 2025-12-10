@@ -134,7 +134,7 @@ const loginSocialAccount = async (req, res) => {
 
     // Lấy thông tin user từ google
     const email = payload.email;
-    const fullName = payload.fullName;
+    const fullName = payload.name || `${payload.given_name || ""} ${payload.family_name || ""}`.trim();
     const avatar = payload.avatar;
     const provider_user_id = payload.sub;
 

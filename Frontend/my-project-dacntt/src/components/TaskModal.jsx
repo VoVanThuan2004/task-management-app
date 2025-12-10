@@ -9,6 +9,7 @@ import TaskMembersPopup from "./TaskModal/TaskMemberPopup";
 import TaskActivityPanel from "./TaskModal/TaskActivityPanel";
 import AttachmentItem from "./TaskModal/AttachmentItem";
 import CheckItemsSection from "./TaskModal/CheckItemSection";
+import { motion as Motion, AnimatePresence } from "framer-motion";
 
 const TaskModal = ({
   task,
@@ -74,7 +75,6 @@ const TaskModal = ({
 
     // Khởi tạo socket mới
     const newSocket = io(httpUrl, {
-      // ⬅️ Đổi thành 'const newSocket'
       transports: ["websocket"],
       auth: { token: accessToken },
     });
@@ -488,385 +488,551 @@ const TaskModal = ({
 
   if (!editedTask) {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-lg p-6">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="text-gray-600 mt-2">Đang tải...</p>
-        </div>
-      </div>
+      <AnimatePresence>
+        <Motion.div
+          key="loading-modal"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+        >
+          <Motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            transition={{ duration: 0.3, type: "spring", stiffness: 300 }}
+            className="bg-white rounded-lg p-6 shadow-xl"
+          >
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+            <p className="text-gray-600 mt-2">Đang tải...</p>
+          </Motion.div>
+        </Motion.div>
+      </AnimatePresence>
     );
   }
 
   // ============ RENDER (Bố cục 2 cột) ============
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col h-full">
-        {/* Header */}
-        <TaskHeader
-          title={editedTask.title}
-          isEditingTitle={isEditingTitle}
-          onTitleChange={(e) =>
-            setEditedTask((prev) => ({ ...prev, title: e.target.value }))
-          }
-          onSaveTitle={handleSaveTitle}
-          onEditTitle={() => setIsEditingTitle(true)}
-          onClose={onClose} // ✅ Sửa thành onClose
-          startDate={editedTask.startDate}
-          dueDate={editedTask.dueDate}
-          onStartDateChange={(date) =>
-            setEditedTask((prev) => ({ ...prev, startDate: date }))
-          }
-          onDueDateChange={(date) =>
-            setEditedTask((prev) => ({ ...prev, dueDate: date }))
-          }
-          isReadOnly={isReadOnly}
-        />
-
-        {/* Thân modal chia 2 cột */}
-        <div className="flex-1 flex overflow-hidden min-h-0">
-          {/* ============ CỘT TRÁI (Nội dung) ============ */}
-          <div className="flex-1 overflow-y-auto p-6 min-w-0">
-            {/* --- Các nút hành động (Placeholder) --- */}
-            <div className="flex flex-wrap gap-2 mb-6 relative">
-              {/* === NÚT THỜI GIAN === */}
-              <button
-                className={`flex items-center gap-1 px-3 py-2 rounded text-sm transition ${
-                  isReadOnly
-                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                    : "bg-gray-100 hover:bg-gray-200"
-                }`}
-                onClick={() => !isReadOnly && setShowPopup(!showPopup)}
-                disabled={isReadOnly}
-              >
-                <ClockIcon className="w-4 h-4" /> Thời gian
-              </button>
-
-              <button
-                className={`flex items-center gap-1 px-3 py-2 rounded text-sm transition ${
-                  isReadOnly
-                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                    : "bg-gray-100 hover:bg-gray-200"
-                }`}
-                onClick={() => !isReadOnly && setShowPopup(!showPopup)}
-                disabled={isReadOnly}
-              >
-                <ClockIcon className="w-4 h-4" /> Nhãn dán
-              </button>
-
-              {/* === NÚT THÀNH VIÊN === */}
-              <button
-                ref={membersButtonRef}
-                className={`flex items-center gap-1 px-3 py-2 rounded text-sm transition ${
-                  isReadOnly
-                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                    : "bg-gray-100 hover:bg-gray-200"
-                }`}
-                onClick={() => !isReadOnly && handleOpenMembers()}
-                disabled={isReadOnly}
-              >
-                <UserIcon className="w-4 h-4" /> Thành viên
-              </button>
-
-              {/* === POPUP THỜI GIAN – CHỈ HIỆN KHI ĐƯỢC PHÉP === */}
-              {showPopup && !isReadOnly && (
-                <TaskDatePickerPopup
-                  startDate={startDate}
-                  dueDate={dueDate}
-                  onStartDateChange={setStartDate}
-                  onDueDateChange={setDueDate}
-                  reminderEnabled={reminderEnabled}
-                  onReminderToggle={(e) => setReminderEnabled(e.target.checked)}
-                  reminderMinutes={reminderMinutes}
-                  onReminderMinutesChange={(e) =>
-                    setReminderMinutes(Number(e.target.value))
-                  }
-                  onClose={() => setShowPopup(false)}
-                  onSave={handleSaveDate}
-                />
-              )}
-
-              {/* === POPUP THÀNH VIÊN – CHỈ HIỆN KHI ĐƯỢC PHÉP === */}
-              {showMembersPopup && !isReadOnly && (
-                <TaskMembersPopup
-                  boardId={editedTask.boardId}
-                  taskId={task._id}
-                  onClose={() => setShowMembersPopup(false)}
-                  triggerRect={membersButtonRef.current?.getBoundingClientRect()}
-                  onMemberAssign={() => {
-                    setToast({
-                      show: true,
-                      type: "success",
-                      message: "Đã gán thành viên",
-                    });
-                  }}
-                  onMemberUnassign={() => {
-                    setToast({
-                      show: true,
-                      type: "success",
-                      message: "Đã bỏ gán thành viên",
-                    });
-                  }}
-                />
-              )}
-            </div>
-
-            {/* --- Ngày & Trạng thái --- */}
-            <div className="mb-6">
-              <h3 className="text-xs font-semibold text-gray-500 mb-1">Ngày</h3>
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm">
-                  {editedTask.startDate
-                    ? new Date(editedTask.startDate).toLocaleString("vi-VN", {
-                        day: "numeric",
-                        month: "short",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
-                    : "Chưa có ngày bắt đầu"}{" "}
-                  -{" "}
-                  {editedTask.dueDate
-                    ? new Date(editedTask.dueDate).toLocaleString("vi-VN", {
-                        day: "numeric",
-                        month: "short",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
-                    : "Chưa có ngày kết thúc"}
-                </span>
-
-                {/* === Trạng thái theo Trello === */}
-                {editedTask.status && (
-                  <span
-                    className={`
-          text-xs px-2 py-0.5 rounded-sm font-medium flex items-center gap-1
-          ${
-            editedTask.isCompleted === true
-              ? "bg-green-100 text-green-700"
-              : editedTask.status === "Quá hạn"
-              ? "bg-red-100 text-red-700"
-              : editedTask.status === "Gần tới hạn"
-              ? "bg-yellow-100 text-yellow-700"
-              : ""
-          }
-        `}
-                  >
-                    {editedTask.isCompleted === true && (
-                      <>
-                        <svg
-                          className="w-3 h-3"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                        Hoàn tất
-                      </>
-                    )}
-                    {editedTask.status === "Quá hạn" && (
-                      <>
-                        <svg
-                          className="w-3 h-3"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                        Quá hạn
-                      </>
-                    )}
-                    {editedTask.status === "Gần tới hạn" && (
-                      <>
-                        <svg
-                          className="w-3 h-3"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.414-1.414L11 9.586V6z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                        Gần tới hạn
-                      </>
-                    )}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* --- Mô tả (Giữ nguyên logic) --- */}
-            <TaskDescription
-              description={editedTask?.description || ""}
-              isEditingDescription={isEditingDescription}
-              onEditDescription={setIsEditingDescription}
-              onSaveDescription={handleSaveDescription} // Truyền hàm xử lý lưu
-              onCancelDescription={handleCancelDescription}
-              loading={loading}
-              tinyApiKey={tinyApiKey}
-              descriptionEditorConfig={descriptionEditorConfig}
-              isReadOnly={isReadOnly}
-            />
-
-            {/* --- Tệp đính kèm --- */}
-            <div className="mb-6">
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="font-semibold text-gray-700">
-                  Các tệp đính kèm
-                </h3>
-
-                {/* Nút "Thêm" – chỉ hiện khi ĐƯỢC PHÉP */}
-                {!isReadOnly && (
-                  <label
-                    className={`text-sm px-3 py-1.5 rounded transition-colors select-none ${
-                      uploadingFile
-                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                        : "bg-gray-100 hover:bg-gray-200 cursor-pointer"
-                    }`}
-                  >
-                    {uploadingFile ? "Đang tải lên..." : "Thêm"}
-                    <input
-                      type="file"
-                      className="hidden"
-                      onChange={handleFileUpload}
-                      disabled={uploadingFile || isReadOnly}
-                    />
-                  </label>
-                )}
-              </div>
-
-              {/* Uploading indicator – vẫn hiện nếu đang upload (trước khi bị khóa) */}
-              {uploadingFile && (
-                <div className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg mb-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-blue-800">
-                      Đang tải lên...
-                    </p>
-                    <p className="text-xs text-blue-600">{uploadingFileName}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Danh sách file */}
-              {editedTask.attachments?.length > 0 ? (
-                <div className="grid grid-cols-2 gap-3">
-                  {editedTask.attachments.map((file) => (
-                    <AttachmentItem
-                      key={file._id}
-                      file={file}
-                      getFileIcon={getFileIcon}
-                      formatFileSize={formatFileSize}
-                      onDelete={
-                        !isReadOnly ? handleDeleteAttachment : undefined
-                      } // ← Khóa xóa
-                      accessToken={accessToken}
-                      isReadOnly={isReadOnly} // ← Truyền xuống để khóa nút xóa trong item
-                    />
-                  ))}
-                </div>
-              ) : (
-                !uploadingFile && (
-                  <p className="text-sm text-gray-500 py-3 text-center italic">
-                    {isReadOnly
-                      ? "Không có tệp đính kèm"
-                      : "Chưa có tệp đính kèm nào."}
-                  </p>
-                )
-              )}
-            </div>
-
-            {/* --- CheckItems (Placeholder) --- */}
-            <CheckItemsSection
-              key={editedTask._id}
-              taskId={editedTask._id}
-              accessToken={accessToken}
-              socket={socket}
-              isReadOnly={isReadOnly}
-            />
-
-            {/* --- Hành động (Xóa) --- */}
-            <div className="mt-8 pt-4 border-t">
-              <button
-                onClick={handleDeleteTask}
-                disabled={loading}
-                className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-100 rounded"
-              >
-                🗑️ Xóa Task
-              </button>
-            </div>
-          </div>
-
-          {/* ============ CỘT PHẢI (Nhận xét / Hoạt động) ============ */}
-          <div className="w-2/5 min-w-0 flex flex-col bg-gray-50 border-l border-gray-200">
-            <TaskActivityPanel
-              taskId={editedTask._id}
-              boardId={editedTask.boardId}
-              tinyApiKey={tinyApiKey}
-              commentEditorConfig={commentEditorConfig}
-              accessToken={accessToken}
-              socket={socket}
-              isReadOnly={isReadOnly}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Toast Notification */}
-      {toast.show && (
-        <div
-          className={`fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 max-w-sm transition-all duration-300 ${
-            toast.type === "success"
-              ? "bg-green-500 text-white"
-              : toast.type === "error"
-              ? "bg-red-500 text-white"
-              : "bg-blue-500 text-white"
-          }`}
+    <AnimatePresence>
+      <Motion.div
+        key={`modal-overlay-${editedTask._id}`}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+      >
+        <Motion.div
+          key={`modal-content-${editedTask._id}`}
+          initial={{
+            scale: 0.9,
+            opacity: 0,
+            y: 20,
+          }}
+          animate={{
+            scale: 1,
+            opacity: 1,
+            y: 0,
+          }}
+          exit={{
+            scale: 0.9,
+            opacity: 0,
+            y: 20,
+          }}
+          transition={{
+            duration: 0.3,
+            type: "spring",
+            stiffness: 300,
+            damping: 30,
+          }}
+          className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col h-full shadow-2xl"
         >
-          <div className="flex items-center gap-2">
-            {toast.type === "success" && (
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+          {/* Header với animation */}
+          <Motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.3 }}
+          >
+            <TaskHeader
+              title={editedTask.title}
+              isEditingTitle={isEditingTitle}
+              onTitleChange={(e) =>
+                setEditedTask((prev) => ({ ...prev, title: e.target.value }))
+              }
+              onSaveTitle={handleSaveTitle}
+              onEditTitle={() => setIsEditingTitle(true)}
+              onClose={onClose}
+              startDate={editedTask.startDate}
+              dueDate={editedTask.dueDate}
+              onStartDateChange={(date) =>
+                setEditedTask((prev) => ({ ...prev, startDate: date }))
+              }
+              onDueDateChange={(date) =>
+                setEditedTask((prev) => ({ ...prev, dueDate: date }))
+              }
+              isReadOnly={isReadOnly}
+            />
+          </Motion.div>
+
+          {/* Thân modal chia 2 cột */}
+          <div className="flex-1 flex overflow-hidden min-h-0">
+            {/* ============ CỘT TRÁI (Nội dung) ============ */}
+            <Motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.15, duration: 0.4 }}
+              className="flex-1 overflow-y-auto p-6 min-w-0"
+            >
+              {/* --- Các nút hành động (Placeholder) --- */}
+              <div className="flex flex-wrap gap-2 mb-6 relative">
+                {/* === NÚT THỜI GIAN === */}
+                <Motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className={`flex items-center gap-1 px-3 py-2 rounded text-sm transition ${
+                    isReadOnly
+                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                      : "bg-gray-100 hover:bg-gray-200"
+                  }`}
+                  onClick={() => !isReadOnly && setShowPopup(!showPopup)}
+                  disabled={isReadOnly}
+                >
+                  <ClockIcon className="w-4 h-4" /> Thời gian
+                </Motion.button>
+
+                <Motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className={`flex items-center gap-1 px-3 py-2 rounded text-sm transition ${
+                    isReadOnly
+                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                      : "bg-gray-100 hover:bg-gray-200"
+                  }`}
+                  onClick={() => !isReadOnly && setShowPopup(!showPopup)}
+                  disabled={isReadOnly}
+                >
+                  <ClockIcon className="w-4 h-4" /> Nhãn dán
+                </Motion.button>
+
+                {/* === NÚT THÀNH VIÊN === */}
+                <Motion.button
+                  ref={membersButtonRef}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className={`flex items-center gap-1 px-3 py-2 rounded text-sm transition ${
+                    isReadOnly
+                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                      : "bg-gray-100 hover:bg-gray-200"
+                  }`}
+                  onClick={() => !isReadOnly && handleOpenMembers()}
+                  disabled={isReadOnly}
+                >
+                  <UserIcon className="w-4 h-4" /> Thành viên
+                </Motion.button>
+
+                {/* === POPUP THỜI GIAN – CHỈ HIỆN KHI ĐƯỢC PHÉP === */}
+                <AnimatePresence>
+                  {showPopup && !isReadOnly && (
+                    <Motion.div
+                      initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <TaskDatePickerPopup
+                        startDate={startDate}
+                        dueDate={dueDate}
+                        onStartDateChange={setStartDate}
+                        onDueDateChange={setDueDate}
+                        reminderEnabled={reminderEnabled}
+                        onReminderToggle={(e) =>
+                          setReminderEnabled(e.target.checked)
+                        }
+                        reminderMinutes={reminderMinutes}
+                        onReminderMinutesChange={(e) =>
+                          setReminderMinutes(Number(e.target.value))
+                        }
+                        onClose={() => setShowPopup(false)}
+                        onSave={handleSaveDate}
+                      />
+                    </Motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* === POPUP THÀNH VIÊN – CHỈ HIỆN KHI ĐƯỢC PHÉP === */}
+                <AnimatePresence>
+                  {showMembersPopup && !isReadOnly && (
+                    <Motion.div
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <TaskMembersPopup
+                        boardId={editedTask.boardId}
+                        taskId={task._id}
+                        onClose={() => setShowMembersPopup(false)}
+                        triggerRect={membersButtonRef.current?.getBoundingClientRect()}
+                        onMemberAssign={() => {
+                          setToast({
+                            show: true,
+                            type: "success",
+                            message: "Đã gán thành viên",
+                          });
+                        }}
+                        onMemberUnassign={() => {
+                          setToast({
+                            show: true,
+                            type: "success",
+                            message: "Đã bỏ gán thành viên",
+                          });
+                        }}
+                      />
+                    </Motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* --- Ngày & Trạng thái --- */}
+              <Motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2, duration: 0.3 }}
+                className="mb-6"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
-            )}
-            {toast.type === "error" && (
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+                <h3 className="text-xs font-semibold text-gray-500 mb-1">
+                  Ngày
+                </h3>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm">
+                    {editedTask.startDate
+                      ? new Date(editedTask.startDate).toLocaleString("vi-VN", {
+                          day: "numeric",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                      : "Chưa có ngày bắt đầu"}{" "}
+                    -{" "}
+                    {editedTask.dueDate
+                      ? new Date(editedTask.dueDate).toLocaleString("vi-VN", {
+                          day: "numeric",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                      : "Chưa có ngày kết thúc"}
+                  </span>
+
+                  {/* === Trạng thái theo Trello === */}
+                  {editedTask.status && (
+                    <Motion.span
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.25, duration: 0.3 }}
+                      className={`
+            text-xs px-2 py-0.5 rounded-sm font-medium flex items-center gap-1
+            ${
+              editedTask.isCompleted === true
+                ? "bg-green-100 text-green-700"
+                : editedTask.status === "Quá hạn"
+                ? "bg-red-100 text-red-700"
+                : editedTask.status === "Gần tới hạn"
+                ? "bg-yellow-100 text-yellow-700"
+                : ""
+            }
+          `}
+                    >
+                      {editedTask.isCompleted === true && (
+                        <>
+                          <svg
+                            className="w-3 h-3"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          Hoàn tất
+                        </>
+                      )}
+                      {editedTask.status === "Quá hạn" && (
+                        <>
+                          <svg
+                            className="w-3 h-3"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          Quá hạn
+                        </>
+                      )}
+                      {editedTask.status === "Gần tới hạn" && (
+                        <>
+                          <svg
+                            className="w-3 h-3"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.414-1.414L11 9.586V6z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          Gần tới hạn
+                        </>
+                      )}
+                    </Motion.span>
+                  )}
+                </div>
+              </Motion.div>
+
+              {/* --- Mô tả (Giữ nguyên logic) --- */}
+              <Motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.25, duration: 0.3 }}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
+                <TaskDescription
+                  description={editedTask?.description || ""}
+                  isEditingDescription={isEditingDescription}
+                  onEditDescription={setIsEditingDescription}
+                  onSaveDescription={handleSaveDescription}
+                  onCancelDescription={handleCancelDescription}
+                  loading={loading}
+                  tinyApiKey={tinyApiKey}
+                  descriptionEditorConfig={descriptionEditorConfig}
+                  isReadOnly={isReadOnly}
                 />
-              </svg>
-            )}
-            <span className="text-sm font-medium">{toast.message}</span>
+              </Motion.div>
+
+              {/* --- Tệp đính kèm --- */}
+              <Motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3, duration: 0.3 }}
+                className="mb-6"
+              >
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="font-semibold text-gray-700">
+                    Các tệp đính kèm
+                  </h3>
+
+                  {/* Nút "Thêm" – chỉ hiện khi ĐƯỢC PHÉP */}
+                  {!isReadOnly && (
+                    <Motion.label
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className={`text-sm px-3 py-1.5 rounded transition-colors select-none cursor-pointer ${
+                        uploadingFile
+                          ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                          : "bg-gray-100 hover:bg-gray-200"
+                      }`}
+                    >
+                      {uploadingFile ? "Đang tải lên..." : "Thêm"}
+                      <input
+                        type="file"
+                        className="hidden"
+                        onChange={handleFileUpload}
+                        disabled={uploadingFile || isReadOnly}
+                      />
+                    </Motion.label>
+                  )}
+                </div>
+
+                {/* Uploading indicator */}
+                <AnimatePresence>
+                  {uploadingFile && (
+                    <Motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.2 }}
+                      className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg mb-2"
+                    >
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-blue-800">
+                          Đang tải lên...
+                        </p>
+                        <p className="text-xs text-blue-600">
+                          {uploadingFileName}
+                        </p>
+                      </div>
+                    </Motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Danh sách file */}
+                {editedTask.attachments?.length > 0 ? (
+                  <Motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.35, duration: 0.3 }}
+                    className="grid grid-cols-2 gap-3"
+                  >
+                    <AnimatePresence>
+                      {editedTask.attachments.map((file, idx) => (
+                        <Motion.div
+                          key={file._id}
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.9 }}
+                          transition={{
+                            delay: 0.35 + idx * 0.05,
+                            duration: 0.3,
+                          }}
+                        >
+                          <AttachmentItem
+                            file={file}
+                            getFileIcon={getFileIcon}
+                            formatFileSize={formatFileSize}
+                            onDelete={
+                              !isReadOnly ? handleDeleteAttachment : undefined
+                            }
+                            accessToken={accessToken}
+                            isReadOnly={isReadOnly}
+                          />
+                        </Motion.div>
+                      ))}
+                    </AnimatePresence>
+                  </Motion.div>
+                ) : (
+                  !uploadingFile && (
+                    <Motion.p
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.35, duration: 0.3 }}
+                      className="text-sm text-gray-500 py-3 text-center italic"
+                    >
+                      {isReadOnly
+                        ? "Không có tệp đính kèm"
+                        : "Chưa có tệp đính kèm nào."}
+                    </Motion.p>
+                  )
+                )}
+              </Motion.div>
+
+              {/* --- CheckItems (Placeholder) --- */}
+              <Motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4, duration: 0.3 }}
+              >
+                <CheckItemsSection
+                  key={editedTask._id}
+                  taskId={editedTask._id}
+                  accessToken={accessToken}
+                  socket={socket}
+                  isReadOnly={isReadOnly}
+                />
+              </Motion.div>
+
+              {/* --- Hành động (Xóa) --- */}
+              <Motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.45, duration: 0.3 }}
+                className="mt-8 pt-4 border-t"
+              >
+                <Motion.button
+                  whileHover={{ backgroundColor: "#fee2e2" }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleDeleteTask}
+                  disabled={loading}
+                  className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-100 rounded transition-colors"
+                >
+                  🗑️ Xóa Task
+                </Motion.button>
+              </Motion.div>
+            </Motion.div>
+
+            {/* ============ CỘT PHẢI (Nhận xét / Hoạt động) ============ */}
+            <Motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.15, duration: 0.4 }}
+              className="w-2/5 min-w-0 flex flex-col bg-gray-50 border-l border-gray-200"
+            >
+              <TaskActivityPanel
+                key={editedTask._id}
+                taskId={editedTask._id}
+                boardId={editedTask.boardId}
+                tinyApiKey={tinyApiKey}
+                commentEditorConfig={commentEditorConfig}
+                accessToken={accessToken}
+                socket={socket}
+                isReadOnly={isReadOnly}
+              />
+            </Motion.div>
           </div>
-        </div>
-      )}
-    </div>
+        </Motion.div>
+      </Motion.div>
+
+      {/* Toast Notification với animation */}
+      <AnimatePresence>
+        {toast.show && (
+          <Motion.div
+            key="toast"
+            initial={{ opacity: 0, x: 400, y: -20 }}
+            animate={{ opacity: 1, x: 0, y: 0 }}
+            exit={{ opacity: 0, x: 400, y: -20 }}
+            transition={{ duration: 0.3, type: "spring", stiffness: 300 }}
+            className={`fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 max-w-sm ${
+              toast.type === "success"
+                ? "bg-green-500 text-white"
+                : toast.type === "error"
+                ? "bg-red-500 text-white"
+                : "bg-blue-500 text-white"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              {toast.type === "success" && (
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              )}
+              {toast.type === "error" && (
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              )}
+              <span className="text-sm font-medium">{toast.message}</span>
+            </div>
+          </Motion.div>
+        )}
+      </AnimatePresence>
+    </AnimatePresence>
   );
 };
 

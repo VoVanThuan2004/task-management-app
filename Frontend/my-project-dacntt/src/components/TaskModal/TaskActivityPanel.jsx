@@ -11,6 +11,7 @@ import {
 import axios from "axios";
 import Picker from "emoji-picker-react";
 import TaskActivityLog from "../TaskModal/TaskActivityLog";
+import Avatar from "../Avatar";
 
 const TABS = { COMMENTS: "comments", ACTIVITY: "activity" };
 
@@ -406,19 +407,7 @@ const CommentItem = ({ comment, onDelete, handleEmojiReaction }) => {
   return (
     <div className="flex gap-3 group relative">
       {/* Avatar */}
-      <div className="flex-shrink-0">
-        {user.avatar ? (
-          <img
-            src={user.avatar}
-            alt={user.fullName}
-            className="w-9 h-9 rounded-full object-cover border"
-          />
-        ) : (
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
-            {user.fullName?.[0] || "U"}
-          </div>
-        )}
-      </div>
+      <Avatar user={user}/>
 
       <div className="flex-1">
         <div className="bg-white rounded-lg p-3 shadow-sm">
@@ -537,40 +526,5 @@ const CommentItem = ({ comment, onDelete, handleEmojiReaction }) => {
   );
 };
 
-/* === Activity Item === */
-const ActivityItem = ({ activity }) => {
-  const user = activity.user || {};
-  const time = new Date(activity.createdAt).toLocaleString("vi-VN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    day: "numeric",
-    month: "short",
-  });
-
-  return (
-    <div className="flex gap-3">
-      <div className="flex-shrink-0">
-        <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-sm font-medium">
-          {user.fullName?.[0] || "U"}
-        </div>
-      </div>
-      <div className="flex-1">
-        <p className="text-sm text-gray-800">
-          <span className="font-medium">{user.fullName || "Người dùng"}</span>{" "}
-          <span className="text-gray-600">
-            đã {activity.action || "thực hiện hành động"}
-          </span>
-          {activity.target && (
-            <span className="font-medium text-blue-600">
-              {" "}
-              {activity.target}
-            </span>
-          )}
-        </p>
-        <p className="text-xs text-gray-500 mt-0.5">{time}</p>
-      </div>
-    </div>
-  );
-};
 
 export default TaskActivityPanel;

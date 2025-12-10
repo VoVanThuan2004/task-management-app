@@ -4,6 +4,7 @@ import axios from "axios";
 import { formatDistanceToNow } from "date-fns";
 import { vi } from "date-fns/locale";
 import { ActionConfig } from "./ActionConfig";
+import Avatar from "../Avatar";
 
 const TaskActivityLog = ({ taskId, socket }) => {
   const [activities, setActivities] = useState([]);
@@ -143,36 +144,7 @@ const TaskActivityLog = ({ taskId, socket }) => {
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex items-center gap-3 flex-1">
                         {/* Avatar */}
-                        <div className="relative w-9 h-9 flex-shrink-0">
-                          {activity.avatar &&
-                          typeof activity.avatar === "string" &&
-                          activity.avatar.trim() !== "" &&
-                          activity.avatar !== "null" ? (
-                            <img
-                              src={activity.avatar}
-                              alt={activity.fullName}
-                              className="w-9 h-9 rounded-full object-cover border border-gray-300"
-                              onError={(e) => {
-                                e.target.style.display = "none";
-                                e.target.nextElementSibling.style.display =
-                                  "flex";
-                              }}
-                            />
-                          ) : null}
-
-                          <div
-                            className={`w-9 h-9 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 text-white font-bold text-sm flex items-center justify-center border border-gray-300 ${
-                              activity.avatar &&
-                              typeof activity.avatar === "string" &&
-                              activity.avatar.trim() !== "" &&
-                              activity.avatar !== "null"
-                                ? "hidden"
-                                : "flex"
-                            }`}
-                          >
-                            {(activity.fullName || "U").charAt(0).toUpperCase()}
-                          </div>
-                        </div>
+                        <Avatar user={activity} size="w-9 h-9 mt-1" />
 
                         {/* Name */}
                         <div className="flex flex-col">

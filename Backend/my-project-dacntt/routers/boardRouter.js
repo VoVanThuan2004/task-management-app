@@ -36,5 +36,11 @@ router.post("/api/v1/boards/share", auth, boardController.shareBoard);
 // Lấy chi tiết bảng làm việc
 router.get("/api/v1/boards-detail/:boardId", boardController.getBoardDetail);
 
+// Lấy danh sách thành viên member trong bảng làm việc
+router.get("/api/v1/boards-member/:boardId", auth, boardController.getAllBoardMembers);
+
+// Xóa thành viên ra khỏi bảng làm việc
+router.delete("/api/v1/boards-member/:boardId/:userId", auth, boardController.deleteBoardMember);
+
 
 module.exports = router;

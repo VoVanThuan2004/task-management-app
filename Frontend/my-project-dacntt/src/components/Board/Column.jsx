@@ -21,6 +21,7 @@ const Column = React.memo(
     onToggleTaskComplete,
     onTaskClick,
     isMember = false,
+    loading
   }) => {
     const isReadOnly = !isMember;
 
@@ -135,6 +136,7 @@ const Column = React.memo(
                     value={newTaskTitle || ""}
                     onChange={onNewTaskChange}
                     onAdd={() => onAddTask(column._id, newTaskTitle)}
+                    loading={loading}
                   />
                 ) : (
                   <div className="py-2 text-center text-gray-500 text-sm italic">

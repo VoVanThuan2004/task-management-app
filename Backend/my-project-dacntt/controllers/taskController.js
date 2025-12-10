@@ -29,8 +29,8 @@ const addTask = async (req, res) => {
 
     // 1. Kiểm tra column, user
     const [column, user] = await Promise.all([
-      await Column.findById(columnId),
-      await User.findById(userId).select("fullName avatar"),
+      Column.findById(columnId),
+      User.findById(userId).select("fullName avatar"),
     ]);
 
     if (!column) {
@@ -143,8 +143,8 @@ const updateTaskTitle = async (req, res) => {
 
     // 1. Tìm task có tồn tại
     const [task, user] = await Promise.all([
-      await Task.findById(taskId),
-      await User.findById(userId).select("fullName avatar"),
+      Task.findById(taskId),
+      User.findById(userId).select("fullName avatar"),
     ]);
 
     if (!task) {
@@ -449,8 +449,8 @@ const updateDeadlineTask = async (req, res) => {
     }
 
     const [task, user] = await Promise.all([
-      await Task.findById(taskId),
-      await User.findById(userId).select("fullName avatar"),
+      Task.findById(taskId),
+      User.findById(userId).select("fullName avatar"),
     ]);
     if (!task) {
       return res.status(404).json({
@@ -811,8 +811,8 @@ const uploadFile = async (req, res) => {
 
     // 2. Kiểm tra task
     const [task, user] = await Promise.all([
-      await Task.findById(taskId),
-      await User.findById(userId).select("fullName avatar"),
+      Task.findById(taskId),
+      User.findById(userId).select("fullName avatar"),
     ]);
 
     if (!task) {
@@ -906,11 +906,11 @@ const deleteFile = async (req, res) => {
 
     // 1️. Kiểm tra attachment tồn tại
     const [attachment, user] = await Promise.all([
-      await Attachment.findById(attachmentId).populate({
+      Attachment.findById(attachmentId).populate({
         path: "taskId",
         select: "_id boardId", // populate để có boardId
       }),
-      await User.findById(userId).select("fullName avatar"),
+      User.findById(userId).select("fullName avatar"),
     ]);
 
     if (!attachment) {
@@ -1171,8 +1171,8 @@ const toggleTask = async (req, res) => {
 
     // 1. Kiểm tra task, user
     const [task, user] = await Promise.all([
-      await Task.findById(taskId),
-      await User.findById(userId).select("fullName avatar"),
+      Task.findById(taskId),
+      User.findById(userId).select("fullName avatar"),
     ]);
 
     if (!task) {
