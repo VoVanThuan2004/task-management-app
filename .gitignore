@@ -96,16 +96,26 @@ jest.config.js
 *.spec.js
 *.test.js
 
-# Ignore AI model weights
-Backend/my-project-dacntt/ai_model/checklist_generator_model/*
-Backend/my-project-dacntt/ai_model/suggest_skill_model/*
+# ===== Python =====
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv/
+venv/
 
-# Giữ lại code Python & hướng dẫn
-!Backend/my-project-dacntt/ai_model/checklist_generator_model/generate_checklist.py
-!Backend/my-project-dacntt/ai_model/checklist_generator_model/README.md
+# ===== AI / ML models =====
+Backend/my-project-dacntt/ai_model/**/model.safetensors
+Backend/my-project-dacntt/ai_model/**/pytorch_model.bin
+Backend/my-project-dacntt/ai_model/**/tf_model.h5
+Backend/my-project-dacntt/ai_model/**/flax_model.msgpack
 
-!Backend/my-project-dacntt/ai_model/suggest_skill_model/auto_assign.py
-!Backend/my-project-dacntt/ai_model/suggest_skill_model/README.md
-
-# Giữ lại router xử lý AI
-!Backend/my-project-dacntt/routers/aiRouter.js
+Backend/my-project-dacntt/ai_model/**/tokenizer.json
+Backend/my-project-dacntt/ai_model/**/vocab.txt
+Backend/my-project-dacntt/ai_model/**/spiece.model
+Backend/my-project-dacntt/ai_model/**/special_tokens_map.json
+Backend/my-project-dacntt/ai_model/**/tokenizer_config.json
+Backend/my-project-dacntt/ai_model/**/config.json
+Backend/my-project-dacntt/ai_model/**/generation_config.json
+Backend/my-project-dacntt/ai_model/**/added_tokens.json
