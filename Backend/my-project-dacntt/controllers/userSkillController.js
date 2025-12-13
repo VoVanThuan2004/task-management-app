@@ -25,7 +25,7 @@ const getAllSkillsUser = async (req, res) => {
     // 2. Lấy ra danh sách skill của người dùng
     const userSkills = await UserSkill.find({ userId, boardId })
       .sort({ createdAt: -1 })
-      .select("_id skill createdAt");
+      .select("_id skill");
 
     return res.status(200).json({
       status: "success",
@@ -99,7 +99,12 @@ const addSkillBoard = async (req, res) => {
       status: "success",
       code: 200,
       message: "Thêm kỹ năng của người dùng thành công",
-      data: userSkill,
+      data: {
+        _id: userSkill._id,
+        userId: userSkill.userId,
+        boardId: userSkill.boardId,
+        skill: userSkill.skill,
+      },
     });
   } catch (error) {
     return res.status(500).json({
@@ -113,6 +118,7 @@ const addSkillBoard = async (req, res) => {
 const deleteSkillUser = async (req, res) => {
   try {
     const id = req.params.id;
+    const userId = req.user.userId;
     if (!id) {
       return res.status(400).json({
         status: "error",
@@ -131,6 +137,15 @@ const deleteSkillUser = async (req, res) => {
       });
     }
 
+    // Kiểm tra skill đó có phải của người dùng không
+    if (!existingUserSkill.userId.equals(userId)) {
+      return res.status(403).json({
+        status: "error",
+        code: 403,
+        message: "Người dùng không có quyền xóa kỹ năng",
+      });
+    }
+
     // 2. Xóa user-skill
     await UserSkill.deleteOne({ _id: existingUserSkill._id });
 
@@ -140,6 +155,7 @@ const deleteSkillUser = async (req, res) => {
       message: "Xóa kỹ năng thành công",
       data: {
         _id: existingUserSkill._id,
+        userId
       },
     });
   } catch (error) {

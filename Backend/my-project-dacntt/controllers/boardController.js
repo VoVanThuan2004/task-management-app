@@ -766,12 +766,42 @@ const getAllBoardMembers = async (req, res) => {
       },
 
       {
+        $lookup: {
+          from: "userskills",
+          let: { userId: "$userId", boardId: "$boardId" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$userId", "$$userId"] },
+                    { $eq: ["$boardId", "$$boardId"] },
+                  ],
+                },
+              },
+            },
+          ],
+          as: "userSkills",
+        },
+      },
+
+      {
         $project: {
           _id: "$user._id",
           email: "$user.email",
           fullName: "$user.fullName",
           avatar: "$user.avatar",
           role: 1,
+          skills: {
+            $map: {
+              input: "$userSkills",
+              as: "userSkill",
+              in: {
+                _id: "$$userSkill._id",
+                skill: "$$userSkill.skill",
+              },
+            },
+          },
         },
       },
     ]);
@@ -805,9 +835,9 @@ const deleteBoardMember = async (req, res) => {
 
     // 1. Kiểm tra quyền xóa, chỉ có owner mới xóa được
     const [board, user] = await Promise.all([
-        Board.findById(boardId).lean(),
-        User.findById(userId).lean()
-    ])
+      Board.findById(boardId).lean(),
+      User.findById(userId).lean(),
+    ]);
     if (!board) {
       return res.status(404).json({
         status: "error",

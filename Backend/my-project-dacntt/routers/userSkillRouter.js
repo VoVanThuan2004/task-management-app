@@ -11,4 +11,5 @@ router.get("/api/v1/user-skill", auth, userSkillController.getAllSkillsUser);
 
 // API xóa skill
 router.delete("/api/v1/user-skill/:id", auth, userSkillController.deleteSkillUser);
+
 module.exports = router;

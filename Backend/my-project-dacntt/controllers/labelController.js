@@ -15,7 +15,7 @@ const addLabel = async (req, res) => {
     }
 
     // 1. Kiểm tra board có tồn tại
-    const board = await Board.findById(boardId);
+    const board = await Board.findById(boardId).lean();
     if (!board) {
       return res.status(404).json({
         status: "error",
@@ -140,7 +140,7 @@ const getAllLabels = async (req, res) => {
     const boardId = req.params.boardId;
 
     // 1. Kiểm tra board
-    const board = await Board.findById(boardId);
+    const board = await Board.findById(boardId).lean();
     if (!board) {
       return res.status(404).json({
         status: "error",
