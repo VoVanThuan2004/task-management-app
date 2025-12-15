@@ -119,3 +119,7 @@ Backend/my-project-dacntt/ai_model/**/tokenizer_config.json
 Backend/my-project-dacntt/ai_model/**/config.json
 Backend/my-project-dacntt/ai_model/**/generation_config.json
 Backend/my-project-dacntt/ai_model/**/added_tokens.json
+
+ai_model/
+*.safetensors
+*.bin

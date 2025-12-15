@@ -9,6 +9,7 @@ import TaskMembersPopup from "./TaskModal/TaskMemberPopup";
 import TaskActivityPanel from "./TaskModal/TaskActivityPanel";
 import AttachmentItem from "./TaskModal/AttachmentItem";
 import CheckItemsSection from "./TaskModal/CheckItemSection";
+import AiChecklistModal from "./TaskModal/AiChecklistModal";
 import { motion as Motion, AnimatePresence } from "framer-motion";
 
 const TaskModal = ({
@@ -37,6 +38,8 @@ const TaskModal = ({
   const [toast, setToast] = useState({ show: false, message: "", type: "" });
 
   const [showPopup, setShowPopup] = useState(false);
+  const [showAiModal, setShowAiModal] = useState(false);
+  const [aiCreatedItems, setAiCreatedItems] = useState(null);
   const [reminderEnabled, setReminderEnabled] = useState(true);
   const [reminderMinutes, setReminderMinutes] = useState(5);
   const [startDate, setStartDate] = useState(null);
@@ -703,6 +706,21 @@ const TaskModal = ({
                   <UserIcon className="w-4 h-4" /> Thành viên
                 </Motion.button>
 
+                {/* === NÚT GỢI Ý CHECKLIST (AI) === */}
+                <Motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className={`flex items-center gap-1 px-3 py-2 rounded text-sm transition ${
+                    isReadOnly
+                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                      : "bg-gray-100 hover:bg-gray-200"
+                  }`}
+                  onClick={() => !isReadOnly && setShowAiModal(true)}
+                  disabled={isReadOnly}
+                >
+                  Gợi ý checklist (AI)
+                </Motion.button>
+
                 {/* === POPUP THỜI GIAN – CHỈ HIỆN KHI ĐƯỢC PHÉP === */}
                 <AnimatePresence>
                   {showPopup && !isReadOnly && (
@@ -729,6 +747,24 @@ const TaskModal = ({
                         onSave={handleSaveDate}
                       />
                     </Motion.div>
+                  )}
+                </AnimatePresence>
+                {/* === POPUP AI CHECKLIST === */}
+                <AnimatePresence>
+                  {showAiModal && !isReadOnly && (
+                    <AiChecklistModal
+                          taskId={task._id}
+                          accessToken={accessToken}
+                          initialTitle={editedTask?.title}
+                          initialDescription={editedTask?.description}
+                          onClose={() => setShowAiModal(false)}
+                          onSaved={(created) => {
+                            setShowAiModal(false);
+                            // store created check items so CheckItemSection can append them
+                            setAiCreatedItems(created || []);
+                            onTaskUpdate && onTaskUpdate();
+                          }}
+                        />
                   )}
                 </AnimatePresence>
 
@@ -1160,6 +1196,7 @@ const TaskModal = ({
                   accessToken={accessToken}
                   socket={socket}
                   isReadOnly={isReadOnly}
+                  aiCreatedItems={aiCreatedItems}
                 />
               </Motion.div>
 

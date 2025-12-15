@@ -17,8 +17,8 @@ import {
 
 const httpUrl = import.meta.env.VITE_API_URL;
 
-const CheckItemsSection = React.memo(
-  ({ taskId, accessToken, socket, isReadOnly = false }) => {
+  const CheckItemsSection = React.memo(
+  ({ taskId, accessToken, socket, isReadOnly = false, aiCreatedItems = null }) => {
     const [checkItems, setCheckItems] = useState([]);
     const [newTitle, setNewTitle] = useState("");
     const [isAdding, setIsAdding] = useState(false);
@@ -50,6 +50,30 @@ const CheckItemsSection = React.memo(
     useEffect(() => {
       fetchCheckItems();
     }, [fetchCheckItems]);
+
+    // Nếu có các item mới được tạo từ AI (sau khi user chấp nhận), append vào UI
+    useEffect(() => {
+      if (!aiCreatedItems || !Array.isArray(aiCreatedItems) || aiCreatedItems.length === 0) return;
+
+      setCheckItems((prev) => {
+        const prevIds = new Set(prev.map((p) => String(p._id)));
+        const normalized = aiCreatedItems
+          .map((it) => ({
+            // Ensure shape matches existing checkItems
+            _id: it._id || it.id || `${Math.random()}`,
+            title: it.title || it.name || "(Mục)",
+            position: typeof it.position === "number" ? it.position : prev.length + 0,
+            isCompleted: !!it.isCompleted,
+            assignedTo: it.assignedTo || null,
+            dueDate: it.dueDate || null,
+          }))
+          .filter((n) => !prevIds.has(String(n._id)));
+
+        if (normalized.length === 0) return prev;
+
+        return [...prev, ...normalized].sort((a, b) => (a.position || 0) - (b.position || 0));
+      });
+    }, [aiCreatedItems]);
 
     // Socket: join task mới, leave task cũ
     useEffect(() => {

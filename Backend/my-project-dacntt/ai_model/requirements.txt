@@ -5,3 +5,5 @@ transformers==4.42.4
 sentencepiece
 numpy
 scikit-learn
+huggingface_hub
+

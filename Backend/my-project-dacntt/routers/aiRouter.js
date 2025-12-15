@@ -75,4 +75,50 @@ router.post("/generate-checklist", async (req, res) => {
   }
 });
 
+// Endpoint to save generated items to CheckItem when user accepts
+router.post("/save-checklist", async (req, res) => {
+  try {
+    const CheckItem = require("../models/checkItem");
+    const { getIO } = require("../config/socket");
+
+    const { taskId, title, items } = req.body;
+
+    if (!taskId) {
+      return res.status(400).json({ error: "taskId is required" });
+    }
+
+    // Create check items directly under the task
+    let createdItems = [];
+    if (Array.isArray(items) && items.length > 0) {
+      const itemsToCreate = items.map((it, idx) => ({
+        taskId,
+        title: it.title || `Item ${idx + 1}`,
+        position: typeof it.position === "number" ? it.position : idx,
+        assignedTo: it.assignedTo || null,
+        dueDate: it.dueDate || null,
+      }));
+
+      createdItems = await CheckItem.insertMany(itemsToCreate);
+
+      // Emit socket events so clients in the task room update immediately
+      try {
+        const io = getIO();
+        createdItems.forEach((it) => {
+          io.to(taskId.toString()).emit("checkItemAdded", {
+            ...it.toObject(),
+            taskId,
+          });
+        });
+      } catch (e) {
+        console.warn("Socket emit failed:", e.message);
+      }
+    }
+
+    res.json({ success: true, items: createdItems });
+  } catch (err) {
+    console.error("SAVE CHECKLIST ERROR:", err);
+    res.status(500).json({ error: "Failed to save check items" });
+  }
+});
+
 module.exports = router;
