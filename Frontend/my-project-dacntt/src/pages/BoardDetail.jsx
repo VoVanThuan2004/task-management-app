@@ -418,6 +418,58 @@ export default function BoardDetail() {
       );
     });
 
+    socket.on("taskLabelUpdated", (data) => {
+      setColumns((prevColumns) =>
+        prevColumns.map((col) => {
+          // Tìm index của task cần cập nhật trong column này
+          const taskIndex = col.tasks.findIndex((t) => t._id === data.taskId);
+
+          // Nếu không tìm thấy task → giữ nguyên column
+          if (taskIndex === -1) return col;
+
+          // Cập nhật mảng tasks với task mới (immutable)
+          const updatedTasks = col.tasks.map((task, idx) => {
+            if (idx !== taskIndex) return task; // Giữ nguyên các task khác
+
+            // Task cần cập nhật
+            if (data.action === "added") {
+              // Thêm label mới vào taskLabels
+              return {
+                ...task,
+                taskLabels: [
+                  ...task.taskLabels,
+                  {
+                    labelId: data.labelId,
+                    title: data.title,
+                    color: data.color,
+                  },
+                ],
+              };
+            }
+
+            if (data.action === "removed") {
+              // Xóa label có labelId khớp
+              return {
+                ...task,
+                taskLabels: task.taskLabels.filter(
+                  (label) => label.labelId !== data.labelId
+                ),
+              };
+            }
+
+            // Nếu action không hợp lệ (hiếm xảy ra), giữ nguyên
+            return task;
+          });
+
+          // Trả về column mới với tasks đã cập nhật
+          return {
+            ...col,
+            tasks: updatedTasks,
+          };
+        })
+      );
+    });
+
     return () => {
       socket.emit("leaveBoard", boardId);
       socket.disconnect();
@@ -763,6 +815,7 @@ export default function BoardDetail() {
       </main>
 
       <TaskModal
+        key={selectedTask?._id}
         task={selectedTask}
         isOpen={showTaskModal}
         onClose={handleCloseModal}

@@ -27,6 +27,9 @@ router.delete("/api/v1/tasks/:taskId", auth, taskController.deleteTask);
 // Gán label (nhãn dán) cho task
 router.post("/api/v1/tasks-label", auth, taskController.toggleLabelOnTask);
 
+// Lấy danh sách task-label
+router.get("/api/v1/tasks-label/:taskId", auth, taskController.getAllTaskLabels);
+
 // Upload file đính kèm cho task
 router.post("/api/v1/tasks-attachment", auth, upload.single("file"), taskController.uploadFile);
 

@@ -13,6 +13,7 @@ import BoardDetail from "./pages/BoardDetail";
 import RecoveryPassword from "./pages/RecoveryPassword";
 import Register from "./pages/Register";
 import ProfilePage from "./pages/ProfilePage";
+import ChangePassword from "./pages/ChangePassword";
 
 function App() {
   return (
@@ -51,6 +52,7 @@ function App() {
             <Route path="/recovery-password" element={<RecoveryPassword />} />
             <Route path="/register" element={<Register />} />
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/change-password" element={<ChangePassword />} />
 
             {/* <Route path="/recovery-password" element={<RecoveryPassword />} />
             <Route path="/register" element={<RegisterPage />} /> */}

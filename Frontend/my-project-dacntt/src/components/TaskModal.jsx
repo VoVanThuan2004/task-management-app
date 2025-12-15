@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { io } from "socket.io-client";
-import { ClockIcon, UserIcon } from "lucide-react"; // icon ví dụ
+import { ClockIcon, UserIcon, TagIcon, X } from "lucide-react";
 import TaskHeader from "./TaskModal/TaskHeader";
 import TaskDatePickerPopup from "./TaskModal/TaskDatePickerPopup";
 import TaskDescription from "./TaskModal/TaskDescription";
@@ -45,6 +45,12 @@ const TaskModal = ({
   // State cho popup gán thành viên
   const [showMembersPopup, setShowMembersPopup] = useState(false);
   const membersButtonRef = useRef(null);
+
+  // State cho popup nhãn dán
+  const [showLabelsPopup, setShowLabelsPopup] = useState(false);
+  const labelsButtonRef = useRef(null); // ref cho nút Nhãn dán
+  const [boardLabels, setBoardLabels] = useState([]); // danh sách labels từ API
+  const [loadingLabels, setLoadingLabels] = useState(false);
 
   // Khi task thay đổi => gọi API lấy chi tiết task
   useEffect(() => {
@@ -116,6 +122,33 @@ const TaskModal = ({
       }
     });
 
+    newSocket.on("taskLabelUpdated", (data) => {
+      console.log("taskLabelUpdated:", data);
+
+      if (data.taskId === task._id) {
+        if (data.action === "added") {
+          setEditedTask((prev) => ({
+            ...prev,
+            labels: [
+              ...prev.labels,
+              {
+                labelId: data.labelId,
+                title: data.title,
+                color: data.color,
+              },
+            ],
+          }));
+        } else if (data.action === "removed") {
+          setEditedTask((prev) => ({
+            ...prev,
+            labels: prev.labels.filter(
+              (label) => label.labelId !== data.labelId
+            ),
+          }));
+        }
+      }
+    });
+
     const handleNewAttachment = (data) => {
       if (data.taskId === task._id) {
         setEditedTask((prev) => ({
@@ -180,24 +213,6 @@ const TaskModal = ({
     });
     return res.data;
   };
-
-  // const uploadAttachment = async (file) => {
-  //   const formData = new FormData();
-  //   formData.append("file", file);
-  //   formData.append("taskId", task._id);
-
-  //   const res = await axios.post(
-  //     `${httpUrl}/api/v1/tasks-attachment`,
-  //     formData,
-  //     {
-  //       headers: {
-  //         Authorization: `Bearer ${accessToken}`,
-  //         "Content-Type": "multipart/form-data",
-  //       },
-  //     }
-  //   );
-  //   return res.data;
-  // };
 
   // ============ HANDLERS ============
 
@@ -312,11 +327,6 @@ const TaskModal = ({
     if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
     return (bytes / 1048576).toFixed(1) + " MB";
   };
-
-  // const formatDate = (dateString) => {
-  //   if (!dateString) return "";
-  //   return new Date(dateString).toLocaleDateString("vi-VN");
-  // };
 
   // Show toast function
   const showToast = (message, type = "info") => {
@@ -484,6 +494,64 @@ const TaskModal = ({
     }));
   };
 
+  // useEffect(() => {
+  //   if (task?._id) {
+  //     fetchLabelsForTask();
+  //   }
+  // }, [task?._id]);
+
+  const fetchLabelsForTask = async () => {
+    setShowLabelsPopup(!showLabelsPopup);
+
+    try {
+      setLoadingLabels(true);
+      const res = await axios.get(
+        `${httpUrl}/api/v1/tasks-label/${editedTask._id}`,
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }
+      );
+      setBoardLabels(res.data.data); // mỗi label có thêm field status: true/false
+    } catch (err) {
+      console.error(err);
+      setToast({
+        show: true,
+        type: "error",
+        message: "Không tải được nhãn dán",
+      });
+    } finally {
+      setLoadingLabels(false);
+    }
+  };
+
+  const handleToggleLabel = async (labelId) => {
+    try {
+      await axios.post(
+        `${httpUrl}/api/v1/tasks-label`,
+        { taskId: task._id, labelId },
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+
+      // Cập nhật local state
+      setBoardLabels((prev) =>
+        prev.map((label) =>
+          label._id === labelId ? { ...label, status: !label.status } : label
+        )
+      );
+
+      // Cập nhật editedTask nếu cần hiển thị labels đã gắn ở đâu đó
+      // setEditedTask(res.data.task); // backend trả về task cập nhật (tùy bạn)
+    } catch (err) {
+      setToast({
+        show: true,
+        type: "error",
+        message: "Lỗi khi cập nhật nhãn",
+      });
+
+      console.log(err);
+    }
+  };
+
   if (!isOpen) return null;
 
   if (!editedTask) {
@@ -601,7 +669,9 @@ const TaskModal = ({
                   <ClockIcon className="w-4 h-4" /> Thời gian
                 </Motion.button>
 
+                {/* === NÚT NHÃN DÁN === */}
                 <Motion.button
+                  ref={labelsButtonRef}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   className={`flex items-center gap-1 px-3 py-2 rounded text-sm transition ${
@@ -609,10 +679,12 @@ const TaskModal = ({
                       ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                       : "bg-gray-100 hover:bg-gray-200"
                   }`}
-                  onClick={() => !isReadOnly && setShowPopup(!showPopup)}
+                  onClick={() => !isReadOnly && fetchLabelsForTask()}  // ← Dùng hàm mới
                   disabled={isReadOnly}
                 >
-                  <ClockIcon className="w-4 h-4" /> Nhãn dán
+                  <TagIcon className="w-4 h-4" />{" "}
+                  {/* Thay ClockIcon bằng TagIcon hoặc LabelIcon */}
+                  Nhãn dán
                 </Motion.button>
 
                 {/* === NÚT THÀNH VIÊN === */}
@@ -692,7 +764,160 @@ const TaskModal = ({
                     </Motion.div>
                   )}
                 </AnimatePresence>
+
+                {/* === POPUP NHÃN DÁN + OVERLAY ĐÓNG KHI CLICK NGOÀI === */}
+                <AnimatePresence>
+                  {showLabelsPopup && !isReadOnly && (
+                    <>
+                      {/* Overlay trong suốt - click vào đây để đóng */}
+                      <Motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.15 }}
+                        className="fixed inset-0 z-40" // z-40 để dưới popup (popup z-50)
+                        onClick={() => setShowLabelsPopup(false)} // ← ĐÓNG KHI CLICK RA NGOÀI
+                      />
+
+                      {/* Popup chính */}
+                      <Motion.div
+                        initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                        transition={{ duration: 0.2 }}
+                        className="fixed z-50" // cao hơn overlay
+                        style={{
+                          left: labelsButtonRef.current
+                            ? labelsButtonRef.current.getBoundingClientRect()
+                                .left
+                            : 0,
+                          top: labelsButtonRef.current
+                            ? labelsButtonRef.current.getBoundingClientRect()
+                                .bottom + 8
+                            : 0,
+                        }}
+                        // Quan trọng: ngăn sự kiện click lan ra overlay khi click vào popup
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="bg-white rounded-lg shadow-2xl border border-gray-200 w-80 max-h-96 overflow-hidden">
+                          {/* Header */}
+                          <div className="p-4 border-b border-gray-200 relative">
+                            <h3 className="text-lg font-semibold text-gray-800 pr-8">
+                              Nhãn dán
+                            </h3>
+                            <button
+                              onClick={() => setShowLabelsPopup(false)}
+                              className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition"
+                            >
+                              <X className="w-5 h-5" />
+                            </button>
+                          </div>
+
+                          {/* Danh sách labels */}
+                          <div className="overflow-y-auto max-h-80">
+                            {loadingLabels ? (
+                              <div className="p-8 text-center text-gray-500">
+                                <div className="animate-spin inline-block w-6 h-6 border-2 border-gray-300 border-t-blue-600 rounded-full"></div>
+                              </div>
+                            ) : boardLabels?.length === 0 ? (
+                              <p className="text-center text-gray-500 py-8">
+                                Chưa có nhãn nào trong bảng làm việc
+                              </p>
+                            ) : (
+                              <div className="p-2">
+                                {boardLabels.map((label) => (
+                                  <Motion.button
+                                    key={label._id}
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={() => handleToggleLabel(label._id)}
+                                    className="w-full flex items-center justify-between p-3 rounded-lg mb-2 transition hover:bg-gray-50"
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <div
+                                        className="w-10 h-8 rounded flex-shrink-0"
+                                        style={{
+                                          backgroundColor:
+                                            label.color || "#6b7280",
+                                        }}
+                                      />
+                                      <span className="text-sm font-medium text-gray-800">
+                                        {label.title}
+                                      </span>
+                                    </div>
+
+                                    {label.status && (
+                                      <svg
+                                        className="w-5 h-5 text-green-600 flex-shrink-0"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={3}
+                                          d="M5 13l4 4L19 7"
+                                        />
+                                      </svg>
+                                    )}
+                                  </Motion.button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </Motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
               </div>
+
+              {/* --- Nhãn (Labels) --- */}
+              {editedTask.labels && editedTask.labels.length > 0 && (
+                <Motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3, duration: 0.3 }}
+                  className="mb-6"
+                >
+                  <h3 className="text-xs font-semibold text-gray-500 mb-1">
+                    Nhãn
+                  </h3>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {editedTask.labels.map((label, index) => (
+                      <Motion.span
+                        key={label.labelId || index}
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{
+                          delay: 0.3 + index * 0.05,
+                          duration: 0.3,
+                        }}
+                        className={`
+            text-xs px-3 py-1 rounded font-medium
+            ${
+              label.color &&
+              label.color.toLowerCase() !== "#ffffff" &&
+              label.color.toLowerCase() !== "#fff"
+                ? `bg-[${label.color}] text-white shadow-sm` // Dùng màu custom từ DB cho nền
+                : "bg-gray-200 text-gray-700" // Màu mặc định nếu không có màu hoặc màu trắng
+            }
+          `}
+                        style={
+                          label.color &&
+                          label.color.toLowerCase() !== "#ffffff" &&
+                          label.color.toLowerCase() !== "#fff"
+                            ? { backgroundColor: label.color }
+                            : {}
+                        }
+                      >
+                        {label.title}
+                      </Motion.span>
+                    ))}
+                  </div>
+                </Motion.div>
+              )}
 
               {/* --- Ngày & Trạng thái --- */}
               <Motion.div

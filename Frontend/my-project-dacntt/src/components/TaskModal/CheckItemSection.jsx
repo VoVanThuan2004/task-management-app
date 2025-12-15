@@ -11,6 +11,8 @@ import {
   Trash2,
   GripVertical,
   CheckSquare,
+  User2Icon,
+  CalendarClock,
 } from "lucide-react";
 
 const httpUrl = import.meta.env.VITE_API_URL;
@@ -292,7 +294,7 @@ const CheckItemsSection = React.memo(
                       <div
                         ref={provided.innerRef}
                         {...provided.draggableProps}
-                        className={`group flex items-center gap-3 p-3 rounded-lg bg-gray-50 transition-all ${
+                        className={`group flex items-center gap-3 p-3 rounded-lg bg-gray-50 transition-all m-3 ${
                           snapshot.isDragging
                             ? "shadow-lg bg-white ring-2 ring-blue-400"
                             : ""
@@ -359,12 +361,28 @@ const CheckItemsSection = React.memo(
 
                         {/* Nút xóa – chỉ hiện khi hover & được phép */}
                         {!isReadOnly && (
-                          <button
-                            onClick={() => deleteCheckItem(item._id)}
-                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 rounded transition"
-                          >
-                            <Trash2 className="w-4 h-4 text-gray-500 hover:text-red-600" />
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => deleteCheckItem(item._id)}
+                              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-50 rounded transition cursor-pointer"
+                            >
+                              <CalendarClock className="w-5 h-5 text-gray-500 hover:text-blue-600" />
+                            </button>
+
+                            <button
+                              onClick={() => deleteCheckItem(item._id)}
+                              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-50 rounded transition cursor-pointer"
+                            >
+                              <User className="w-5 h-5 text-gray-500 hover:text-blue-600" />
+                            </button>
+
+                            <button
+                              onClick={() => deleteCheckItem(item._id)}
+                              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-50 rounded transition cursor-pointer"
+                            >
+                              <Trash2 className="w-5 h-5 text-gray-500 hover:text-blue-600" />
+                            </button>
+                          </div>
                         )}
                       </div>
                     )}

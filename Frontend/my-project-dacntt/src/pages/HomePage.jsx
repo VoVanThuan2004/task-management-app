@@ -322,7 +322,7 @@ export default function HomePage() {
 
                       <button
                         onClick={() => {
-                          alert("Tính năng đang phát triển");
+                          navigate("/change-password");
                           setShowProfileMenu(false);
                         }}
                         className="flex items-center gap-3 w-full px-5 py-3 hover:bg-gray-50 text-gray-700 transition"

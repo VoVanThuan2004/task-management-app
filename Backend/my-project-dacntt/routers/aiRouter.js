@@ -57,8 +57,8 @@ const router = express.Router();
 router.post("/generate-checklist", async (req, res) => {
   try {
     const cleanPayload = {
-      title: cleanText(req.body.task_title),
-      description: cleanText(req.body.task_description),
+      title: cleanText(req.body.title),
+      description: cleanText(req.body.description),
       users: req.body.users || []
     };
 
