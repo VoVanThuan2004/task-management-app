@@ -71,13 +71,23 @@ const sendRecoveryPassword = async (to, otp) => {
 // -----------------------------
 // 3️⃣ Mời tham gia board
 // -----------------------------
-const sendShareBoardEmail = async (to, inviterName, boardTitle, message, link) => {
+const sendShareBoardEmail = async (
+  to,
+  inviterName,
+  boardTitle,
+  message,
+  link
+) => {
   const subject = `Lời mời tham gia bảng "${boardTitle}"`;
   const html = `
     <div style="font-family: Arial, sans-serif; font-size:16px; color:#333; line-height:1.5;">
       <h2 style="color:#2d8cf0;">Mời bạn tham gia bảng làm việc</h2>
       <p><b>${inviterName}</b> đã mời bạn tham gia bảng <b>"${boardTitle}"</b>.</p>
-      ${message ? `<blockquote style="margin:15px 0; padding:10px 15px; background:#f3f8ff; border-left:4px solid #2d8cf0;">${message}</blockquote>` : ""}
+      ${
+        message
+          ? `<blockquote style="margin:15px 0; padding:10px 15px; background:#f3f8ff; border-left:4px solid #2d8cf0;">${message}</blockquote>`
+          : ""
+      }
       <p>Bạn có thể truy cập bảng này tại liên kết sau:</p>
       <p style="text-align:center;">
         <a href="${link}" style="display:inline-block; background-color:#2d8cf0; color:#fff; padding:10px 20px; border-radius:6px; text-decoration:none;">Tham gia ngay</a>
@@ -100,9 +110,13 @@ const sendAssignTaskEmail = async (to, task, title, inviterName) => {
   const html = `
     <div style="font-family: Arial, sans-serif; font-size:16px; color:#333; line-height:1.5;">
       <h2 style="color:#2d8cf0;">Bạn được chỉ định vào task</h2>
-      <p><b>${inviterName}</b> đã chỉ định bạn vào task <b>"${task.title}"</b> trên bảng <b>"${title}"</b>.</p>
-      <p><strong>Mô tả:</strong> ${task.description || 'Không có'}</p>
-      <p><strong>Bắt đầu:</strong> ${task.startDate || 'Chưa có'} | <strong>Hạn:</strong> ${task.dueDate || 'Chưa có'}</p>
+      <p><b>${inviterName}</b> đã chỉ định bạn vào task <b>"${
+    task.title
+  }"</b> trên bảng <b>"${title}"</b>.</p>
+      <p><strong>Mô tả:</strong> ${task.description || "Không có"}</p>
+      <p><strong>Bắt đầu:</strong> ${
+        task.startDate || "Chưa có"
+      } | <strong>Hạn:</strong> ${task.dueDate || "Chưa có"}</p>
       <p>Hãy truy cập ứng dụng để xem chi tiết và thực hiện công việc.</p>
       <br/>
       <p>Trân trọng,</p>
@@ -217,6 +231,96 @@ const sendRemoveFromBoardEmail = async (to, boardTitle) => {
   await sendEmail(to, subject, html);
 };
 
+// -----------------------------
+// 6️⃣ Thông báo gán user vào check-item (mục việc cần làm)
+// -----------------------------
+const sendAssignCheckItemEmail = async (
+  to,
+  inviterName,
+  boardTitle,
+  taskTitle,
+  checkItemTitle
+) => {
+  const subject = `Bạn được giao mục việc: "${checkItemTitle}"`;
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9fafb;">
+      
+      <!-- Header -->
+      <div style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 40px 20px; text-align: center; border-radius: 8px 8px 0 0;">
+        <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 600;">
+          Công việc mới được giao
+        </h1>
+      </div>
+
+      <!-- Main Content -->
+      <div style="background: #ffffff; padding: 40px 30px; border-radius: 0 0 8px 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+        
+        <!-- Greeting -->
+        <p style="font-size: 16px; color: #374151; line-height: 1.6; margin-bottom: 30px;">
+          Chào bạn,
+        </p>
+        <p style="font-size: 16px; color: #374151; line-height: 1.7; margin-bottom: 30px;">
+          <strong>${inviterName}</strong> đã giao cho bạn một mục việc cần thực hiện trong task.
+        </p>
+
+        <!-- Check Item Highlight -->
+        <div style="background: #eef2ff; border-left: 4px solid #6366f1; padding: 20px; border-radius: 6px; margin: 30px 0;">
+          <p style="margin: 0 0 8px 0; color: #6366f1; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">
+            Mục việc cần làm
+          </p>
+          <h2 style="margin: 0; color: #1e293b; font-size: 22px; font-weight: 600;">
+            ${checkItemTitle}
+          </h2>
+        </div>
+
+        <!-- Task & Board Context -->
+        <div style="background: #f8fafc; padding: 20px; border-radius: 6px; margin: 30px 0;">
+          <table style="width: 100%; font-size: 15px; color: #4b5563;">
+            <tr>
+              <td style="padding: 8px 0; font-weight: 600;">Trong bảng:</td>
+              <td style="padding: 8px 0;">${boardTitle}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; font-weight: 600; width: 100px;">Thuộc task:</td>
+              <td style="padding: 8px 0;">${taskTitle}</td>
+            </tr>
+          </table>
+        </div>
+
+        <!-- Suggestion -->
+        <div style="background: #f0fdfa; padding: 20px; border-radius: 6px; border-left: 4px solid #14b8a6; margin: 30px 0;">
+          <p style="margin: 0; color: #0f766e; font-size: 15px; line-height: 1.6;">
+            <strong>Lời khuyên:</strong> Bạn vui lòng truy cập ứng dụng để xem chi tiết và đánh dấu hoàn thành khi đã thực hiện xong mục việc này.
+          </p>
+        </div>
+
+        <!-- Closing -->
+        <p style="font-size: 15px; color: #6b7280; line-height: 1.6; margin-top: 40px;">
+          Trân trọng,<br>
+          <strong>Đội ngũ Hệ thống quản lý công việc</strong>
+        </p>
+
+        <!-- Footer Note -->
+        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 40px 0 20px 0;">
+        <p style="font-size: 12px; color: #9ca3af; text-align: center;">
+          Đây là email tự động, vui lòng không trả lời email này.<br>
+          Nếu bạn có thắc mắc, hãy liên hệ với quản trị viên của bảng làm việc.
+        </p>
+      </div>
+
+      <!-- Brand Footer -->
+      <div style="text-align: center; padding: 30px 20px; color: #9ca3af; font-size: 12px; background: #f9fafb;">
+        <p style="margin: 0;">
+          © 2025 Hệ thống quản lý công việc. All rights reserved.
+        </p>
+      </div>
+    </div>
+  `;
+
+  await sendEmail(to, subject, html);
+};
+
 module.exports = {
   sendCreateAccount,
   sendRecoveryPassword,
@@ -225,4 +329,5 @@ module.exports = {
   sendTaskDeadlineEmail,
   sendRemoveMemberEmail,
   sendRemoveFromBoardEmail,
+  sendAssignCheckItemEmail,
 };

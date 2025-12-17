@@ -450,7 +450,7 @@ const updateDeadlineTask = async (req, res) => {
 
     const [task, user] = await Promise.all([
       Task.findById(taskId),
-      User.findById(userId).select("fullName avatar"),
+      User.findById(userId).select("fullName avatar").lean(),
     ]);
     if (!task) {
       return res.status(404).json({
@@ -489,7 +489,7 @@ const updateDeadlineTask = async (req, res) => {
       const oldJob = await reminderQueue.getJob(id);
       if (oldJob) {
         await oldJob.remove();
-        console.log(`🗑️ Đã xóa job cũ: ${id}`);
+        console.log(`Đã xóa job cũ: ${id}`);
       }
     }
 

@@ -1,28 +1,54 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import axios from "axios";
-import { format } from "date-fns";
+import { parseISO, format } from "date-fns";
 import {
   Check,
   X,
   Plus,
   Calendar,
-  User,
   Trash2,
   GripVertical,
   CheckSquare,
-  User2Icon,
+  UserPlus,
   CalendarClock,
 } from "lucide-react";
+import Avatar from "../Avatar";
+import DatePicker from "react-datepicker"; // ← Thêm
+import "react-datepicker/dist/react-datepicker.css"; // ← Thêm
 
 const httpUrl = import.meta.env.VITE_API_URL;
 
-  const CheckItemsSection = React.memo(
-  ({ taskId, accessToken, socket, isReadOnly = false, aiCreatedItems = null }) => {
+const CheckItemsSection = React.memo(
+  ({
+    taskId,
+    task,
+    accessToken,
+    socket,
+    isReadOnly = false,
+    aiCreatedItems = null,
+  }) => {
     const [checkItems, setCheckItems] = useState([]);
     const [newTitle, setNewTitle] = useState("");
     const [isAdding, setIsAdding] = useState(false);
     const [loading, setLoading] = useState(false);
+
+    // State cho popup chọn thời gian
+    const [datePickerOpenFor, setDatePickerOpenFor] = useState(null); // lưu _id của item đang mở
+    const [selectedStartDate, setSelectedStartDate] = useState(null);
+    const [selectedDueDate, setSelectedDueDate] = useState(null);
+    const [selectedStartTime, setSelectedStartTime] = useState({
+      hour: "00",
+      minute: "00",
+    });
+    const [selectedDueTime, setSelectedDueTime] = useState({
+      hour: "23",
+      minute: "59",
+    });
+
+    // State lấy danh sách thành viên
+    const [boardMembers, setBoardMembers] = useState([]);
+    const [membersPopupOpenFor, setMembersPopupOpenFor] = useState(null); // null hoặc checkItemId
 
     // Reset toàn bộ khi taskId thay đổi
     useEffect(() => {
@@ -53,7 +79,12 @@ const httpUrl = import.meta.env.VITE_API_URL;
 
     // Nếu có các item mới được tạo từ AI (sau khi user chấp nhận), append vào UI
     useEffect(() => {
-      if (!aiCreatedItems || !Array.isArray(aiCreatedItems) || aiCreatedItems.length === 0) return;
+      if (
+        !aiCreatedItems ||
+        !Array.isArray(aiCreatedItems) ||
+        aiCreatedItems.length === 0
+      )
+        return;
 
       setCheckItems((prev) => {
         const prevIds = new Set(prev.map((p) => String(p._id)));
@@ -62,7 +93,8 @@ const httpUrl = import.meta.env.VITE_API_URL;
             // Ensure shape matches existing checkItems
             _id: it._id || it.id || `${Math.random()}`,
             title: it.title || it.name || "(Mục)",
-            position: typeof it.position === "number" ? it.position : prev.length + 0,
+            position:
+              typeof it.position === "number" ? it.position : prev.length + 0,
             isCompleted: !!it.isCompleted,
             assignedTo: it.assignedTo || null,
             dueDate: it.dueDate || null,
@@ -71,7 +103,9 @@ const httpUrl = import.meta.env.VITE_API_URL;
 
         if (normalized.length === 0) return prev;
 
-        return [...prev, ...normalized].sort((a, b) => (a.position || 0) - (b.position || 0));
+        return [...prev, ...normalized].sort(
+          (a, b) => (a.position || 0) - (b.position || 0)
+        );
       });
     }, [aiCreatedItems]);
 
@@ -151,11 +185,37 @@ const httpUrl = import.meta.env.VITE_API_URL;
         });
       };
 
+      const handleDeadlineUpdated = (data) => {
+        setCheckItems((prev) =>
+          prev.map((item) =>
+            item._id === data._id
+              ? {
+                  ...item,
+                  startDate: data.startDate || null,
+                  dueDate: data.dueDate || null,
+                  status: data.status || null,
+                }
+              : item
+          )
+        );
+      };
+
+      const handleUpdateStatusDeadline = (data) => {
+        setCheckItems((prev) =>
+          prev.map((item) =>
+            item._id === data._id ? { ...item, status: data.status } : item
+          )
+        );
+      };
+
       socket.on("checkItemAdded", handleAdded);
       socket.on("checkItemTitleUpdated", handleTitleUpdated);
       socket.on("checkItemCompleted", handleCompleted);
       socket.on("checkItemDeleted", handleDeleted);
       socket.on("checkItemReordered", handleReordered);
+      socket.on("deadlineCheckItem", handleDeadlineUpdated);
+      socket.on("checkItemNearDeadline", handleUpdateStatusDeadline);
+      socket.on("checkItemOverdue", handleUpdateStatusDeadline);
 
       return () => {
         socket.off("checkItemAdded", handleAdded);
@@ -163,14 +223,15 @@ const httpUrl = import.meta.env.VITE_API_URL;
         socket.off("checkItemCompleted", handleCompleted);
         socket.off("checkItemDeleted", handleDeleted);
         socket.off("checkItemReordered", handleReordered);
+        socket.off("deadlineCheckItem", handleDeadlineUpdated);
+        socket.off("checkItemNearDeadline", handleUpdateStatusDeadline);
+        socket.off("checkItemOverdue", handleUpdateStatusDeadline);
       };
     }, [socket, taskId]);
 
     // ==========================
     // ACTIONS (UPDATE UI FROM API RESPONSE)
     // ==========================
-
-    // Trong CheckItemsSection.jsx
 
     const addCheckItem = async () => {
       if (isReadOnly || !newTitle.trim()) return;
@@ -244,18 +305,201 @@ const httpUrl = import.meta.env.VITE_API_URL;
     const handleDragEnd = async (result) => {
       if (isReadOnly || !result.destination) return;
 
-      const { draggableId, destination } = result;
+      const { draggableId, source, destination } = result;
 
+      // Nếu kéo về đúng vị trí cũ → không làm gì
+      if (source.index === destination.index) return;
+
+      // ===== 1. OPTIMISTIC UPDATE: Di chuyển ngay trên UI =====
+      setCheckItems((prev) => {
+        const items = Array.from(prev);
+        const [movedItem] = items.splice(source.index, 1);
+        items.splice(destination.index, 0, movedItem);
+        return items;
+      });
+
+      // ===== 2. Gọi API =====
       try {
         await axios.put(
           `${httpUrl}/api/v1/check-item/position/${draggableId}`,
           { destinationIndex: destination.index },
           { headers: { Authorization: `Bearer ${accessToken}` } }
         );
-
-        // Không update local vì socket sẽ gửi danh sách reorder chuẩn
+        // Thành công → không cần làm gì thêm
+        // Socket sẽ gửi danh sách chuẩn (nếu có re-index thì UI sẽ được refine nhẹ)
       } catch (err) {
-        console.error("Lỗi reorder:", err);
+        console.error("Lỗi reorder checkItem:", err);
+
+        // ===== 3. Revert nếu lỗi =====
+        setCheckItems((prev) => {
+          const items = Array.from(prev);
+          const [movedItem] = items.splice(destination.index, 1);
+          items.splice(source.index, 0, movedItem);
+          return items;
+        });
+
+        // Optional: thông báo lỗi
+        // toast.error("Không thể thay đổi thứ tự, vui lòng thử lại");
+      }
+    };
+
+    // === Cập nhật deadline ===
+    const updateDeadlineCheckItem = async (itemId) => {
+      if (isReadOnly) return;
+
+      try {
+        const payload = {};
+
+        // Kết hợp ngày và giờ cho startDate
+        if (selectedStartDate) {
+          const startDateTime = new Date(
+            selectedStartDate.getFullYear(),
+            selectedStartDate.getMonth(),
+            selectedStartDate.getDate(),
+            parseInt(selectedStartTime.hour),
+            parseInt(selectedStartTime.minute)
+          );
+          payload.startDate = startDateTime.toISOString();
+        }
+
+        // Kết hợp ngày và giờ cho dueDate
+        if (selectedDueDate) {
+          const dueDateTime = new Date(
+            selectedDueDate.getFullYear(),
+            selectedDueDate.getMonth(),
+            selectedDueDate.getDate(),
+            parseInt(selectedDueTime.hour),
+            parseInt(selectedDueTime.minute)
+          );
+          payload.dueDate = dueDateTime.toISOString();
+        }
+
+        const res = await axios.put(
+          `${httpUrl}/api/v1/check-item/deadline/${itemId}`,
+          payload,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+
+        const updatedItem = res.data.data;
+
+        // Optimistic update local
+        setCheckItems((prev) =>
+          prev.map((item) =>
+            item._id === itemId
+              ? {
+                  ...item,
+                  startDate: updatedItem.startDate || null,
+                  dueDate: updatedItem.dueDate || null,
+                  status: updatedItem.status || null,
+                }
+              : item
+          )
+        );
+
+        // Đóng popup và reset state
+        setDatePickerOpenFor(null);
+        setSelectedStartDate(null);
+        setSelectedDueDate(null);
+        setSelectedStartTime({ hour: "00", minute: "00" });
+        setSelectedDueTime({ hour: "23", minute: "59" });
+      } catch (error) {
+        console.error("Lỗi cập nhật deadline:", error);
+        alert("Không thể cập nhật thời hạn");
+      }
+    };
+
+    const openDatePicker = (item) => {
+      setDatePickerOpenFor(item._id);
+
+      // Parse ngày
+      setSelectedStartDate(item.startDate ? parseISO(item.startDate) : null);
+      setSelectedDueDate(item.dueDate ? parseISO(item.dueDate) : null);
+
+      // Parse giờ phút từ dữ liệu hiện tại
+      if (item.startDate) {
+        const startDate = parseISO(item.startDate);
+        setSelectedStartTime({
+          hour: startDate.getHours().toString().padStart(2, "0"),
+          minute: startDate.getMinutes().toString().padStart(2, "0"),
+        });
+      } else {
+        setSelectedStartTime({ hour: "00", minute: "00" });
+      }
+
+      if (item.dueDate) {
+        const dueDate = parseISO(item.dueDate);
+        setSelectedDueTime({
+          hour: dueDate.getHours().toString().padStart(2, "0"),
+          minute: dueDate.getMinutes().toString().padStart(2, "0"),
+        });
+      } else {
+        setSelectedDueTime({ hour: "23", minute: "59" });
+      }
+    };
+
+    // === Lấy danh sách thành viên trong board ===
+    const fetchBoardMembers = async (checkItemId) => {
+      if (!task?.boardId || !checkItemId) return;
+      try {
+        const res = await axios.get(
+          `${httpUrl}/api/v1/check-item/members/${checkItemId}/${task.boardId}`,
+          {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          }
+        );
+        setBoardMembers(res.data.data || []);
+
+        console.log(res.data.data);
+        console.log(checkItemId);
+      } catch (err) {
+        console.error("Lỗi lấy thành viên bảng:", err);
+      }
+    };
+
+    const openMembersPopup = async (checkItemId) => {
+      setMembersPopupOpenFor(checkItemId); // ← lưu id item đang mở
+      await fetchBoardMembers(checkItemId);
+    };
+
+    const closeMembersPopup = () => {
+      setMembersPopupOpenFor(null);
+      setBoardMembers([]);
+    };
+
+    // Hàm giao nhiệm vụ cho thành viên
+    const assignMemberToCheckItem = async (checkItemId, memberId) => {
+      if (isReadOnly) return;
+
+      try {
+        setLoading(true);
+        const res = await axios.put(
+          `${httpUrl}/api/v1/check-item/assigned/${checkItemId}`,
+          { userId: memberId },
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+
+        const updatedItem = res.data.data;
+
+        // Cập nhật local state
+        setCheckItems((prev) =>
+          prev.map((i) =>
+            i._id === checkItemId
+              ? {
+                  ...i,
+                  assignedTo: updatedItem.checkItem?.assignedTo || null,
+                  fullName: updatedItem.fullName || null,
+                  avatar: updatedItem.avatar || null,
+                }
+              : i
+          )
+        );
+
+        await fetchBoardMembers(checkItemId);
+      } catch (error) {
+        console.error("Lỗi giao nhiệm vụ:", error);
+        alert("Không thể giao nhiệm vụ cho thành viên");
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -305,113 +549,554 @@ const httpUrl = import.meta.env.VITE_API_URL;
               <div
                 {...provided.droppableProps}
                 ref={provided.innerRef}
-                className="space-y-y-2"
+                className="space-y-2 relative"
               >
-                {checkItems.map((item, index) => (
-                  <Draggable
-                    key={item._id}
-                    draggableId={item._id}
-                    index={index}
-                    isDragDisabled={isReadOnly} // ← Không cho kéo nếu chỉ đọc
-                  >
-                    {(provided, snapshot) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.draggableProps}
-                        className={`group flex items-center gap-3 p-3 rounded-lg bg-gray-50 transition-all m-3 ${
-                          snapshot.isDragging
-                            ? "shadow-lg bg-white ring-2 ring-blue-400"
-                            : ""
-                        }`}
-                      >
-                        {/* Drag handle – chỉ hiện khi được phép */}
-                        {!isReadOnly && (
-                          <div
-                            {...provided.dragHandleProps}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <GripVertical className="w-5 h-5 text-gray-400" />
-                          </div>
-                        )}
+                {checkItems.map((item, index) => {
+                  const assignee = item.assignedTo
+                    ? {
+                        _id: item.assignedTo,
+                        fullName: item.fullName || "Unknown",
+                        avatar: item.avatar,
+                      }
+                    : null;
 
-                        {/* Checkbox – khóa khi read-only */}
-                        <button
-                          onClick={() => toggleComplete(item._id)}
-                          disabled={isReadOnly}
-                          className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                            isReadOnly
-                              ? "cursor-not-allowed opacity-60"
-                              : "hover:border-gray-500"
-                          } ${
-                            item.isCompleted
-                              ? "bg-green-500 border-green-500"
-                              : "border-gray-300"
+                  const isDatePickerOpen = datePickerOpenFor === item._id;
+
+                  return (
+                    <Draggable
+                      key={item._id}
+                      draggableId={item._id}
+                      index={index}
+                      isDragDisabled={isReadOnly}
+                    >
+                      {(provided, snapshot) => (
+                        <div
+                          ref={provided.innerRef}
+                          {...provided.draggableProps}
+                          className={`group flex items-center gap-3 p-3 rounded-lg bg-gray-50 transition-all relative ${
+                            snapshot.isDragging
+                              ? "shadow-lg bg-white ring-2 ring-blue-400 z-50"
+                              : "hover:bg-gray-100"
                           }`}
                         >
-                          {item.isCompleted && (
-                            <Check className="w-3 h-3 text-white" />
+                          {/* Drag handle */}
+                          {!isReadOnly && (
+                            <div
+                              {...provided.dragHandleProps}
+                              className="opacity-60 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+                            >
+                              <GripVertical className="w-5 h-5 text-gray-400" />
+                            </div>
                           )}
-                        </button>
 
-                        {/* Nội dung */}
-                        <div className="flex-1">
-                          <p
-                            className={`text-sm ${
+                          {/* Checkbox */}
+                          <button
+                            onClick={() => toggleComplete(item._id)}
+                            disabled={isReadOnly}
+                            className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
                               item.isCompleted
-                                ? "line-through text-gray-500"
-                                : "text-gray-800"
+                                ? "bg-green-500 border-green-500"
+                                : "border-gray-300 bg-white"
                             }`}
                           >
-                            {item.title}
-                          </p>
-                          {/* Thành viên + hạn */}
-                          <div className="flex items-center gap-3 mt-1">
-                            {item.assignedTo && (
-                              <div className="flex items-center gap-1 text-xs text-gray-600">
-                                <User className="w-3 h-3" />
-                                <span>Được giao cho bạn</span>
-                              </div>
+                            {item.isCompleted && (
+                              <Check className="w-3 h-3 text-white" />
                             )}
-                            {item.dueDate && (
-                              <div className="flex items-center gap-1 text-xs text-gray-600">
-                                <Calendar className="w-3 h-3" />
-                                <span>
-                                  {format(new Date(item.dueDate), "dd/MM/yyyy")}
-                                </span>
-                              </div>
-                            )}
+                          </button>
+
+                          {/* Nội dung */}
+                          <div className="flex-1 min-w-0">
+                            <p
+                              className={`text-sm font-medium break-words ${
+                                item.isCompleted
+                                  ? "line-through text-gray-500"
+                                  : "text-gray-800"
+                              }`}
+                            >
+                              {item.title}
+                            </p>
+
+                            {/* Assignee + Due Date - giữ nguyên */}
+                            <div className="flex items-center gap-4 mt-2">
+                              {assignee && (
+                                <div className="flex items-center gap-1">
+                                  <Avatar user={assignee} size="sm" />
+                                  <span className="text-xs font-medium text-gray-700 truncate max-w-32">
+                                    {assignee.fullName}
+                                  </span>
+                                </div>
+                              )}
+
+                              {(item.startDate || item.dueDate) && (
+                                <div className="flex items-center gap-2 text-xs text-gray-600">
+                                  <Calendar className="w-3.5 h-3.5 text-gray-500" />
+                                  <div>
+                                    <span>
+                                      {item.startDate && (
+                                        <div className="inline-block">
+                                          <div>
+                                            {format(
+                                              new Date(item.startDate),
+                                              "dd/MM/yyyy"
+                                            )}
+                                          </div>
+                                          <div className="text-xs text-gray-500">
+                                            {format(
+                                              new Date(item.startDate),
+                                              "HH:mm"
+                                            )}
+                                          </div>
+                                        </div>
+                                      )}
+                                      {item.startDate && item.dueDate && (
+                                        <span className="self-center mx-1">
+                                          →
+                                        </span>
+                                      )}
+                                      {item.dueDate && (
+                                        <div className="inline-block">
+                                          <div>
+                                            {format(
+                                              new Date(item.dueDate),
+                                              "dd/MM/yyyy"
+                                            )}
+                                          </div>
+                                          <div className="text-xs text-gray-500">
+                                            {format(
+                                              new Date(item.dueDate),
+                                              "HH:mm"
+                                            )}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </span>
+                                  </div>
+                                  {item.status && (
+                                    <span
+                                      className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium ${
+                                        item.status === "Quá hạn"
+                                          ? "bg-red-100 text-red-800"
+                                          : item.status === "Gần tới hạn"
+                                          ? "bg-amber-100 text-amber-800"
+                                          : "bg-gray-100 text-gray-700"
+                                      }`}
+                                    >
+                                      {item.status}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
+
+                          {/* Nút hành động */}
+                          {!isReadOnly && (
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              {/* Nút mở DatePicker */}
+                              <button
+                                onClick={() => openDatePicker(item)}
+                                className="p-2 hover:bg-gray-200 rounded transition"
+                                title="Đặt thời hạn"
+                              >
+                                <CalendarClock className="w-4 h-4 text-gray-500 hover:text-blue-600" />
+                              </button>
+
+                              <button
+                                onClick={() => openMembersPopup(item._id)}
+                                className="p-2 hover:bg-gray-200 rounded transition"
+                                title="Giao cho thành viên"
+                              >
+                                <UserPlus className="w-4 h-4 text-gray-500 hover:text-blue-600" />
+                              </button>
+
+                              <button
+                                onClick={() => deleteCheckItem(item._id)}
+                                className="p-2 hover:bg-gray-200 rounded transition"
+                                title="Xóa mục"
+                              >
+                                <Trash2 className="w-4 h-4 text-gray-500 hover:text-red-600" />
+                              </button>
+                            </div>
+                          )}
+
+                          {/* POPUP DATE PICKER */}
+                          {isDatePickerOpen && (
+                            <div className="absolute top-full right-1 z-50 bg-white rounded-lg shadow-xl border border-gray-200 p-4 w-80">
+                              <h4 className="text-sm font-semibold mb-3">
+                                Thời hạn hoàn thành
+                              </h4>
+
+                              {/* Start Date (tùy chọn) */}
+                              <div className="mb-4">
+                                <label className="text-xs text-gray-600 mb-1 block">
+                                  Ngày bắt đầu (tùy chọn)
+                                </label>
+                                <DatePicker
+                                  selected={selectedStartDate}
+                                  onChange={(date) =>
+                                    setSelectedStartDate(date)
+                                  }
+                                  placeholderText="Chọn ngày bắt đầu"
+                                  dateFormat="dd/MM/yyyy"
+                                  className="w-full px-3 py-2 border border-orange-400 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                  popperPlacement="bottom-start"
+                                  minDate={new Date()}
+                                />
+                                {selectedStartDate && (
+                                  <div className="mt-2 grid grid-cols-2 gap-2">
+                                    <div>
+                                      <label className="text-xs text-gray-600 mb-1 block">
+                                        Giờ
+                                      </label>
+                                      <select
+                                        value={selectedStartTime.hour}
+                                        onChange={(e) =>
+                                          setSelectedStartTime((prev) => ({
+                                            ...prev,
+                                            hour: e.target.value,
+                                          }))
+                                        }
+                                        className="w-full px-3 py-2 border border-orange-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
+                                      >
+                                        {Array.from({ length: 24 }, (_, i) =>
+                                          i.toString().padStart(2, "0")
+                                        ).map((hour) => (
+                                          <option key={hour} value={hour}>
+                                            {hour}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    <div>
+                                      <label className="text-xs text-gray-600 mb-1 block">
+                                        Phút
+                                      </label>
+                                      <select
+                                        value={selectedStartTime.minute}
+                                        onChange={(e) =>
+                                          setSelectedStartTime((prev) => ({
+                                            ...prev,
+                                            minute: e.target.value,
+                                          }))
+                                        }
+                                        className="w-full px-3 py-2 border border-orange-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
+                                      >
+                                        {Array.from({ length: 60 }, (_, i) =>
+                                          i.toString().padStart(2, "0")
+                                        ).map((minute) => (
+                                          <option key={minute} value={minute}>
+                                            {minute}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Due Date (chính) */}
+                              <div className="mb-4">
+                                <label className="text-xs text-gray-600 mb-1 block">
+                                  Ngày hết hạn
+                                </label>
+                                <DatePicker
+                                  selected={selectedDueDate}
+                                  onChange={(date) => setSelectedDueDate(date)}
+                                  placeholderText="Chọn ngày hết hạn"
+                                  dateFormat="dd/MM/yyyy"
+                                  className="w-full px-3 py-2 border border-orange-400 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                  popperPlacement="bottom-start"
+                                  minDate={
+                                    selectedStartDate
+                                      ? new Date(
+                                          Math.max(
+                                            selectedStartDate.getTime(),
+                                            new Date().getTime()
+                                          )
+                                        )
+                                      : new Date()
+                                  }
+                                />
+                                {selectedDueDate && (
+                                  <div className="mt-2 grid grid-cols-2 gap-2">
+                                    <div>
+                                      <label className="text-xs text-gray-600 mb-1 block">
+                                        Giờ
+                                      </label>
+                                      <select
+                                        value={selectedDueTime.hour}
+                                        onChange={(e) =>
+                                          setSelectedDueTime((prev) => ({
+                                            ...prev,
+                                            hour: e.target.value,
+                                          }))
+                                        }
+                                        className="w-full px-3 py-2 border border-orange-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
+                                      >
+                                        {Array.from({ length: 24 }, (_, i) =>
+                                          i.toString().padStart(2, "0")
+                                        ).map((hour) => (
+                                          <option key={hour} value={hour}>
+                                            {hour}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    <div>
+                                      <label className="text-xs text-gray-600 mb-1 block">
+                                        Phút
+                                      </label>
+                                      <select
+                                        value={selectedDueTime.minute}
+                                        onChange={(e) =>
+                                          setSelectedDueTime((prev) => ({
+                                            ...prev,
+                                            minute: e.target.value,
+                                          }))
+                                        }
+                                        className="w-full px-3 py-2 border border-orange-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
+                                      >
+                                        {Array.from({ length: 60 }, (_, i) =>
+                                          i.toString().padStart(2, "0")
+                                        ).map((minute) => (
+                                          <option key={minute} value={minute}>
+                                            {minute}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Validation message */}
+                              {selectedStartDate &&
+                                selectedDueDate &&
+                                new Date(
+                                  selectedStartDate.getFullYear(),
+                                  selectedStartDate.getMonth(),
+                                  selectedStartDate.getDate(),
+                                  parseInt(selectedStartTime.hour),
+                                  parseInt(selectedStartTime.minute)
+                                ) >=
+                                  new Date(
+                                    selectedDueDate.getFullYear(),
+                                    selectedDueDate.getMonth(),
+                                    selectedDueDate.getDate(),
+                                    parseInt(selectedDueTime.hour),
+                                    parseInt(selectedDueTime.minute)
+                                  ) && (
+                                  <div className="mb-4 p-2 bg-red-50 border border-red-200 rounded text-red-600 text-xs">
+                                    Thời gian bắt đầu phải nhỏ hơn thời gian hết
+                                    hạn
+                                  </div>
+                                )}
+
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  onClick={() => {
+                                    setDatePickerOpenFor(null);
+                                    setSelectedStartDate(null);
+                                    setSelectedDueDate(null);
+                                    setSelectedStartTime({
+                                      hour: "00",
+                                      minute: "00",
+                                    });
+                                    setSelectedDueTime({
+                                      hour: "23",
+                                      minute: "59",
+                                    });
+                                  }}
+                                  className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded"
+                                >
+                                  Hủy
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    updateDeadlineCheckItem(item._id)
+                                  }
+                                  disabled={
+                                    !selectedDueDate ||
+                                    (selectedStartDate &&
+                                      selectedDueDate &&
+                                      new Date(
+                                        selectedStartDate.getFullYear(),
+                                        selectedStartDate.getMonth(),
+                                        selectedStartDate.getDate(),
+                                        parseInt(selectedStartTime.hour),
+                                        parseInt(selectedStartTime.minute)
+                                      ) >=
+                                        new Date(
+                                          selectedDueDate.getFullYear(),
+                                          selectedDueDate.getMonth(),
+                                          selectedDueDate.getDate(),
+                                          parseInt(selectedDueTime.hour),
+                                          parseInt(selectedDueTime.minute)
+                                        ))
+                                  }
+                                  className="px-4 py-2 text-sm bg-orange-400 text-white rounded hover:bg-orange-500 disabled:opacity-50"
+                                >
+                                  Lưu
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {membersPopupOpenFor === item._id && (
+                            <div className="absolute top-full right-1 mt-2 z-50 bg-white rounded-lg shadow-xl border border-gray-200 p-4 w-96 max-h-96 overflow-y-auto">
+                              <h4 className="text-sm font-semibold mb-4 text-center">
+                                Giao nhiệm vụ cho thành viên
+                              </h4>
+
+                              {/* Overlay loading toàn popup khi đang assign */}
+                              {loading && (
+                                <div className="absolute inset-0 bg-white/50 rounded-lg flex items-center justify-center z-50">
+                                  <div className="flex flex-col items-center gap-3">
+                                    <div className="w-10 h-10 border-4 border-orange-400 border-t-transparent rounded-full animate-spin"></div>
+                                    <p className="text-sm text-gray-700 font-medium">
+                                      Đang giao nhiệm vụ...
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Danh sách thành viên */}
+                              <div
+                                className={`space-y-3 ${
+                                  loading
+                                    ? "opacity-50 pointer-events-none"
+                                    : ""
+                                }`}
+                              >
+                                {boardMembers.map((member) => {
+                                  const isAssigned =
+                                    member.assignStatus === true;
+
+                                  return (
+                                    <div
+                                      key={member._id}
+                                      onClick={() =>
+                                        !isAssigned &&
+                                        assignMemberToCheckItem(
+                                          item._id,
+                                          member._id
+                                        )
+                                      }
+                                      className={`relative p-4 rounded-xl transition-all border ${
+                                        isAssigned
+                                          ? "bg-orange-50 border-orange-200 shadow-sm cursor-default"
+                                          : "cursor-pointer hover:bg-gray-50 hover:shadow-md hover:border-blue-200 border-transparent"
+                                      } ${
+                                        loading
+                                          ? "cursor-not-allowed"
+                                          : ""
+                                      }`}
+                                    >
+                                      {/* Nội dung thành viên giữ nguyên */}
+                                      <div className="flex items-start gap-3">
+                                        <div
+                                          className={`flex-shrink-0 rounded-full overflow-hidden ring-3 ${
+                                            isAssigned
+                                              ? "ring-orange-400 w-12 h-12"
+                                              : "ring-transparent hover:ring-blue-400 w-11 h-11"
+                                          } transition-all`}
+                                        >
+                                          <Avatar
+                                            user={member}
+                                            size={
+                                              isAssigned
+                                                ? "w-12 h-12"
+                                                : "w-11 h-11"
+                                            }
+                                          />
+                                        </div>
+
+                                        <div className="flex-1 min-w-0">
+                                          <div className="flex items-center gap-2 mb-1">
+                                            <p className="font-semibold text-base text-gray-900">
+                                              {member.fullName}
+                                            </p>
+                                            {isAssigned && (
+                                              <span className="text-xs bg-orange-500 text-white px-3 py-1 rounded-full font-medium">
+                                                Đã giao
+                                              </span>
+                                            )}
+                                          </div>
+                                          <p className="text-sm text-gray-600 mb-3 truncate">
+                                            {member.email}
+                                          </p>
+
+                                          {member.skills?.length > 0 ? (
+                                            <div className="flex flex-wrap gap-2">
+                                              {member.skills.map((s) => (
+                                                <span
+                                                  key={s._id}
+                                                  className={`inline-block px-3 py-1.5 text-xs font-medium rounded-full ${
+                                                    isAssigned
+                                                      ? "text-amber-800 bg-amber-200"
+                                                      : "text-blue-800 bg-blue-100"
+                                                  }`}
+                                                >
+                                                  {s.skill}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <p className="text-xs text-gray-400 italic">
+                                              Chưa có kỹ năng
+                                            </p>
+                                          )}
+                                        </div>
+
+                                        {isAssigned && (
+                                          <svg
+                                            className="w-7 h-7 text-orange-600 flex-shrink-0 mt-1"
+                                            fill="currentColor"
+                                            viewBox="0 0 20 20"
+                                          >
+                                            <path
+                                              fillRule="evenodd"
+                                              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                              clipRule="evenodd"
+                                            />
+                                          </svg>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+
+                              {/* Không có thành viên */}
+                              {boardMembers.length === 0 && !loading && (
+                                <div className="text-center py-10 text-gray-500">
+                                  <p className="text-sm">
+                                    Không có thành viên nào trong bảng
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Nút đóng - vẫn click được khi loading */}
+                              <div className="mt-6 pt-4 border-t border-gray-200 flex justify-end">
+                                <button
+                                  onClick={() => closeMembersPopup()}
+                                  disabled={loading}
+                                  className={`px-6 py-2.5 text-sm font-medium rounded-lg transition ${
+                                    loading
+                                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                  }`}
+                                >
+                                  Đóng
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </div>
-
-                        {/* Nút xóa – chỉ hiện khi hover & được phép */}
-                        {!isReadOnly && (
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => deleteCheckItem(item._id)}
-                              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-50 rounded transition cursor-pointer"
-                            >
-                              <CalendarClock className="w-5 h-5 text-gray-500 hover:text-blue-600" />
-                            </button>
-
-                            <button
-                              onClick={() => deleteCheckItem(item._id)}
-                              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-50 rounded transition cursor-pointer"
-                            >
-                              <User className="w-5 h-5 text-gray-500 hover:text-blue-600" />
-                            </button>
-
-                            <button
-                              onClick={() => deleteCheckItem(item._id)}
-                              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-50 rounded transition cursor-pointer"
-                            >
-                              <Trash2 className="w-5 h-5 text-gray-500 hover:text-blue-600" />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </Draggable>
-                ))}
+                      )}
+                    </Draggable>
+                  );
+                })}
                 {provided.placeholder}
               </div>
             )}
@@ -462,7 +1147,7 @@ const httpUrl = import.meta.env.VITE_API_URL;
         ) : (
           <button
             onClick={() => setIsAdding(true)}
-            className="mt-3 flex items-center gap-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 px-3 py-2 rounded-lg transition"
+            className="mt-3 flex items-center gap-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 px-3 py-2 rounded-lg transition w-full"
           >
             <Plus className="w-4 h-4" />
             Thêm một mục

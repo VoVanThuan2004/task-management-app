@@ -1,6 +1,6 @@
 import { getAvatarInfo } from "../utils/getAvatarInfo";
 
-export default function Avatar({ user, size = "w-10 h-10", className = "" }) {
+export default function Avatar({ user, size = "w-7 h-7", className = "" }) {
   const hasAvatar = user?.avatar && user.avatar.trim() && user.avatar !== "null";
   const { initials, bg } = getAvatarInfo(user?.fullName);
 

@@ -4,6 +4,10 @@ const BoardMember = require("../models/boardMember");
 const { getIO } = require("../config/socket");
 const createActivityLogTask = require("../utils/createActivityLogTask");
 const User = require("../models/user");
+const checkItemReminderQueue = require("../services/checkItemReminderQueue");
+const { sendAssignCheckItemEmail } = require("../config/mailConfig");
+const { ObjectId } = require("mongodb");
+const Board = require("../models/board");
 
 const addCheckItem = async (req, res) => {
   try {
@@ -488,20 +492,293 @@ const getAllCheckItems = async (req, res) => {
       });
     }
 
-    // 2. Lấy danh sách số lượng checkItems hoàn thành có positon tăng dần
-    const [totalCheckItemsCompleted, checkItems] = await Promise.all([
-      CheckItem.countDocuments({ isCompleted: true }),
-      CheckItem.find({ taskId }).sort({ position: 1 }),
+    // 2. Aggregate duy nhất: lấy danh sách + đếm hoàn thành
+    const result = await CheckItem.aggregate([
+      // Lọc theo taskId
+      {
+        $match: {
+          taskId: new ObjectId(taskId),
+        },
+      },
+
+      // Join với users để lấy thông tin người được gán (chỉ 1 user)
+      {
+        $lookup: {
+          from: "users",
+          localField: "assignedTo",
+          foreignField: "_id",
+          as: "userInfo",
+        },
+      },
+
+      // Giữ lại check-item không có assignedTo (preserveNullAndEmptyArrays: true)
+      {
+        $unwind: {
+          path: "$userInfo",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+
+      // Sắp xếp theo position tăng dần
+      { $sort: { position: 1 } },
+
+      // Nhóm để tính tổng và đẩy danh sách
+      {
+        $group: {
+          _id: null,
+          totalCheckItemsCompleted: {
+            $sum: { $cond: [{ $eq: ["$isCompleted", true] }, 1, 0] },
+          },
+          totalCheckItems: { $sum: 1 },
+          checkItems: {
+            $push: {
+              _id: "$_id",
+              taskId: "$taskId",
+              title: "$title",
+              position: "$position",
+              isCompleted: "$isCompleted",
+              assignedTo: "$assignedTo",
+              fullName: { $ifNull: ["$userInfo.fullName", null] },
+              avatar: { $ifNull: ["$userInfo.avatar", null] },
+              startDate: "$startDate",
+              dueDate: "$dueDate",
+              status: "$status",
+            },
+          },
+        },
+      },
+
+      // Format output cuối cùng
+      {
+        $project: {
+          _id: 0,
+          totalCheckItemsCompleted: 1,
+          totalCheckItems: 1,
+          checkItems: 1,
+        },
+      },
     ]);
+
+    // Nếu không có check-item nào → result = []
+    const data =
+      result.length > 0
+        ? result[0]
+        : {
+            totalCheckItemsCompleted: 0,
+            totalCheckItems: 0,
+            checkItems: [],
+          };
 
     return res.status(200).json({
       status: "success",
       code: 200,
       message: "Lấy danh sách check-items thành công",
+      data,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      code: 500,
+      message: "Lỗi hệ thống: " + error,
+    });
+  }
+};
+
+const updateDeadlineCheckItem = async (req, res) => {
+  try {
+    const checkItemId = req.params.id;
+    if (!checkItemId) {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Thiếu check-item id",
+      });
+    }
+
+    const { startDate, dueDate } = req.body;
+
+    // Parse ngày nếu có
+    const parsedStartDate = startDate ? new Date(startDate) : undefined;
+    const parsedDueDate = dueDate ? new Date(dueDate) : undefined;
+
+    if (parsedStartDate && parsedDueDate && parsedStartDate > parsedDueDate) {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Ngày bắt đầu không thể sau ngày kết thúc",
+      });
+    }
+
+    // 1. Kiểm tra check-item
+    const checkItem = await CheckItem.findById(checkItemId);
+    if (!checkItem) {
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Việc cần làm không tồn tại",
+      });
+    }
+
+    // 2. Cập nhật check-item
+    if (parsedStartDate !== undefined) {
+      checkItem.startDate = parsedStartDate;
+    }
+    if (parsedDueDate !== undefined) {
+      checkItem.dueDate = parsedDueDate;
+    }
+
+    if (parsedStartDate === undefined) {
+      checkItem.startDate = null;
+    }
+
+    checkItem.status = null;
+    await checkItem.save();
+
+    // 3. Tạo job remindQueue
+    // Xóa job cũ nếu có
+    const jobIds = [
+      `${checkItem._id}-reminder`,
+      `${checkItem._id}-nearDeadline`,
+      `${checkItem._id}-overdue`,
+    ];
+    for (const id of jobIds) {
+      const oldJob = await checkItemReminderQueue.getJob(id);
+      if (oldJob) {
+        await oldJob.remove();
+        console.log(`Đã xóa job cũ: ${id}`);
+      }
+    }
+
+    // 3.1 Thông báo trạng thái gần tới hạn
+    // Job: Gần tới hạn (10 phút trước)
+    const now = Date.now();
+    const dueTime = checkItem.dueDate.getTime();
+
+    const nearDeadlineDelay = dueTime - now - 5 * 60 * 1000; // nhắc nhở thông báo trước 5 phút
+    if (nearDeadlineDelay > 30000) {
+      // chỉ add nếu còn > 30 giây
+      await checkItemReminderQueue.add(
+        "markNearDeadline",
+        { checkItemId: checkItem._id, taskId: checkItem.taskId },
+        {
+          delay: nearDeadlineDelay,
+          jobId: `${checkItem._id}-nearDeadline`,
+        }
+      );
+      console.log(`⏳ Đã lên lịch markNearDeadline sau ${nearDeadlineDelay}ms`);
+    }
+
+    // Job: Quá hạn
+    const overdueDelay = Math.max(dueTime - now, 0);
+    await checkItemReminderQueue.add(
+      "markOverdue",
+      { checkItemId: checkItem._id, taskId: checkItem.taskId },
+      {
+        delay: overdueDelay,
+        jobId: `${checkItem._id}-overdue`,
+      }
+    );
+
+    // 4. Cập nhật socket
+    const io = getIO();
+    io.to(checkItem.taskId.toString()).emit("deadlineCheckItem", {
+      checkItem,
+    });
+    return res.status(200).json({
+      status: "success",
+      code: 200,
+      message: "Cập nhật deadline cho việc cần làm thành công",
+      data: checkItem,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      code: 500,
+      message: "Lỗi hệ thống: " + error,
+    });
+  }
+};
+
+const assignCheckItem = async (req, res) => {
+  try {
+    const checkItemId = req.params.id;
+    if (!checkItemId) {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Thiếu check-item id",
+      });
+    }
+
+    const { userId } = req.body;
+
+    // 1. Kiểm tra checkItem, user
+    const [checkItem, user] = await Promise.all([
+      CheckItem.findById(checkItemId),
+      User.findById(userId).lean(),
+    ]);
+    if (!checkItem) {
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "CheckItem không tồn tại",
+      });
+    }
+    if (!user) {
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Người dùng không tồn tại",
+      });
+    }
+
+    const task = await Task.findById(checkItem.taskId)
+      .populate({
+        path: "boardId",
+        select: "title",
+      })
+      .lean();
+
+    if (!task) {
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Task không tồn tại",
+      });
+    }
+
+    // 2. Gán người dùng
+    checkItem.assignedTo = userId;
+    await checkItem.save();
+
+    // 3. Cập nhật socket
+    const io = getIO();
+    io.to(checkItem.taskId.toString()).emit("assingedToCheckItem", {
+      checkItem,
+      userId: userId,
+      avatar: user.avatar,
+      fullName: user.fullName,
+    });
+
+    // 4. Gửi email thông báo
+    const fullName = req.user.fullName;
+    await sendAssignCheckItemEmail(
+      user.email,
+      fullName,
+      task.boardId.title,
+      task.title,
+      checkItem.title
+    );
+
+    return res.status(200).json({
+      status: "success",
+      code: 200,
+      message: "Gán người dùng cho việc cần làm thành công",
       data: {
-        totalCheckItemsCompleted,
-        totalCheckItems: checkItems.length,
-        checkItems,
+        checkItem,
+        userId: userId,
+        avatar: user.avatar,
+        fullName: user.fullName,
       },
     });
   } catch (error) {
@@ -513,6 +790,128 @@ const getAllCheckItems = async (req, res) => {
   }
 };
 
+const getMembersForAssign = async (req, res) => {
+  try {
+    const { boardId, checkItemId } = req.params;
+
+    if (!boardId || !checkItemId) {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "boardId và checkItemId là bắt buộc",
+      });
+    }
+
+    // Kiểm tra tồn tại board và checkItem (tùy chọn, nhưng nên giữ để bảo mật)
+    const [board, checkItem] = await Promise.all([
+      Board.findById(boardId),
+      CheckItem.findById(checkItemId).lean(), // .lean() để lấy plain object nhanh hơn
+    ]);
+
+    if (!board) {
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Bảng làm việc không tồn tại",
+      });
+    }
+
+    if (!checkItem) {
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "CheckItem không tồn tại",
+      });
+    }
+
+    // Lấy userId hiện đang được giao (nếu có)
+    const assignedUserId = checkItem.assignedTo?._id
+      ? checkItem.assignedTo.toString()
+      : null;
+
+    // Aggregate lấy thành viên board + skills + đánh dấu assignStatus
+    const boardMembers = await BoardMember.aggregate([
+      {
+        $match: { boardId: new ObjectId(boardId) },
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "userId",
+          foreignField: "_id",
+          as: "user",
+        },
+      },
+      { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
+
+      // Lấy skills của user trong board này
+      {
+        $lookup: {
+          from: "userskills",
+          let: { userId: "$userId", boardId: new ObjectId(boardId) },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$userId", "$$userId"] },
+                    { $eq: ["$boardId", "$$boardId"] },
+                  ],
+                },
+              },
+            },
+            { $project: { _id: 1, skill: 1 } },
+          ],
+          as: "userSkills",
+        },
+      },
+
+      // Project dữ liệu trả về
+      {
+        $project: {
+          _id: "$user._id",
+          email: "$user.email",
+          fullName: "$user.fullName",
+          avatar: "$user.avatar",
+          skills: {
+            $map: {
+              input: "$userSkills",
+              as: "us",
+              in: { _id: "$$us._id", skill: "$$us.skill" },
+            },
+          },
+          assignStatus: {
+            $cond: {
+              if: { $eq: [{ $toString: "$user._id" }, assignedUserId] },
+              then: true,
+              else: false,
+            },
+          },
+        },
+      },
+
+      // Sắp xếp: người đang được giao lên đầu
+      {
+        $sort: { assignStatus: -1, fullName: 1 },
+      },
+    ]);
+
+    return res.status(200).json({
+      status: "success",
+      code: 200,
+      message: "Lấy danh sách thành viên để giao nhiệm vụ thành công",
+      data: boardMembers,
+    });
+  } catch (error) {
+    console.error("Lỗi getMembersForAssign:", error);
+    return res.status(500).json({
+      status: "error",
+      code: 500,
+      message: "Lỗi hệ thống",
+    });
+  }
+};
+
 module.exports = {
   addCheckItem,
   updateTitleCheckItem,
@@ -520,4 +919,7 @@ module.exports = {
   moveCheckItem,
   toggleCheckItemComplete,
   getAllCheckItems,
+  updateDeadlineCheckItem,
+  assignCheckItem,
+  getMembersForAssign,
 };

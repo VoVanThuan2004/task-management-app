@@ -530,13 +530,13 @@ export default function BoardDetail() {
       return;
     }
     try {
-      await axios.put(
+      const res = await axios.put(
         `${httpUrl}/api/v1/columns/${columnId}`,
         { title: editTitle },
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
       setEditingColumn(null);
-      setEditTitle("");
+      setEditTitle(res.data.data.title);
     } catch (err) {
       console.error("❌ Lỗi khi cập nhật column:", err);
     }

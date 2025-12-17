@@ -14,6 +14,7 @@ const checkItemSchema = new mongoose.Schema({
   isCompleted: {
     type: Boolean,
     default: false,
+    index: true,
   },
   assignedTo: {
     type: mongoose.Schema.Types.ObjectId,
@@ -21,7 +22,9 @@ const checkItemSchema = new mongoose.Schema({
     index: true,
     default: null,
   },
+  startDate: { type: Date, default: null },
   dueDate: { type: Date, default: null },
+  status: { type: String, default: null },
 });
 
 checkItemSchema.index({ taskId: 1, isCompleted: 1 });

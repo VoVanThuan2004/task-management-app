@@ -21,7 +21,7 @@ const Column = React.memo(
     onToggleTaskComplete,
     onTaskClick,
     isMember = false,
-    loading
+    loading,
   }) => {
     const isReadOnly = !isMember;
 
@@ -56,16 +56,19 @@ const Column = React.memo(
                   <textarea
                     value={editTitle}
                     onChange={(e) => onEditTitle(e.target.value)}
-                    onBlur={onUpdateColumn}
+                    onBlur={onUpdateColumn} // Click ra ngoài → lưu
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault(); // Tránh xuống dòng
                         onUpdateColumn();
                       }
-                      if (e.key === "Escape") onStartEdit(null);
+                      if (e.key === "Escape") {
+                        onStartEdit(null); // Hủy edit, khôi phục giá trị cũ
+                      }
                     }}
-                    className="w-full px-2 py-1 text-sm font-semibold bg-white rounded border border-blue-500 resize-none"
+                    className="w-full min-h-8 px-3 py-1.5 text-sm font-semibold bg-white rounded-lg border-2 border-blue-500 shadow-sm resize-none focus:outline-none"
                     autoFocus
+                    rows={1}
                     disabled={isReadOnly}
                   />
                 ) : (

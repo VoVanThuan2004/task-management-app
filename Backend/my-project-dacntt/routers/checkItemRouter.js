@@ -21,4 +21,13 @@ router.put("/api/v1/check-item/complete/:id", auth, checkItemController.toggleCh
 // API lấy danh sách checkItems
 router.get("/api/v1/check-item/:taskId", auth, checkItemController.getAllCheckItems);
 
+// API thêm thời gian deadline cho checkItem
+router.put("/api/v1/check-item/deadline/:id", auth, checkItemController.updateDeadlineCheckItem);
+
+// API gán người dùng cho checkItem
+router.put("/api/v1/check-item/assigned/:id", auth, checkItemController.assignCheckItem);
+
+// API lấy danh sách members trong board
+router.get("/api/v1/check-item/members/:checkItemId/:boardId", auth, checkItemController.getMembersForAssign);
+
 module.exports = router;

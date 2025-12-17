@@ -107,7 +107,7 @@ export default function AiChecklistModal({ taskId, accessToken, onClose, onSaved
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-lg w-96 max-h-[80vh] overflow-auto p-4">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold">Gợi ý checklist (AI)</h3>
+          <h3 className="font-semibold">Gợi ý việc cần làm (AI)</h3>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-800">
             <X className="w-4 h-4" />
           </button>
@@ -120,7 +120,7 @@ export default function AiChecklistModal({ taskId, accessToken, onClose, onSaved
               className="px-3 py-1 bg-blue-600 text-white rounded disabled:opacity-50"
               disabled={loading}
             >
-              Sinh checklist
+              Sinh việc cần làm
             </button>
             <button
               onClick={() => { setItems(null); setTitle(""); setError(null); }}
@@ -164,7 +164,7 @@ export default function AiChecklistModal({ taskId, accessToken, onClose, onSaved
         )}
 
         {!items && !loading && (
-          <div className="text-sm text-gray-600">Nhấn "Sinh checklist" để lấy đề xuất từ AI.</div>
+          <div className="text-sm text-gray-600">Nhấn "Sinh việc cần làm" để lấy đề xuất từ AI.</div>
         )}
       </div>
     </div>

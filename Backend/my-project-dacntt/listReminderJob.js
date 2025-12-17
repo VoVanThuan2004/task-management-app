@@ -11,7 +11,7 @@ const connection = new Redis({
   enableReadyCheck: false,
 });
 
-const reminderQueue = new Queue("taskReminderQueue", { connection });
+const reminderQueue = new Queue("checkItemReminderQueue", { connection });
 
 async function listJobs() {
   try {
@@ -25,7 +25,7 @@ async function listJobs() {
         const delayMs =
           job.timestamp + (job.opts.delay || 0) - Date.now();
         console.log(
-          `- JobId: ${job.id}, TaskId: ${job.data.taskId}, BoardId: ${job.data.boardId}, Delay còn: ${Math.max(delayMs, 0)} ms`
+          `- JobId: ${job.id}, checkItemId: ${job.data.checkItemId}, taskId: ${job.data.taskId}, Delay còn: ${Math.max(delayMs, 0)} ms`
         );
       }
     }

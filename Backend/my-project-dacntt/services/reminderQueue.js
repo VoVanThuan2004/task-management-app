@@ -30,7 +30,7 @@ const worker = new Worker(
     const task = await Task.findById(taskId).populate("boardId");
     const io = getIO();
 
-    if (!task) return console.log(`⚠️ Task ${taskId} không tồn tại.`);
+    if (!task) return console.log(`Task ${taskId} không tồn tại.`);
 
     switch (job.name) {
       // === 1️⃣ GỬI NHẮC NHỞ ===
@@ -57,7 +57,7 @@ const worker = new Worker(
 
       // === 2️⃣ ĐÁNH DẤU GẦN TỚI HẠN ===
       case "markNearDeadline":
-        console.log(`⏳ [markNearDeadline] Task ${task.title} gần tới hạn`);
+        console.log(`[markNearDeadline] Task ${task.title} gần tới hạn`);
         if (!task.isCompleted && new Date() < task.dueDate) {
           task.status = "Gần tới hạn";
           await task.save();
@@ -82,31 +82,12 @@ const worker = new Worker(
         break;
 
       default:
-        console.log(`⚠️ Job không xác định: ${job.name}`);
+      console.log(`Job không xác định: ${job.name}`);
     }
   },
   { connection }
 );
 
-// 📋 Ghi log sự kiện queue & worker
-reminderQueue.on("waiting", (jobId) =>
-  console.log(`⏳ Job ${jobId} đang chờ thực thi...`)
-);
-reminderQueue.on("active", (job) =>
-  console.log(`⚙️ Job ${job.id} đang chạy...`)
-);
-reminderQueue.on("completed", (job) =>
-  console.log(`✅ Job ${job.id} hoàn thành.`)
-);
-reminderQueue.on("failed", (job, err) =>
-  console.error(`💥 Job ${job.id} thất bại:`, err.message)
-);
-
-worker.on("error", (err) => console.error("💣 Worker bị lỗi:", err));
-worker.on("failed", (job, err) =>
-  console.error(`❌ Job ${job.id} failed: ${err.message}`)
-);
-
-console.log("🟢 Reminder queue & worker đã khởi động thành công.");
+console.log("Reminder queue & worker đã khởi động thành công.");
 
 module.exports = reminderQueue;

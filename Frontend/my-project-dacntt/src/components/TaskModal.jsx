@@ -718,7 +718,7 @@ const TaskModal = ({
                   onClick={() => !isReadOnly && setShowAiModal(true)}
                   disabled={isReadOnly}
                 >
-                  Gợi ý checklist (AI)
+                  Gợi ý việc cần làm (AI)
                 </Motion.button>
 
                 {/* === POPUP THỜI GIAN – CHỈ HIỆN KHI ĐƯỢC PHÉP === */}
@@ -749,6 +749,7 @@ const TaskModal = ({
                     </Motion.div>
                   )}
                 </AnimatePresence>
+                
                 {/* === POPUP AI CHECKLIST === */}
                 <AnimatePresence>
                   {showAiModal && !isReadOnly && (
@@ -1193,6 +1194,7 @@ const TaskModal = ({
                 <CheckItemsSection
                   key={editedTask._id}
                   taskId={editedTask._id}
+                  task={editedTask}
                   accessToken={accessToken}
                   socket={socket}
                   isReadOnly={isReadOnly}

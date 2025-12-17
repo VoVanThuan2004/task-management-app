@@ -12,18 +12,18 @@ import {
 } from "lucide-react";
 
 const TaskCard = React.memo(({ task, index, onClick, onToggleComplete }) => {
-  const getDueDateStatus = (dueDate, isCompleted) => {
-    if (isCompleted || !dueDate) return null;
-    const today = new Date();
-    const due = new Date(dueDate);
-    const diffDays = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
+  // const getDueDateStatus = (dueDate, isCompleted) => {
+  //   if (isCompleted || !dueDate) return null;
+  //   const today = new Date();
+  //   const due = new Date(dueDate);
+  //   const diffDays = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
 
-    if (diffDays < 0) return { text: "Quá hạn", color: "bg-red-100 text-red-700" };
-    if (diffDays <= 1) return { text: "Gần tới hạn", color: "bg-yellow-100 text-yellow-700" };
-    return null;
-  };
+  //   if (diffDays < 0) return { text: "Quá hạn", color: "bg-red-100 text-red-700" };
+  //   if (diffDays <= 1) return { text: "Gần tới hạn", color: "bg-yellow-100 text-yellow-700" };
+  //   return null;
+  // };
 
-  const dueStatus = getDueDateStatus(task.dueDate, task.isCompleted);
+  // const dueStatus = getDueDateStatus(task.dueDate, task.isCompleted);
 
   return (
     <Draggable draggableId={task._id} index={index}>
@@ -80,9 +80,15 @@ const TaskCard = React.memo(({ task, index, onClick, onToggleComplete }) => {
               <div className="flex items-center gap-2 mt-2 text-xs">
                 <Clock className="w-3.5 h-3.5 text-gray-500" />
                 <span className="text-gray-600">{format(new Date(task.dueDate), "dd MMM")}</span>
-                {dueStatus && (
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${dueStatus.color}`}>
-                    {dueStatus.text}
+                {task.status === "Gần tới hạn" && (
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700`}>
+                    {task.status}
+                  </span>
+                )}
+
+                {task.status === "Quá hạn" && (
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700`}>
+                    {task.status}
                   </span>
                 )}
               </div>
