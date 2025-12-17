@@ -30,4 +30,7 @@ router.put("/api/v1/check-item/assigned/:id", auth, checkItemController.assignCh
 // API lấy danh sách members trong board
 router.get("/api/v1/check-item/members/:checkItemId/:boardId", auth, checkItemController.getMembersForAssign);
 
+// API xóa thành viên ra khỏi checkItem
+router.delete("/api/v1/check-item/:checkItemId/members/:memberId", auth, checkItemController.removeMember);
+
 module.exports = router;

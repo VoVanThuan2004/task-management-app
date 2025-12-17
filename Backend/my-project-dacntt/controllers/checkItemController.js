@@ -912,6 +912,75 @@ const getMembersForAssign = async (req, res) => {
   }
 };
 
+const removeMember = async (req, res) => {
+  try {
+    const { checkItemId, memberId } = req.params;
+    if (!checkItemId || !memberId) {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "checkItemId hoặc memberId đang thiếu",
+      });
+    }
+
+    // 1. Kiểm tra checkItem
+    const [checkItem, member] = await Promise.all([
+      await CheckItem.findById(checkItemId),
+      await User.findById(memberId).lean(),
+    ]);
+    if (!checkItem) {
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "CheckItem không tồn tại",
+      });
+    }
+    if (!member) {
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Thành viên không tồn tại",
+      });
+    }
+
+    // 2. Kiểm tra thành viên có phải được giao checkItem
+    if (checkItem.assignedTo.toString() !== memberId) {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Thành viên hiện tại chưa được giao việc cần làm này",
+      });
+    }
+
+    // 3. Xóa thành viên ra khỏi checkItem
+    checkItem.assignedTo = null;
+    await checkItem.save();
+
+    // 4. Gửi lên socket - cập nhật realtime
+    const io = getIO();
+    io.to(checkItem.taskId.toString()).emit("removeMember", {
+      checkItem,
+    });
+
+    // 5. Gửi thông báo email
+
+    return res.status(200).json({
+      status: "success",
+      code: 200,
+      message: "Loại bỏ thành viên ra khỏi việc cần làm thành công",
+      data: {
+        userId: memberId
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      code: 500,
+      message: "Lỗi hệ thống: " + error,
+    });
+  }
+};
+
 module.exports = {
   addCheckItem,
   updateTitleCheckItem,
@@ -922,4 +991,5 @@ module.exports = {
   updateDeadlineCheckItem,
   assignCheckItem,
   getMembersForAssign,
+  removeMember,
 };

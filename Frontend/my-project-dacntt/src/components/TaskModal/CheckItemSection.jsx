@@ -469,6 +469,7 @@ const CheckItemsSection = React.memo(
     // Hàm giao nhiệm vụ cho thành viên
     const assignMemberToCheckItem = async (checkItemId, memberId) => {
       if (isReadOnly) return;
+      if (!memberId || !checkItemId) return;
 
       try {
         setLoading(true);
@@ -498,6 +499,50 @@ const CheckItemsSection = React.memo(
       } catch (error) {
         console.error("Lỗi giao nhiệm vụ:", error);
         alert("Không thể giao nhiệm vụ cho thành viên");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Hàm gọi API xóa thành viên ra khỏi checkItem
+    const handleDeleteMember = async (checkItemId, memberId) => {
+      if (isReadOnly) return;
+      if (!memberId || !checkItemId) return;
+
+      try {
+        setLoading(true);
+        const res = await axios.delete(
+          `${httpUrl}/api/v1/check-item/${checkItemId}/members/${memberId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          }
+        );
+
+        const data = res.data.data;
+
+        setBoardMembers((prev) =>
+          prev.map((m) =>
+            m._id === data.userId ? { ...m, assignStatus: false } : m
+          )
+        );
+
+        // Cập nhật local state
+        setCheckItems((prev) =>
+          prev.map((i) =>
+            i._id === checkItemId
+              ? {
+                  ...i,
+                  assignedTo: null,
+                  fullName: null,
+                  avatar: null,
+                }
+              : i
+          )
+        );
+      } catch (error) {
+        console.log(error);
       } finally {
         setLoading(false);
       }
@@ -986,11 +1031,7 @@ const CheckItemsSection = React.memo(
                                         isAssigned
                                           ? "bg-orange-50 border-orange-200 shadow-sm cursor-default"
                                           : "cursor-pointer hover:bg-gray-50 hover:shadow-md hover:border-blue-200 border-transparent"
-                                      } ${
-                                        loading
-                                          ? "cursor-not-allowed"
-                                          : ""
-                                      }`}
+                                      } ${loading ? "cursor-not-allowed" : ""}`}
                                     >
                                       {/* Nội dung thành viên giữ nguyên */}
                                       <div className="flex items-start gap-3">
@@ -1048,18 +1089,50 @@ const CheckItemsSection = React.memo(
                                           )}
                                         </div>
 
+                                        {/* Tick + Nút Xóa khi đang được giao */}
                                         {isAssigned && (
-                                          <svg
-                                            className="w-7 h-7 text-orange-600 flex-shrink-0 mt-1"
-                                            fill="currentColor"
-                                            viewBox="0 0 20 20"
-                                          >
-                                            <path
-                                              fillRule="evenodd"
-                                              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                              clipRule="evenodd"
-                                            />
-                                          </svg>
+                                          <div className="flex items-center gap-2 flex-shrink-0 mt-1">
+                                            {/* Tick icon */}
+                                            <svg
+                                              className="w-7 h-7 text-orange-600"
+                                              fill="currentColor"
+                                              viewBox="0 0 20 20"
+                                            >
+                                              <path
+                                                fillRule="evenodd"
+                                                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                                clipRule="evenodd"
+                                              />
+                                            </svg>
+
+                                            {/* Nút Xóa (hủy giao) */}
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation(); // ngăn trigger click assign của div cha
+                                                handleDeleteMember(
+                                                  item._id,
+                                                  member._id
+                                                );
+                                              }}
+                                              disabled={loading}
+                                              className="p-1.5 rounded-full hover:bg-red-100 transition-all group"
+                                              title="Hủy giao nhiệm vụ"
+                                            >
+                                              <svg
+                                                className="w-5 h-5 text-gray-500 group-hover:text-red-600 transition-colors"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                              >
+                                                <path
+                                                  strokeLinecap="round"
+                                                  strokeLinejoin="round"
+                                                  strokeWidth={2}
+                                                  d="M6 18L18 6M6 6l12 12"
+                                                />
+                                              </svg>
+                                            </button>
+                                          </div>
                                         )}
                                       </div>
                                     </div>
