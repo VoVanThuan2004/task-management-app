@@ -257,7 +257,6 @@ const moveColumn = async (req, res) => {
 // Lấy danh sách columns
 const getAllColumns = async (req, res) => {
   try {
-    const userId = req.user.userId;
     const boardId = req.params.boardId;
 
     const board = await Board.findById(boardId);
@@ -288,7 +287,7 @@ const getAllColumns = async (req, res) => {
           foreignField: "columnId",
           as: "tasks",
           pipeline: [
-            // 1. CHECKITEMS – CHỈ CÒN DÙNG CÁNH RIÊNG NÀY
+            // 1. CHECKITEMS
             {
               $lookup: {
                 from: "checkitems", // collection name (mongoose tự thêm s)
@@ -363,14 +362,40 @@ const getAllColumns = async (req, res) => {
               },
             },
 
+            // Task-assignee
+            {
+              $lookup: {
+                from: "taskassignees",
+                localField: "_id",
+                foreignField: "taskId",
+                as: "taskassignees",
+                pipeline: [
+                  {
+                    $lookup: {
+                      from: "users",
+                      localField: "userId",
+                      foreignField: "_id",
+                      as: "users",
+                    },
+                  },
+                  { $unwind: "$users" },
+                  {
+                    $project: {
+                      _id: 0,
+                      userId: "$users._id",
+                      avatar: "$users.avatar",
+                      fullName: "$user.fullName",
+                    },
+                  },
+                ],
+              },
+            },
+
             // 6. TỔNG HỢP FIELD ĐỂ FRONTEND KHÔNG PHẢI SỬA GÌ CẢ
             {
               $addFields: {
-                // Giữ nguyên tên cũ để frontend không cần đổi
-                // totalChecklists: "$totalCheckItems",
                 totalCheckItems: "$totalCheckItems",
                 totalCheckItemsCompleted: "$completedCheckItems",
-
                 totalComments: { $size: "$comments" },
                 totalAttachments: { $size: "$attachments" },
               },
@@ -394,6 +419,7 @@ const getAllColumns = async (req, res) => {
                 totalComments: 1,
                 totalAttachments: 1,
                 taskLabels: "$tasklabels",
+                taskAssignees: "$taskassignees",
               },
             },
 
@@ -416,6 +442,396 @@ const getAllColumns = async (req, res) => {
       status: "error",
       code: 500,
       message: "Lỗi hệ thống: " + error.message,
+    });
+  }
+};
+
+const getAllColumnsAndFilter = async (req, res) => {
+  try {
+    const boardId = req.params.boardId;
+    if (!boardId) {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Thiếu boardId",
+      });
+    }
+    const board = await Board.findById(boardId);
+    if (!board) {
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Bảng làm việc không tồn tại",
+      });
+    }
+
+    const {
+      search,
+      assignees,
+      minTask,
+      taskStatus,
+      deadline,
+      labels,
+      activityLog,
+    } = req.query;
+
+    const taskFilterConditions = [];
+
+    // 1. Lọc theo tiêu chí search
+    let columnTitleMatch = {};
+    let taskTitleMatch = {};
+    if (search) {
+      const regex = { $regex: search, $options: "i" }; // Không phân biệt chữ hoa - thường
+
+      columnTitleMatch = { title: regex };
+
+      // taskFilterConditions.push({
+      //   title: regex,
+      // });
+    }
+
+    // 2. Lọc theo assignees
+    let assigneesCondition = {};
+    if (assignees) {
+      const assigneeIds = assignees
+        .split(",")
+        .map((id) => new ObjectId(id.trim()));
+
+      if (assignees === "none") {
+        assigneesCondition = {
+          $or: [{ "taskassignees.userId": null }],
+        };
+      } else {
+        assigneesCondition = {
+          "taskassignees.userId": { $in: assigneeIds },
+        };
+      }
+
+      taskFilterConditions.push(assigneesCondition);
+    }
+
+    // 3. Lọc theo deadline
+    let deadlineCondition = {};
+    if (deadline) {
+      const now = new Date();
+      switch (deadline) {
+        case "overdue":
+          deadlineCondition = { status: "Quá hạn" };
+          break;
+        case "near":
+          deadlineCondition = { status: "Gần tới hạn" };
+          break;
+        case "tommorow":
+          const tommorow = new Date(now);
+          tommorow.setDate(now.getDate() + 1);
+          deadlineCondition = {
+            dueDate: { $gte: now, $lt: tommorow },
+          };
+          break;
+        case "nextWeek":
+          const nextWeek = new Date(now);
+          nextWeek.setDate(now.getDate() + 7);
+          deadlineCondition = {
+            dueDate: { $gte: now, $lt: nextWeek },
+          };
+          break;
+        case "nextMonth":
+          const nextMonth = new Date(now);
+          nextMonth.setMonth(nextMonth.getMonth() + 1);
+          deadlineCondition = {
+            dueDate: { $gte: now, $lt: nextMonth },
+          };
+          break;
+        case "noDeadline":
+          deadlineCondition = {
+            dueDate: null,
+          };
+      }
+      taskFilterConditions.push(deadlineCondition);
+    }
+
+    // 4. Lọc theo labels
+    let labelsCondition = {};
+    if (labels) {
+      if (labels === "none") {
+        labelsCondition = {
+          $or: [{ tasklabels: { $size: 0 } }],
+        };
+      } else {
+        const labelIds = labels.split(",").map((id) => new ObjectId(id.trim()));
+        labelsCondition = {
+          "tasklabels.labelId": { $in: labelIds },
+        };
+      }
+      taskFilterConditions.push(labelsCondition);
+    }
+
+    // 5. Lọc theo trạng thái task
+    let taskStatusCondition = {};
+    if (taskStatus) {
+      taskStatusCondition = {
+        isCompleted: taskStatus === "completed",
+      };
+
+      taskFilterConditions.push(taskStatusCondition);
+    }
+
+    // 6. Lọc theo activityLog
+    let activityLogCondition = {};
+    if (activityLog) {
+      const now = new Date();
+      let fromDate = new Date();
+
+      switch (activityLog) {
+        case "lastWeek":
+          fromDate.setDate(now.getDate() - 7);
+          break;
+        case "last2Week":
+          fromDate.setDate(now.getDate() - 14);
+          break;
+        case "last3Week":
+          fromDate.setDate(now.getDate() - 21);
+          break;
+        case "thisMonth":
+          fromDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          break;
+        case "noActivity":
+          activityLogCondition = {
+            activitylogs: { $size: 0 },
+          };
+          taskFilterConditions.push(activityLogCondition);
+          break;
+        default:
+          break;
+      }
+
+      if (activityLog !== "noActivity") {
+        activityLogCondition = {
+          "activitylogs.createdAt": { $gte: fromDate },
+        };
+      }
+    }
+
+    const taskMatchStage =
+      taskFilterConditions.length > 0
+        ? [
+            {
+              $match: {
+                $and: taskFilterConditions,
+              },
+            },
+          ]
+        : [];
+
+    const columns = await Column.aggregate([
+      {
+        $match: {
+          boardId: new ObjectId(boardId),
+          isArchived: false,
+          ...columnTitleMatch,
+        },
+      },
+
+      // ──────────────────────────────
+      // LẤY TẤT CẢ TASK TRONG COLUMN
+      // ──────────────────────────────
+      {
+        $lookup: {
+          from: "tasks",
+          localField: "_id",
+          foreignField: "columnId",
+          as: "tasks",
+          pipeline: [
+            // Labels
+            {
+              $lookup: {
+                from: "tasklabels",
+                localField: "_id",
+                foreignField: "taskId",
+                as: "tasklabels",
+                pipeline: [
+                  {
+                    $lookup: {
+                      from: "labels",
+                      localField: "labelId",
+                      foreignField: "_id",
+                      as: "labelDetails",
+                    },
+                  },
+                  {
+                    $unwind: {
+                      path: "$labelDetails",
+                      preserveNullAndEmptyArrays: true,
+                    },
+                  },
+                  {
+                    $project: {
+                      _id: 0,
+                      labelId: "$labelId",
+                      title: "$labelDetails.title",
+                      color: "$labelDetails.color",
+                    },
+                  },
+                ],
+              },
+            },
+
+            // Task-assignee
+            {
+              $lookup: {
+                from: "taskassignees",
+                localField: "_id",
+                foreignField: "taskId",
+                as: "taskassignees",
+                pipeline: [
+                  {
+                    $lookup: {
+                      from: "users",
+                      localField: "userId",
+                      foreignField: "_id",
+                      as: "userDetails",
+                    },
+                  },
+                  {
+                    $unwind: {
+                      path: "$userDetails",
+                      preserveNullAndEmptyArrays: true,
+                    },
+                  },
+                  {
+                    $project: {
+                      _id: 0,
+                      userId: "$userDetails._id",
+                      avatar: "$userDetails.avatar",
+                      fullName: "$userDetails.fullName",
+                    },
+                  },
+                ],
+              },
+            },
+
+            // Activity Log
+            {
+              $lookup: {
+                from: "activitylogs",
+                localField: "_id",
+                foreignField: "taskId",
+                as: "activitylogs",
+              },
+            },
+
+            // ==== Filter theo điều kiện nếu có ====
+            ...taskMatchStage,
+
+            // 1. CHECKITEMS
+            {
+              $lookup: {
+                from: "checkitems", // collection name (mongoose tự thêm s)
+                localField: "_id",
+                foreignField: "taskId",
+                as: "checkItems",
+              },
+            },
+
+            // 2. TÍNH TỔNG VÀ HOÀN THÀNH
+            {
+              $addFields: {
+                totalCheckItems: { $size: "$checkItems" },
+                completedCheckItems: {
+                  $size: {
+                    $filter: {
+                      input: "$checkItems",
+                      as: "item",
+                      cond: { $eq: ["$$item.isCompleted", true] },
+                    },
+                  },
+                },
+              },
+            },
+
+            // 3. COMMENTS
+            {
+              $lookup: {
+                from: "comments",
+                localField: "_id",
+                foreignField: "taskId",
+                as: "comments",
+              },
+            },
+
+            // 4. ATTACHMENTS
+            {
+              $lookup: {
+                from: "attachments",
+                localField: "_id",
+                foreignField: "taskId",
+                as: "attachments",
+              },
+            },
+
+            // 6. TỔNG HỢP FIELD ĐỂ FRONTEND KHÔNG PHẢI SỬA GÌ CẢ
+            {
+              $addFields: {
+                totalCheckItems: "$totalCheckItems",
+                totalCheckItemsCompleted: "$completedCheckItems",
+                totalComments: { $size: "$comments" },
+                totalAttachments: { $size: "$attachments" },
+              },
+            },
+
+            // 7. CHỈ TRẢ VỀ CÁC FIELD CẦN THIẾT
+            {
+              $project: {
+                _id: 1,
+                title: 1,
+                position: 1,
+                isCompleted: 1,
+                startDate: 1,
+                dueDate: 1,
+                status: 1,
+
+                // Checklist fields (tương thích 100% với code cũ)
+                totalCheckItems: 1,
+                totalCheckItemsCompleted: 1,
+
+                totalComments: 1,
+                totalAttachments: 1,
+                taskLabels: "$tasklabels",
+                taskAssignees: "$taskassignees",
+              },
+            },
+
+            { $sort: { position: 1 } },
+          ],
+        },
+      },
+
+      ...(minTask
+        ? [
+            {
+              $match: {
+                $expr: {
+                  $gte: [{ $size: "$tasks" }, parseInt(minTask)],
+                },
+              },
+            },
+          ]
+        : []),
+
+      { $sort: { position: 1 } },
+    ]);
+
+    return res.status(200).json({
+      status: "success",
+      code: 200,
+      message: "Lấy danh sách các columns trong bảng làm việc",
+      data: columns,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      code: 500,
+      message: "Lỗi hệ thống: " + error,
     });
   }
 };
@@ -600,4 +1016,5 @@ module.exports = {
   getAllColumns,
   moveToBoard,
   deleteColumn,
+  getAllColumnsAndFilter,
 };

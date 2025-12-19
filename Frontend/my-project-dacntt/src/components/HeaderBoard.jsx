@@ -23,7 +23,13 @@ import {
 } from "lucide-react";
 import { io } from "socket.io-client";
 
-const HeaderBoard = ({ board, boardTitle, onBoardUpdate, isMember }) => {
+const HeaderBoard = ({
+  board,
+  boardTitle,
+  onBoardUpdate,
+  isMember,
+  onApplyFilters,
+}) => {
   const [showFilter, setShowFilter] = useState(false);
   const [showMoreOptions, setShowMoreOptions] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -471,7 +477,6 @@ const HeaderBoard = ({ board, boardTitle, onBoardUpdate, isMember }) => {
   };
 
   // Thêm skill
-  // Thêm skill + cập nhật boardMembers realtime (chuẩn 100%)
   const handleAddSkill = async () => {
     if (!newSkill.trim()) return;
 
@@ -622,6 +627,80 @@ const HeaderBoard = ({ board, boardTitle, onBoardUpdate, isMember }) => {
     }
   };
 
+  // Giả sử bạn có state để quản lý filters và gọi API
+  const [filters, setFilters] = useState({
+    search: "",
+    assignees: [],
+    minTask: 0,
+    taskStatus: "",
+    deadline: "",
+    labels: [],
+    activityLog: "",
+  });
+
+  // Danh sách thành viên (từ API)
+  const [boardMembersList, setBoardMembersList] = useState([]);
+  const fetchBoardMembers = async () => {
+    try {
+      const res = await axios.get(
+        `${httpUrl}/api/v1/boards-member/${board._id}`,
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }
+      );
+      setBoardMembersList(res.data.data || []);
+    } catch (err) {
+      console.error("Lỗi lấy thành viên:", err);
+    }
+  };
+
+  // Danh sách labels (từ API)
+  const [labelsList, setLabelsList] = useState([]);
+  const fetchLabels = async () => {
+    try {
+      const res = await axios.get(`${httpUrl}/api/v1/labels/${board._id}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      setLabelsList(res.data.data || []);
+    } catch (err) {
+      console.error("Lỗi lấy labels:", err);
+    }
+  };
+
+  const openFilterPopup = async () => {
+    await Promise.all([fetchBoardMembers(), fetchLabels()]);
+    setShowFilter(true);
+  };
+
+  // Gọi applyFilters mỗi khi filter thay đổi
+  const handleFilterChange = (newFilters) => {
+    console.log("New filters:", newFilters);
+
+    const serializedFilters = {
+      ...newFilters,
+      labels: newFilters.labels.join(",") || undefined, // → string "id1,id2" hoặc undefined
+      assignees: newFilters.assignees.join(",") || undefined,
+    };
+
+    setFilters(newFilters);
+    onApplyFilters(serializedFilters);  // Gọi api lọc columns
+  };
+
+  // Xóa filter
+  const clearFilters = () => {
+    const emptyFilters = {
+      search: "",
+      assignees: [],
+      minTask: 0,
+      taskStatus: "",
+      deadline: "",
+      labels: [],
+      activityLog: "",
+    };
+    setFilters(emptyFilters);
+    onApplyFilters(emptyFilters);
+  };
+
   return (
     <>
       <header className="flex items-center justify-between p-4 bg-white/70 backdrop-blur-sm shadow-sm z-10">
@@ -724,7 +803,7 @@ const HeaderBoard = ({ board, boardTitle, onBoardUpdate, isMember }) => {
           {isMember && (
             <>
               <button
-                onClick={() => setShowFilter(!showFilter)}
+                onClick={() => openFilterPopup()}
                 className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all font-medium"
               >
                 <Filter size={18} className="text-gray-600" />
@@ -842,6 +921,307 @@ const HeaderBoard = ({ board, boardTitle, onBoardUpdate, isMember }) => {
           )}
         </div>
       </header>
+
+      {/* Filter Panel - Trello Style */}
+      {showFilter && (
+        <div className="fixed top-20 bottom-2 right-2 w-96 bg-white shadow-2xl border-l border-gray-200 z-50 flex flex-col">
+          {/* Header */}
+          <div className="flex items-center justify-between p-5 border-b border-gray-200">
+            <div className="flex items-center gap-3">
+              <Filter size={20} className="text-gray-600" />
+              <h3 className="text-lg font-semibold text-gray-900">Lọc</h3>
+            </div>
+            <button
+              onClick={() => setShowFilter(false)}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <X size={20} className="text-gray-600" />
+            </button>
+          </div>
+
+          {/* Body - Scrollable */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-7">
+            {/* Từ khóa tìm kiếm */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Từ khóa
+              </label>
+              <input
+                type="text"
+                value={filters.search}
+                onChange={(e) =>
+                  handleFilterChange({ ...filters, search: e.target.value })
+                }
+                placeholder="Nhập từ khóa..."
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+              />
+              <p className="text-xs text-gray-500 mt-2">
+                Tìm kiếm tiêu đề thẻ, mô tả, bình luận...
+              </p>
+            </div>
+
+            {/* Thành viên */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Thành viên
+              </label>
+              <div className="space-y-2">
+                <label className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                  <input
+                    type="checkbox"
+                    checked={filters.assignees.includes("none")}
+                    onChange={(e) => {
+                      let newAssignees = [...filters.assignees];
+                      if (e.target.checked) {
+                        newAssignees.push("none");
+                      } else {
+                        newAssignees = newAssignees.filter((a) => a !== "none");
+                      }
+                      handleFilterChange({
+                        ...filters,
+                        assignees: newAssignees,
+                      });
+                    }}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">
+                    Không có thành viên
+                  </span>
+                </label>
+
+                {boardMembersList.map((member) => (
+                  <label
+                    key={member._id}
+                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={filters.assignees.includes(member._id)}
+                      onChange={(e) => {
+                        let newAssignees = [...filters.assignees];
+                        if (e.target.checked) {
+                          newAssignees.push(member._id);
+                        } else {
+                          newAssignees = newAssignees.filter(
+                            (a) => a !== member._id
+                          );
+                        }
+                        handleFilterChange({
+                          ...filters,
+                          assignees: newAssignees,
+                        });
+                      }}
+                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                    />
+                    <Avatar user={member} size="w-8 h-8" />
+                    <span className="text-sm text-gray-700 truncate">
+                      {member.fullName}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Số lượng task tối thiểu */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Số lượng task tối thiểu
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={filters.minTask}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value) || 0;
+                  handleFilterChange({ ...filters, minTask: value });
+                }}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+              />
+            </div>
+
+            {/* Trạng thái task */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Trạng thái thẻ
+              </label>
+              <div className="space-y-2">
+                <label className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                  <input
+                    type="radio"
+                    name="taskStatus"
+                    value="completed"
+                    checked={filters.taskStatus === "completed"}
+                    onChange={(e) => {
+                      handleFilterChange({
+                        ...filters,
+                        taskStatus: e.target.value,
+                      });
+                    }}
+                    className="text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">Đã hoàn thành</span>
+                </label>
+                <label className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                  <input
+                    type="radio"
+                    name="taskStatus"
+                    value="incomplete"
+                    checked={filters.taskStatus === "incomplete"}
+                    onChange={(e) => {
+                      handleFilterChange({
+                        ...filters,
+                        taskStatus: e.target.value,
+                      });
+                    }}
+                    className="text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">Chưa hoàn thành</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Deadline */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Ngày hết hạn
+              </label>
+              <div className="space-y-2">
+                {[
+                  { value: "noDeadline", label: "Không có ngày hết hạn" },
+                  { value: "overdue", label: "Quá hạn" },
+                  { value: "near", label: "Gần tới hạn" },
+                  { value: "tomorrow", label: "Sẽ hết hạn vào ngày mai" },
+                  { value: "nextWeek", label: "Sẽ hết hạn vào tuần sau" },
+                  { value: "nextMonth", label: "Sẽ hết hạn vào tháng sau" },
+                ].map((opt) => (
+                  <label
+                    key={opt.value}
+                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition"
+                  >
+                    <input
+                      type="radio"
+                      name="deadline"
+                      value={opt.value}
+                      checked={filters.deadline === opt.value}
+                      onChange={(e) => {
+                        handleFilterChange({
+                          ...filters,
+                          deadline: e.target.value,
+                        });
+                      }}
+                      className="text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-700">{opt.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Nhãn dán */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Nhãn dán
+              </label>
+              <div className="space-y-2">
+                <label className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                  <input
+                    type="checkbox"
+                    checked={filters.labels.includes("none")}
+                    onChange={(e) => {
+                      let newLabels = [...filters.labels];
+                      if (e.target.checked) {
+                        newLabels.push("none");
+                      } else {
+                        newLabels = newLabels.filter((l) => l !== "none");
+                      }
+                      handleFilterChange({ ...filters, labels: newLabels });
+                    }}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">Không có nhãn</span>
+                </label>
+
+                {labelsList.map((label) => (
+                  <label
+                    key={label._id}
+                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={filters.labels.includes(label._id)}
+                      onChange={(e) => {
+                        let newLabels = [...filters.labels];
+                        if (e.target.checked) {
+                          newLabels.push(label._id);
+                        } else {
+                          newLabels = newLabels.filter((l) => l !== label._id);
+                        }
+                        handleFilterChange({ ...filters, labels: newLabels });
+                      }}
+                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                    />
+                    <div
+                      className="w-6 h-6 rounded"
+                      style={{ backgroundColor: label.color }}
+                    />
+                    <span className="text-sm text-gray-700">{label.title}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Activity Log */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Hoạt động gần đây
+              </label>
+              <div className="space-y-2">
+                {[
+                  { value: "", label: "Tất cả" },
+                  { value: "lastWeek", label: "Tuần qua" },
+                  { value: "last2Weeks", label: "2 tuần qua" },
+                  { value: "last3Weeks", label: "3 tuần qua" },
+                  { value: "thisMonth", label: "Tháng này" },
+                  { value: "noActivity", label: "Chưa có hoạt động" },
+                ].map((opt) => (
+                  <label
+                    key={opt.value}
+                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition"
+                  >
+                    <input
+                      type="radio"
+                      name="activity"
+                      value={opt.value}
+                      checked={filters.activityLog === opt.value}
+                      onChange={(e) => {
+                        handleFilterChange({
+                          ...filters,
+                          activityLog: e.target.value,
+                        });
+                      }}
+                      className="text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-700">{opt.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="p-5 border-t border-gray-200 bg-gray-50">
+            <button
+              onClick={() => {
+                clearFilters();
+                // reset về không filter
+              }}
+              className="text-sm text-blue-600 hover:text-blue-700 font-medium transition"
+            >
+              Xóa tất cả bộ lọc
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modal Chia sẻ bảng */}
       {showShareModal && (

@@ -6,6 +6,8 @@ const columnController = require("../controllers/columnController");
 // Lấy danh sách columns tăng dần theo position
 router.get("/api/v1/columns/:boardId", auth, columnController.getAllColumns);
 
+router.get("/api/v2/columns/:boardId", auth, columnController.getAllColumnsAndFilter);
+
 // Thêm column của 1 board 
 router.post("/api/v1/columns", auth, columnController.addColumn);
 

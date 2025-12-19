@@ -481,9 +481,10 @@ export default function BoardDetail() {
     fetchColumns();
   }, [boardId, accessToken]);
 
-  const fetchColumns = async () => {
+  const fetchColumns = async (filters = {}) => {
     try {
-      const res = await axios.get(`${httpUrl}/api/v1/columns/${boardId}`, {
+      const res = await axios.get(`${httpUrl}/api/v2/columns/${boardId}`, {
+        params: filters,
         headers: { Authorization: `Bearer ${accessToken}` },
       });
 
@@ -758,6 +759,7 @@ export default function BoardDetail() {
         onBoardUpdate={handleBoardUpdate}
         isMember={isMember}
         socket={socket}
+        onApplyFilters={fetchColumns}
       />
 
       <main className="flex-1 overflow-x-auto p-6" style={getBoardBackground()}>
