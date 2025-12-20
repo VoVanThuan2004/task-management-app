@@ -12,14 +12,15 @@ const actionMessage = Object.freeze({
   CHECKITEM_UNCOMPLETE: "đã bỏ hoàn thành mục",
   CHECKITEM_DELETE: "đã xóa mục việc cần làm",
   CHECKITEM_UPDATE_TITLE: "đã sửa tiêu đề mục việc cần làm",
+  CHECKITEM_DEADLINE: "đã sửa thời gian đến hạn mục việc cần làm",
 
   // Attachment
   ATTACHMENT_UPLOAD: "đã tải lên tệp",
   ATTACHMENT_DELETE: "đã xóa tệp đính kèm",
 
   // Member
-  MEMBER_ASSIGN: "đã gán thành viên",
-  MEMBER_UNASSIGN: "đã bỏ gán thành viên",
+  MEMBER_ASSIGN_TASK: "đã gán thành viên",
+  MEMBER_UNASSIGN_TASK: "đã bỏ gán thành viên",
 
   // Label
   LABEL_ADD: "đã thêm nhãn",

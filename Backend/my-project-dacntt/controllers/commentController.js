@@ -106,6 +106,7 @@ const sendMessage = async (req, res) => {
       totalComments,
     };
 
+    console.log(payload);
     io.to(task.boardId.toString()).emit("comment:new", payload);
 
     // === HTTP RESPONSE ===

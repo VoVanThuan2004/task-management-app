@@ -2,16 +2,16 @@ const CheckItem = require("../models/checkItem");
 const Task = require("../models/task");
 const BoardMember = require("../models/boardMember");
 const { getIO } = require("../config/socket");
-const createActivityLogTask = require("../utils/createActivityLogTask");
 const User = require("../models/user");
 const checkItemReminderQueue = require("../services/checkItemReminderQueue");
 const { sendAssignCheckItemEmail } = require("../config/mailConfig");
 const { ObjectId } = require("mongodb");
 const Board = require("../models/board");
+const activityLogQueue = require("../services/activityLogQueue");
 
 const addCheckItem = async (req, res) => {
   try {
-    const { taskId, title, assignedTo, dueDate } = req.body;
+    const { taskId, title } = req.body;
     const userId = req.user.userId;
 
     // 1. Validate dữ liệu
@@ -25,7 +25,7 @@ const addCheckItem = async (req, res) => {
     // 2. Kiểm tra task
     const [task, user] = await Promise.all([
       Task.findById(taskId),
-      User.findById(userId),
+      User.findById(userId).lean(),
     ]);
     if (!task) {
       return res.status(404).json({
@@ -33,24 +33,6 @@ const addCheckItem = async (req, res) => {
         code: 404,
         message: "Task không tồn tại",
       });
-    }
-
-    // 3. Nếu có assignedTo (thành viên cần làm nhiệm vụ này)
-    if (assignedTo) {
-      // 3.1 Kiểm thành viên có tồn tại trong bảng làm việc này không
-      const boardMember = await BoardMember.findOne({
-        boardId: task.boardId,
-        userId: assignedTo,
-        status: "accepted",
-      });
-
-      if (!boardMember) {
-        return res.status(404).json({
-          status: "error",
-          code: 404,
-          message: "Thành viên chỉ định không hợp lệ",
-        });
-      }
     }
 
     // 4. Lấy vị trí cuối cùng của CheckItem
@@ -66,8 +48,6 @@ const addCheckItem = async (req, res) => {
       taskId,
       title,
       position,
-      assignedTo: assignedTo ? assignedTo : null,
-      dueDate: dueDate ? dueDate : null,
     });
 
     // 5. Gửi lên socket
@@ -87,24 +67,13 @@ const addCheckItem = async (req, res) => {
       taskId,
     });
 
-    // === ActivityLogs === (thông báo)
-    const activityLog = await createActivityLogTask({
+    // Gửi qua queue Redis - tạo activity-log
+    await activityLogQueue.add("activityLog", {
       userId,
       boardId: task.boardId,
       taskId: checkItem.taskId,
       action: "CHECKITEM_CREATE",
       target: checkItem.title,
-    });
-
-    io.to(task._id.toString()).emit("activityLogTask", {
-      userId,
-      fullName: user.fullName,
-      avatar: user.avatar,
-      taskId: activityLog.taskId,
-      boardId: activityLog.boardId,
-      action: activityLog.action,
-      description: activityLog.description,
-      createdAt: activityLog.createdAt,
     });
 
     return res.status(201).json({
@@ -132,6 +101,7 @@ const addCheckItem = async (req, res) => {
 
 const updateTitleCheckItem = async (req, res) => {
   try {
+    const userId = req.user.userId;
     const checkItemId = req.params.id;
     if (!checkItemId) {
       return res.status(400).json({
@@ -151,7 +121,11 @@ const updateTitleCheckItem = async (req, res) => {
     }
 
     // 1. Kiểm tra checklist-item
-    const checkItem = await CheckItem.findById(checkItemId);
+    const checkItem = await CheckItem.findById(checkItemId)
+      .populate({
+        path: "taskId",
+        select: "boardId",
+      });
     if (!checkItem) {
       return res.status(404).json({
         status: "error",
@@ -166,13 +140,18 @@ const updateTitleCheckItem = async (req, res) => {
 
     // 3. Gửi lên socket
     const io = getIO();
-    io.to(checkItem.taskId.toString()).emit("checkItemTitleUpdated", {
+    io.to(checkItem.taskId._id.toString()).emit("checkItemTitleUpdated", {
       _id: checkItem._id,
       title: checkItem.title,
-      position: checkItem.position,
-      isCompleted: checkItem.isCompleted,
-      assignedTo: checkItem.assignedTo,
-      dueDate: checkItem.dueDate,
+    });
+
+    // 4. Gửi qua queue Redis - cập nhật thông báo
+    await activityLogQueue.add("activityLog", {
+      userId,
+      boardId: checkItem.taskId.boardId,
+      taskId: checkItem.taskId._id,
+      action: "CHECKITEM_UPDATE_TITLE",
+      target: checkItem.title,
     });
 
     return res.status(200).json({
@@ -182,10 +161,6 @@ const updateTitleCheckItem = async (req, res) => {
       data: {
         _id: checkItem._id,
         title: checkItem.title,
-        position: checkItem.position,
-        isCompleted: checkItem.isCompleted,
-        assignedTo: checkItem.assignedTo,
-        dueDate: checkItem.dueDate,
       },
     });
   } catch (error) {
@@ -199,6 +174,7 @@ const updateTitleCheckItem = async (req, res) => {
 
 const deleteCheckItem = async (req, res) => {
   try {
+    const userId = req.user.userId;
     const checkItemId = req.params.id;
     if (!checkItemId) {
       return res.status(400).json({
@@ -209,7 +185,12 @@ const deleteCheckItem = async (req, res) => {
     }
 
     // 1. Kiểm tra checkItem
-    const checkItem = await CheckItem.findById(checkItemId);
+    const checkItem = await CheckItem.findById(checkItemId)
+      .populate({
+        path: "taskId",
+        select: "boardId",
+      })
+      .lean();
     if (!checkItem) {
       return res.status(404).json({
         status: "error",
@@ -221,12 +202,19 @@ const deleteCheckItem = async (req, res) => {
     // 2. Xóa check-item
     await CheckItem.deleteOne({ _id: checkItemId });
 
-    // === ActivityLogs (Gửi thông báo) ===
-
     // 3. Gửi lên socket
     const io = getIO();
-    io.to(checkItem.taskId.toString()).emit("checkItemDeleted", {
+    io.to(checkItem.taskId._id.toString()).emit("checkItemDeleted", {
       _id: checkItem._id,
+    });
+
+    // 4. Gửi qua queue Redis - cập nhật thông báo
+    await activityLogQueue.add("activityLog", {
+      userId,
+      boardId: checkItem.taskId.boardId,
+      taskId: checkItem.taskId._id,
+      action: "CHECKITEM_DELETE",
+      target: checkItem.title,
     });
 
     return res.status(200).json({
@@ -385,7 +373,7 @@ const toggleCheckItemComplete = async (req, res) => {
         select: "boardId",
       }),
 
-      User.findById(userId).select("fullName avatar"),
+      User.findById(userId).select("fullName avatar").lean(),
     ]);
     if (!checkItem) {
       return res.status(404).json({
@@ -394,9 +382,6 @@ const toggleCheckItemComplete = async (req, res) => {
         message: "CheckItem không tồn tại",
       });
     }
-
-    // 2. Kiểm tra trạng thái hiện tại checklist-item
-    // const currentStatus = checkItem.isCompleted;
 
     // 3. Cập nhật lại checklist-item
     checkItem.isCompleted = !checkItem.isCompleted;
@@ -413,27 +398,6 @@ const toggleCheckItemComplete = async (req, res) => {
       dueDate: checkItem.dueDate,
     });
 
-    // === ActivityLogs (Gửi thông báo) ===
-    const activityLog = await createActivityLogTask({
-      userId,
-      boardId: checkItem.taskId.boardId,
-      taskId: checkItem.taskId,
-      action: checkItem.isCompleted
-        ? "CHECKITEM_COMPLETE"
-        : "CHECKITEM_UNCOMPLETE",
-      target: checkItem.title,
-    });
-    io.to(checkItem.taskId._id.toString()).emit("activityLogTask", {
-      userId,
-      fullName: user.fullName,
-      avatar: user.avatar,
-      taskId: activityLog.taskId,
-      boardId: activityLog.boardId,
-      action: activityLog.action,
-      description: activityLog.description,
-      createdAt: activityLog.createdAt,
-    });
-
     // 5. Gửi lên socket - cập nhật lại tổng số check-item hoàn thành
     // === Lấy tổng số check-item hoàn thành - Tổng số check-item hiện có ===
     const totalCheckItemsCompleted = await CheckItem.countDocuments({
@@ -444,6 +408,17 @@ const toggleCheckItemComplete = async (req, res) => {
     io.to(checkItem.taskId.boardId.toString()).emit("toggle:check-item", {
       taskId: checkItem.taskId._id,
       totalCheckItemsCompleted,
+    });
+
+    // === ActivityLogs (Gửi thông báo) ===
+    await activityLogQueue.add("activityLog", {
+      userId,
+      boardId: checkItem.taskId.boardId,
+      taskId: checkItem.taskId._id,
+      action: checkItem.isCompleted
+        ? "CHECKITEM_COMPLETE"
+        : "CHECKITEM_UNCOMPLETE",
+      target: checkItem.title,
     });
 
     return res.status(200).json({
@@ -586,6 +561,7 @@ const getAllCheckItems = async (req, res) => {
 
 const updateDeadlineCheckItem = async (req, res) => {
   try {
+    const userId = req.user.userId;
     const checkItemId = req.params.id;
     if (!checkItemId) {
       return res.status(400).json({
@@ -610,7 +586,10 @@ const updateDeadlineCheckItem = async (req, res) => {
     }
 
     // 1. Kiểm tra check-item
-    const checkItem = await CheckItem.findById(checkItemId);
+    const checkItem = await CheckItem.findById(checkItemId).populate({
+      path: "taskId",
+      select: "boardId",
+    });
     if (!checkItem) {
       return res.status(404).json({
         status: "error",
@@ -659,7 +638,7 @@ const updateDeadlineCheckItem = async (req, res) => {
       // chỉ add nếu còn > 30 giây
       await checkItemReminderQueue.add(
         "markNearDeadline",
-        { checkItemId: checkItem._id, taskId: checkItem.taskId },
+        { checkItemId: checkItem._id, taskId: checkItem.taskId._id },
         {
           delay: nearDeadlineDelay,
           jobId: `${checkItem._id}-nearDeadline`,
@@ -672,7 +651,7 @@ const updateDeadlineCheckItem = async (req, res) => {
     const overdueDelay = Math.max(dueTime - now, 0);
     await checkItemReminderQueue.add(
       "markOverdue",
-      { checkItemId: checkItem._id, taskId: checkItem.taskId },
+      { checkItemId: checkItem._id, taskId: checkItem.taskId._id },
       {
         delay: overdueDelay,
         jobId: `${checkItem._id}-overdue`,
@@ -681,9 +660,19 @@ const updateDeadlineCheckItem = async (req, res) => {
 
     // 4. Cập nhật socket
     const io = getIO();
-    io.to(checkItem.taskId.toString()).emit("deadlineCheckItem", {
+    io.to(checkItem.taskId._id.toString()).emit("deadlineCheckItem", {
       checkItem,
     });
+
+    // 5. Gửi qua queue Redis - cập nhật thông báo
+    await activityLogQueue.add("activityLog", {
+      userId,
+      boardId: checkItem.taskId.boardId,
+      taskId: checkItem.taskId._id,
+      action: "CHECKITEM_DEADLINE",
+      target: checkItem.title,
+    });
+
     return res.status(200).json({
       status: "success",
       code: 200,
@@ -969,8 +958,8 @@ const removeMember = async (req, res) => {
       code: 200,
       message: "Loại bỏ thành viên ra khỏi việc cần làm thành công",
       data: {
-        userId: memberId
-      }
+        userId: memberId,
+      },
     });
   } catch (error) {
     return res.status(500).json({

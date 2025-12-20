@@ -28,6 +28,7 @@ const TaskActivityPanel = ({
   const [comments, setComments] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalComments, setTotalComments] = useState(0); // ← thêm state này
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -38,8 +39,9 @@ const TaskActivityPanel = ({
   const fileInputRef = useRef(null);
 
   const httpUrl = import.meta.env.VITE_API_URL;
-
   const userId = localStorage.getItem("userId");
+
+  const limit = 10; // cố định
 
   // === Tải comment ===
   const fetchComments = useCallback(
@@ -50,15 +52,16 @@ const TaskActivityPanel = ({
 
       try {
         const res = await axios.get(
-          `${httpUrl}/api/v1/comments/${taskId}?page=${pageNum}&limit=10`,
+          `${httpUrl}/api/v1/comments/${taskId}?page=${pageNum}&limit=${limit}`,
           { headers: { Authorization: `Bearer ${accessToken}` } }
         );
 
-        const { data, page, totalPages } = res.data;
+        const { data, totalPages, totalComments } = res.data;
         setComments((prev) => (append ? [...prev, ...data] : data));
-        setPage(page + 1);
+        setTotalComments(totalComments);
         setTotalPages(totalPages);
-        setHasMore(page < totalPages);
+        setPage(pageNum + 1);
+        setHasMore(pageNum < totalPages);
       } catch (err) {
         console.error("Lỗi khi tải comment:", err);
       } finally {
@@ -82,14 +85,38 @@ const TaskActivityPanel = ({
     socket.emit("joinBoard", boardId);
 
     const handleNewComment = (data) => {
-      if (data.taskId === taskId && data.comment.user._id !== userId) {
-        setComments((prev) => [data.comment, ...prev]);
+      if (data.taskId === taskId) {
+        setComments((prev) => {
+          // Tránh duplicate (an toàn)
+          const exists = prev.some(
+            (c) => c._id?.toString() === data.comment._id?.toString()
+          );
+          if (exists) return prev;
+
+          return [data.comment, ...prev];
+        });
+
+        // Cập nhật totalComments & totalPages từ backend → chính xác 100%
+        if (data.totalComments != null) {
+          setTotalComments(data.totalComments);
+          setTotalPages(Math.ceil(data.totalComments / limit));
+          setHasMore(data.totalComments > comments.length + 1);
+        }
       }
     };
 
     const handleDeleteComment = (data) => {
       if (data.taskId === taskId) {
         setComments((prev) => prev.filter((c) => c._id !== data.commentId));
+
+        // Cập nhật total nếu backend gửi, hoặc tự giảm 1
+        if (data.totalComments != null) {
+          setTotalComments(data.totalComments);
+          setTotalPages(Math.ceil(data.totalComments / limit));
+        } else {
+          setTotalComments((prev) => Math.max(0, prev - 1));
+          setTotalPages(Math.ceil(Math.max(0, totalComments - 1) / limit));
+        }
       }
     };
 
@@ -145,46 +172,18 @@ const TaskActivityPanel = ({
 
     try {
       setSending(true);
-
-      const res = await axios.post(`${httpUrl}/api/v1/comments`, formData, {
+      await axios.post(`${httpUrl}/api/v1/comments`, formData, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "multipart/form-data",
         },
       });
 
-      // XÓA FORM
+      // Chỉ reset form - comment mới sẽ đến từ socket
       commentEditorRef.current?.setContent("");
       setFiles([]);
-
-      // LẤY COMMENT MỚI TỪ API RESPONSE
-      const newComment = res.data.data?.comment;
-      const attachments = res.data.data?.attachments || [];
-      const fullName = res.data.data?.fullName;
-      const avatar = res.data.data?.avatar;
-
-      if (newComment) {
-        setComments((prev) => [
-          {
-            ...newComment,
-            user: {
-              _id: res.data.data?.userId || userId, // ← THÊM _id
-              fullName,
-              avatar,
-            },
-            attachments,
-            emojiSummary: [],
-          },
-          ...prev,
-        ]);
-
-        setTotalPages((prev) => Math.ceil((prev * 10 + 1) / 10));
-      }
-
-      console.log(boardId);
     } catch (err) {
       console.error("Lỗi khi gửi comment:", err);
-      // Có thể thêm toast error
     } finally {
       setSending(false);
     }
@@ -404,10 +403,25 @@ const CommentItem = ({ comment, onDelete, handleEmojiReaction }) => {
     setShowEmojiPicker(false);
   };
 
+  // Đóng emoji picker khi click ra ngoài
+  useEffect(() => {
+    if (!showEmojiPicker) return;
+
+    const handleClickOutside = (e) => {
+      // Nếu click ngoài vùng comment item
+      if (!e.target.closest(".comment-item")) {
+        setShowEmojiPicker(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showEmojiPicker]);
+
   return (
     <div className="flex gap-3 group relative">
       {/* Avatar */}
-      <Avatar user={user}/>
+      <Avatar user={user} size="w-10 h-10" />
 
       <div className="flex-1">
         <div className="bg-white rounded-lg p-3 shadow-sm">
@@ -512,7 +526,7 @@ const CommentItem = ({ comment, onDelete, handleEmojiReaction }) => {
                     searchPlaceholder="Tìm emoji..."
                     skinTonePosition="none"
                     native={true}
-                    emojiStyle="native" // iOS/Android style
+                    emojiStyle="native"
                     height={350}
                     width={300}
                   />
@@ -525,6 +539,5 @@ const CommentItem = ({ comment, onDelete, handleEmojiReaction }) => {
     </div>
   );
 };
-
 
 export default TaskActivityPanel;

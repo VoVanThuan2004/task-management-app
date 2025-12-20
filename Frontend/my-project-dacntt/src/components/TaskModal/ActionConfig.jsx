@@ -87,12 +87,12 @@ export const ActionConfig = {
   },
 
   // Member
-  MEMBER_ASSIGN: {
+  MEMBER_ASSIGN_TASK: {
     label: "Gán thành viên",
     color: "bg-green-50 border-green-200",
     icon: <UserPlus size={16} className="text-green-600" />,
   },
-  MEMBER_UNASSIGN: {
+  MEMBER_UNASSIGN_TASK: {
     label: "Bỏ gán thành viên",
     color: "bg-gray-50 border-gray-300",
     icon: <UserMinus size={16} className="text-gray-600" />,

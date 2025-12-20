@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { io } from "socket.io-client";
-import { ClockIcon, UserIcon, TagIcon, X } from "lucide-react";
+import { ClockIcon, UserIcon, TagIcon, X, UserPlus } from "lucide-react";
 import TaskHeader from "./TaskModal/TaskHeader";
 import TaskDatePickerPopup from "./TaskModal/TaskDatePickerPopup";
 import TaskDescription from "./TaskModal/TaskDescription";
@@ -11,6 +11,8 @@ import AttachmentItem from "./TaskModal/AttachmentItem";
 import CheckItemsSection from "./TaskModal/CheckItemSection";
 import AiChecklistModal from "./TaskModal/AiChecklistModal";
 import { motion as Motion, AnimatePresence } from "framer-motion";
+import Avatar from "./Avatar";
+import { format } from "date-fns";
 
 const TaskModal = ({
   task,
@@ -55,6 +57,9 @@ const TaskModal = ({
   const [boardLabels, setBoardLabels] = useState([]); // danh sách labels từ API
   const [loadingLabels, setLoadingLabels] = useState(false);
 
+  const [showAllMembers, setShowAllMembers] = useState(false);
+  const dateButtonRef = useRef(null);
+
   // Khi task thay đổi => gọi API lấy chi tiết task
   useEffect(() => {
     const fetchTaskDetail = async () => {
@@ -76,6 +81,8 @@ const TaskModal = ({
       }
     };
 
+    setStartDate(task?.startDate ? new Date(task?.startDate) : null);
+    setDueDate(task?.dueDate ? new Date(task?.dueDate) : null);
     fetchTaskDetail();
   }, [task, isOpen]);
 
@@ -117,11 +124,72 @@ const TaskModal = ({
                 ...prev,
                 startDate: data.startDate,
                 dueDate: data.dueDate,
+                status: data.status,
                 reminderEnabled: data.reminderEnabled,
                 reminderTime: data.reminderTime,
               }
             : null
         );
+      }
+    });
+
+    newSocket.on("taskOverdue", (data) => {
+      console.log(data);
+      if (data.taskId === task._id) {
+        setEditedTask((prev) =>
+          prev ? { ...prev, status: data.status } : prev
+        );
+      }
+    });
+
+    newSocket.on("taskNearDeadline", (data) => {
+      if (data.taskId === task._id) {
+        setEditedTask((prev) =>
+          prev ? { ...prev, status: data.status } : prev
+        );
+      }
+    });
+
+    newSocket.on("assignMember", (data) => {
+      if (data.taskId === task._id) {
+        setEditedTask((prev) => {
+          if (!prev) return prev; // nếu prev null thì giữ nguyên
+
+          // Kiểm tra xem user này đã có trong danh sách chưa (tránh trùng)
+          const isAlreadyAssigned = prev.taskAssignees?.some(
+            (assignee) => assignee.userId === data.userId
+          );
+
+          if (isAlreadyAssigned) return prev; // đã có rồi → không thêm
+
+          // Tạo object assignee mới theo đúng cấu trúc
+          const newAssignee = {
+            userId: data.userId,
+            fullName: data.fullName,
+            avatar: data.avatar || null,
+          };
+
+          // Thêm vào danh sách (nếu chưa có taskAssignees thì tạo mảng mới)
+          return {
+            ...prev,
+            taskAssignees: [...(prev.taskAssignees || []), newAssignee],
+          };
+        });
+      }
+    });
+
+    newSocket.on("removeMember", (data) => {
+      if (data.taskId === task._id) {
+        setEditedTask((prev) => {
+          if (!prev || !prev.taskAssignees) return prev;
+
+          return {
+            ...prev,
+            taskAssignees: prev.taskAssignees.filter(
+              (a) => a.userId !== data.userId
+            ),
+          };
+        });
       }
     });
 
@@ -497,12 +565,6 @@ const TaskModal = ({
     }));
   };
 
-  // useEffect(() => {
-  //   if (task?._id) {
-  //     fetchLabelsForTask();
-  //   }
-  // }, [task?._id]);
-
   const fetchLabelsForTask = async () => {
     setShowLabelsPopup(!showLabelsPopup);
 
@@ -659,6 +721,7 @@ const TaskModal = ({
               <div className="flex flex-wrap gap-2 mb-6 relative">
                 {/* === NÚT THỜI GIAN === */}
                 <Motion.button
+                  ref={dateButtonRef} // ← THÊM REF ĐỂ LẤY VỊ TRÍ
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   className={`flex items-center gap-1 px-3 py-2 rounded text-sm transition ${
@@ -666,7 +729,7 @@ const TaskModal = ({
                       ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                       : "bg-gray-100 hover:bg-gray-200"
                   }`}
-                  onClick={() => !isReadOnly && setShowPopup(!showPopup)}
+                  onClick={() => !isReadOnly && setShowPopup(true)} // ← mở popup, không toggle (tránh nháy)
                   disabled={isReadOnly}
                 >
                   <ClockIcon className="w-4 h-4" /> Thời gian
@@ -682,7 +745,7 @@ const TaskModal = ({
                       ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                       : "bg-gray-100 hover:bg-gray-200"
                   }`}
-                  onClick={() => !isReadOnly && fetchLabelsForTask()}  // ← Dùng hàm mới
+                  onClick={() => !isReadOnly && fetchLabelsForTask()} // ← Dùng hàm mới
                   disabled={isReadOnly}
                 >
                   <TagIcon className="w-4 h-4" />{" "}
@@ -729,6 +792,17 @@ const TaskModal = ({
                       animate={{ opacity: 1, scale: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.95, y: -10 }}
                       transition={{ duration: 0.2 }}
+                      className="fixed z-50" // ← fixed thay absolute → không nhảy khi scroll/re-render
+                      style={{
+                        top: dateButtonRef.current
+                          ? dateButtonRef.current.getBoundingClientRect()
+                              .bottom + 8
+                          : 0,
+                        left: dateButtonRef.current
+                          ? dateButtonRef.current.getBoundingClientRect().left
+                          : 0,
+                      }}
+                      onClick={(e) => e.stopPropagation()} // ngăn click ngoài đóng popup (nếu cần)
                     >
                       <TaskDatePickerPopup
                         startDate={startDate}
@@ -749,23 +823,35 @@ const TaskModal = ({
                     </Motion.div>
                   )}
                 </AnimatePresence>
-                
+
+                <AnimatePresence>
+                  {showPopup && !isReadOnly && (
+                    <Motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="fixed inset-0 z-40" // dưới popup (popup z-50)
+                      onClick={() => setShowPopup(false)}
+                    />
+                  )}
+                </AnimatePresence>
+
                 {/* === POPUP AI CHECKLIST === */}
                 <AnimatePresence>
                   {showAiModal && !isReadOnly && (
                     <AiChecklistModal
-                          taskId={task._id}
-                          accessToken={accessToken}
-                          initialTitle={editedTask?.title}
-                          initialDescription={editedTask?.description}
-                          onClose={() => setShowAiModal(false)}
-                          onSaved={(created) => {
-                            setShowAiModal(false);
-                            // store created check items so CheckItemSection can append them
-                            setAiCreatedItems(created || []);
-                            onTaskUpdate && onTaskUpdate();
-                          }}
-                        />
+                      taskId={task._id}
+                      accessToken={accessToken}
+                      initialTitle={editedTask?.title}
+                      initialDescription={editedTask?.description}
+                      onClose={() => setShowAiModal(false)}
+                      onSaved={(created) => {
+                        setShowAiModal(false);
+                        // store created check items so CheckItemSection can append them
+                        setAiCreatedItems(created || []);
+                        onTaskUpdate && onTaskUpdate();
+                      }}
+                    />
                   )}
                 </AnimatePresence>
 
@@ -956,6 +1042,70 @@ const TaskModal = ({
                 </Motion.div>
               )}
 
+              {/* --- Thành viên đã gán (Task Assignees) --- */}
+              {editedTask.taskAssignees &&
+                editedTask.taskAssignees.length > 0 && (
+                  <Motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.35, duration: 0.3 }}
+                    className="mb-6"
+                  >
+                    <h3 className="text-xs font-semibold text-gray-500 mb-2">
+                      Thành viên
+                    </h3>
+
+                    <div className="flex flex-wrap items-center gap-1">
+                      {/* Hiển thị tối đa 6 avatar đầu tiên */}
+                      {editedTask.taskAssignees.slice(0, 6).map((assignee) => (
+                        <div
+                          key={assignee.userId}
+                          className="relative group flex flex-col items-center"
+                        >
+                          <Avatar
+                            user={{
+                              _id: assignee.userId,
+                              fullName: assignee.fullName,
+                              avatar: assignee.avatar,
+                            }}
+                            size="w-9 h-9"
+                            className="ring-3 ring-white shadow-md transition-all duration-300 hover:scale-110 hover:ring-blue-400 hover:shadow-lg"
+                          />
+
+                          {/* Tooltip tên khi hover */}
+                          <div className="absolute bottom-full mb-2 px-3 py-1.5 bg-gray-900 text-white text-xs font-medium rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
+                            {assignee.fullName}
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-0 h-0 border-4 border-transparent border-t-gray-900"></div>
+                          </div>
+                        </div>
+                      ))}
+
+                      {/* Nếu có nhiều hơn 6 người → nút "..." để mở popup xem thêm */}
+                      {editedTask.taskAssignees.length > 6 && (
+                        <button
+                          onClick={() => setShowAllMembers(true)} // mở popup danh sách đầy đủ
+                          className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-bold transition shadow-md hover:shadow-lg"
+                        >
+                          <span className="text-lg leading-none">...</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Nút mở popup thành viên (nếu không read-only) */}
+                    {!isReadOnly && (
+                      <Motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => handleOpenMembers()}
+                        className="mt-3 text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 transition"
+                      >
+                        <UserPlus className="w-4 h-4" />
+                        Thêm thành viên
+                      </Motion.button>
+                    )}
+                  </Motion.div>
+                )}
+
               {/* --- Ngày & Trạng thái --- */}
               <Motion.div
                 initial={{ opacity: 0, y: 10 }}
@@ -963,53 +1113,73 @@ const TaskModal = ({
                 transition={{ delay: 0.2, duration: 0.3 }}
                 className="mb-6"
               >
-                <h3 className="text-xs font-semibold text-gray-500 mb-1">
+                <h3 className="text-xs font-semibold text-gray-500 mb-2">
                   Ngày
                 </h3>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm">
-                    {editedTask.startDate
-                      ? new Date(editedTask.startDate).toLocaleString("vi-VN", {
-                          day: "numeric",
-                          month: "short",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
-                      : "Chưa có ngày bắt đầu"}{" "}
-                    -{" "}
-                    {editedTask.dueDate
-                      ? new Date(editedTask.dueDate).toLocaleString("vi-VN", {
-                          day: "numeric",
-                          month: "short",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
-                      : "Chưa có ngày kết thúc"}
-                  </span>
 
-                  {/* === Trạng thái theo Trello === */}
-                  {editedTask.status && (
+                <div className="flex flex-col gap-2 text-sm">
+                  {/* Ngày bắt đầu - chỉ hiển thị nếu có */}
+                  {editedTask.startDate && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-600 font-medium">
+                        Bắt đầu:
+                      </span>
+                      <span className="text-gray-800">
+                        {format(
+                          new Date(editedTask.startDate),
+                          "HH:mm, dd/MM/yyyy"
+                        )}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Ngày kết thúc - luôn hiển thị nếu có */}
+                  {editedTask.dueDate && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-600 font-medium">
+                        Kết thúc:
+                      </span>
+                      <span className="text-gray-800">
+                        {format(
+                          new Date(editedTask.dueDate),
+                          "HH:mm, dd/MM/yyyy"
+                        )}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Nếu không có ngày nào → thông báo nhẹ */}
+                  {!editedTask.startDate && !editedTask.dueDate && (
+                    <span className="text-sm text-gray-500 italic">
+                      Chưa đặt thời gian
+                    </span>
+                  )}
+                </div>
+
+                {/* === Trạng thái badge (Quá hạn / Gần tới hạn / Hoàn tất) === */}
+                {editedTask.status && (
+                  <div className="mt-3">
                     <Motion.span
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: 0.25, duration: 0.3 }}
                       className={`
-            text-xs px-2 py-0.5 rounded-sm font-medium flex items-center gap-1
-            ${
-              editedTask.isCompleted === true
-                ? "bg-green-100 text-green-700"
-                : editedTask.status === "Quá hạn"
-                ? "bg-red-100 text-red-700"
-                : editedTask.status === "Gần tới hạn"
-                ? "bg-yellow-100 text-yellow-700"
-                : ""
-            }
-          `}
+          inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium
+          ${
+            editedTask.isCompleted === true
+              ? "bg-green-100 text-green-700"
+              : editedTask.status === "Quá hạn"
+              ? "bg-red-100 text-red-700"
+              : editedTask.status === "Gần tới hạn"
+              ? "bg-yellow-100 text-yellow-700"
+              : "bg-gray-100 text-gray-700"
+          }
+        `}
                     >
                       {editedTask.isCompleted === true && (
                         <>
                           <svg
-                            className="w-3 h-3"
+                            className="w-4 h-4"
                             fill="currentColor"
                             viewBox="0 0 20 20"
                           >
@@ -1025,7 +1195,7 @@ const TaskModal = ({
                       {editedTask.status === "Quá hạn" && (
                         <>
                           <svg
-                            className="w-3 h-3"
+                            className="w-4 h-4"
                             fill="currentColor"
                             viewBox="0 0 20 20"
                           >
@@ -1041,7 +1211,7 @@ const TaskModal = ({
                       {editedTask.status === "Gần tới hạn" && (
                         <>
                           <svg
-                            className="w-3 h-3"
+                            className="w-4 h-4"
                             fill="currentColor"
                             viewBox="0 0 20 20"
                           >
@@ -1055,8 +1225,8 @@ const TaskModal = ({
                         </>
                       )}
                     </Motion.span>
-                  )}
-                </div>
+                  </div>
+                )}
               </Motion.div>
 
               {/* --- Mô tả (Giữ nguyên logic) --- */}
@@ -1293,6 +1463,77 @@ const TaskModal = ({
               )}
               <span className="text-sm font-medium">{toast.message}</span>
             </div>
+          </Motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* === POPUP XEM TẤT CẢ THÀNH VIÊN (khi >6 người) === */}
+      <AnimatePresence>
+        {showAllMembers && (
+          <Motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
+            onClick={() => setShowAllMembers(false)}
+          >
+            <Motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[80vh] overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between p-5 border-b border-gray-200 bg-gray-50">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Tất cả thành viên ({editedTask.taskAssignees.length})
+                </h3>
+                <button
+                  onClick={() => setShowAllMembers(false)}
+                  className="p-2 hover:bg-gray-200 rounded-lg transition"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+
+              {/* Danh sách thành viên */}
+              <div className="p-5 space-y-3 max-h-96 overflow-y-auto">
+                {editedTask.taskAssignees.map((assignee) => (
+                  <div
+                    key={assignee.userId}
+                    className="flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50 transition"
+                  >
+                    <Avatar
+                      user={{
+                        _id: assignee.userId,
+                        fullName: assignee.fullName,
+                        avatar: assignee.avatar,
+                      }}
+                      size="w-12 h-12"
+                    />
+                    <div>
+                      <p className="font-medium text-gray-900">
+                        {assignee.fullName}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {assignee.email || "Không có email"}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Footer */}
+              <div className="p-4 border-t border-gray-200 bg-gray-50 text-right">
+                <button
+                  onClick={() => setShowAllMembers(false)}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition"
+                >
+                  Đóng
+                </button>
+              </div>
+            </Motion.div>
           </Motion.div>
         )}
       </AnimatePresence>

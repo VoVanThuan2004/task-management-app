@@ -571,6 +571,7 @@ const updateDeadlineTask = async (req, res) => {
       position: task.position,
       startDate: task.startDate,
       dueDate: task.dueDate,
+      status: task.status,
       reminderEnabled: task.reminderEnabled,
       reminderTime: task.reminderTime,
     });
@@ -1102,7 +1103,41 @@ const getTaskDetail = async (req, res) => {
     const [taskDetail] = await Task.aggregate([
       { $match: { _id: new ObjectId(taskId) } },
 
-      // Labels (giữ nguyên nếu bạn còn dùng)
+      // Task Assignee
+      {
+        $lookup: {
+          from: "taskassignees",
+          localField: "_id",
+          foreignField: "taskId",
+          as: "taskassignees",
+          pipeline: [
+            {
+              $lookup: {
+                from: "users",
+                localField: "userId",
+                foreignField: "_id",
+                as: "userDetails",
+              },
+            },
+            {
+              $unwind: {
+                path: "$userDetails",
+                preserveNullAndEmptyArrays: true,
+              },
+            },
+            {
+              $project: {
+                _id: 0,
+                userId: "$userDetails._id",
+                avatar: "$userDetails.avatar",
+                fullName: "$userDetails.fullName",
+              },
+            },
+          ],
+        },
+      },
+
+      // Labels
       {
         $lookup: {
           from: "tasklabels",
@@ -1223,10 +1258,11 @@ const getTaskDetail = async (req, res) => {
           status: 1,
           position: 1,
           labels: 1,
-          checkItems: 1, // ← Mới: danh sách check items
-          totalCheckItems: 1, // ← Tổng số
-          completedCheckItems: 1, // ← Số đã hoàn thành
+          checkItems: 1, // danh sách check-items
+          totalCheckItems: 1, // Tổng số
+          completedCheckItems: 1, // Tổng số check-item đã hoàn thành
           attachments: 1,
+          taskAssignees: "$taskassignees",
           createdAt: 1,
           updatedAt: 1,
         },
@@ -1263,7 +1299,7 @@ const toggleTask = async (req, res) => {
     // 1. Kiểm tra task, user
     const [task, user] = await Promise.all([
       Task.findById(taskId),
-      User.findById(userId).select("fullName avatar"),
+      User.findById(userId).select("fullName avatar").lean(),
     ]);
 
     if (!task) {

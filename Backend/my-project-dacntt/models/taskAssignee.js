@@ -13,7 +13,9 @@ const taskAssigneeSchema = new mongoose.Schema({
     index: true,
     required: true,
   },
-  assignedAt: { type: Date }
+  assignedAt: { type: Date },
 });
+
+taskAssigneeSchema.index({ taskId: 1, userId: 1 });
 
 module.exports = mongoose.model("TaskAssignee", taskAssigneeSchema);

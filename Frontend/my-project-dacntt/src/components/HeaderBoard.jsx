@@ -21,6 +21,7 @@ import {
   Edit2,
   Trash2,
 } from "lucide-react";
+import { AnimatePresence } from "framer-motion";
 import { io } from "socket.io-client";
 
 const HeaderBoard = ({
@@ -69,6 +70,8 @@ const HeaderBoard = ({
   // Refs để xử lý click outside
   const membersRef = useRef(null);
   const moreOptionsRef = useRef(null);
+
+  const [showAllMembers, setShowAllMembers] = useState(false);
 
   const httpUrl = import.meta.env.VITE_API_URL;
   const accessToken = localStorage.getItem("accessToken");
@@ -683,7 +686,7 @@ const HeaderBoard = ({
     };
 
     setFilters(newFilters);
-    onApplyFilters(serializedFilters);  // Gọi api lọc columns
+    onApplyFilters(serializedFilters); // Gọi api lọc columns
   };
 
   // Xóa filter
@@ -715,27 +718,26 @@ const HeaderBoard = ({
         <div className="flex items-center gap-6">
           {/* Chỉ hiện khi là thành viên */}
           {isMember && boardMembers.length > 0 && (
-            <div className="flex items-center -space-x-3">
-              {/* Hiển thị tối đa 6 người */}
-              {boardMembers.slice(0, 6).map((member, idx) => (
+            <div className="flex items-center flex-wrap gap-2">
+              {/* Hiển thị tối đa 6 thành viên đầu tiên */}
+              {boardMembers.slice(0, 6).map((member) => (
                 <div
                   key={member._id}
-                  className="relative group"
-                  style={{ zIndex: boardMembers.length - idx }}
+                  className="relative group flex flex-col items-center"
                 >
                   <Avatar
                     user={member}
-                    size="w-11 h-11"
+                    size="w-10 h-10"
                     className="ring-4 ring-white shadow-xl transition-all duration-300 hover:scale-115 hover:z-50 hover:ring-blue-400"
                   />
 
-                  {/* TOOLTIP SIÊU ĐẸP - ClickUp Style */}
+                  {/* Tooltip siêu đẹp - ClickUp Style */}
                   <div className="absolute top-full left-1/2 -translate-x-1/2 mt-4 w-80 p-6 bg-white rounded-2xl shadow-2xl border border-gray-200 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-50">
                     {/* Header: Avatar + Info */}
                     <div className="flex items-center gap-4 mb-5">
                       <Avatar
                         user={member}
-                        size="w-16 h-16"
+                        size="w-12 h-12"
                         className="ring-4 ring-white shadow-2xl flex-shrink-0"
                       />
                       <div className="flex-1 min-w-0">
@@ -782,19 +784,15 @@ const HeaderBoard = ({
                 </div>
               ))}
 
-              {/* +N nếu có nhiều hơn 6 người */}
+              {/* Nếu có nhiều hơn 6 người → nút "..." để mở popup xem thêm */}
               {boardMembers.length > 6 && (
-                <div className="relative group">
-                  <div className="w-11 h-11 rounded-full bg-gradient-to-br from-gray-700 to-gray-900 text-white text-sm font-bold flex items-center justify-center ring-4 ring-white shadow-xl">
-                    +{boardMembers.length - 6}
-                  </div>
-                  <div className="absolute top-full left-1/2 -translate-x-1/2 mt-4 px-6 py-4 bg-white rounded-2xl shadow-2xl border border-gray-200 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-50 text-center">
-                    <p className="font-medium text-gray-900">
-                      Và {boardMembers.length - 6} thành viên khác
-                    </p>
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 -mb-2 w-0 h-0 border-8 border-transparent border-b-white"></div>
-                  </div>
-                </div>
+                <button
+                  onClick={() => setShowAllMembers(true)}
+                  className="flex items-center justify-center w-11 h-11 rounded-full bg-gradient-to-br from-gray-600 to-gray-900 text-white text-sm font-bold shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-110"
+                  title={`Và ${boardMembers.length - 6} thành viên khác`}
+                >
+                  <span className="text-lg leading-none">...</span>
+                </button>
               )}
             </div>
           )}
@@ -1042,38 +1040,35 @@ const HeaderBoard = ({
             {/* Trạng thái task */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Trạng thái thẻ
+                Trạng thái task
               </label>
               <div className="space-y-2">
                 <label className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition">
                   <input
-                    type="radio"
-                    name="taskStatus"
-                    value="completed"
+                    type="checkbox"
                     checked={filters.taskStatus === "completed"}
                     onChange={(e) => {
                       handleFilterChange({
                         ...filters,
-                        taskStatus: e.target.value,
+                        taskStatus: e.target.checked ? "completed" : "", // nếu bỏ check → ""
                       });
                     }}
-                    className="text-blue-600 focus:ring-blue-500"
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
                   />
                   <span className="text-sm text-gray-700">Đã hoàn thành</span>
                 </label>
+
                 <label className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition">
                   <input
-                    type="radio"
-                    name="taskStatus"
-                    value="incomplete"
+                    type="checkbox"
                     checked={filters.taskStatus === "incomplete"}
                     onChange={(e) => {
                       handleFilterChange({
                         ...filters,
-                        taskStatus: e.target.value,
+                        taskStatus: e.target.checked ? "incomplete" : "",
                       });
                     }}
-                    className="text-blue-600 focus:ring-blue-500"
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
                   />
                   <span className="text-sm text-gray-700">Chưa hoàn thành</span>
                 </label>
@@ -1099,17 +1094,15 @@ const HeaderBoard = ({
                     className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition"
                   >
                     <input
-                      type="radio"
-                      name="deadline"
-                      value={opt.value}
+                      type="checkbox"
                       checked={filters.deadline === opt.value}
                       onChange={(e) => {
                         handleFilterChange({
                           ...filters,
-                          deadline: e.target.value,
+                          deadline: e.target.checked ? opt.value : "", // nếu bỏ check → ""
                         });
                       }}
-                      className="text-blue-600 focus:ring-blue-500"
+                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
                     />
                     <span className="text-sm text-gray-700">{opt.label}</span>
                   </label>
@@ -1189,17 +1182,15 @@ const HeaderBoard = ({
                     className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition"
                   >
                     <input
-                      type="radio"
-                      name="activity"
-                      value={opt.value}
+                      type="checkbox"
                       checked={filters.activityLog === opt.value}
                       onChange={(e) => {
                         handleFilterChange({
                           ...filters,
-                          activityLog: e.target.value,
+                          activityLog: e.target.checked ? opt.value : "",
                         });
                       }}
-                      className="text-blue-600 focus:ring-blue-500"
+                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
                     />
                     <span className="text-sm text-gray-700">{opt.label}</span>
                   </label>
@@ -2173,6 +2164,89 @@ const HeaderBoard = ({
           </div>
         </div>
       )}
+
+      {/* === POPUP XEM TẤT CẢ THÀNH VIÊN (khi >6 người) === */}
+      <AnimatePresence>
+        {showAllMembers && (
+          <div
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={() => setShowAllMembers(false)}
+          >
+            <Motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gray-50">
+                <h3 className="text-xl font-bold text-gray-900">
+                  Thành viên bảng làm việc ({boardMembers.length})
+                </h3>
+                <button
+                  onClick={() => setShowAllMembers(false)}
+                  className="p-2 hover:bg-gray-200 rounded-lg transition"
+                >
+                  <X className="w-6 h-6 text-gray-600" />
+                </button>
+              </div>
+
+              {/* Danh sách thành viên */}
+              <div className="p-6 grid grid-cols-2 gap-6 max-h-full overflow-y-auto">
+                {boardMembers.map((member) => (
+                  <div
+                    key={member._id}
+                    className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition"
+                  >
+                    <Avatar
+                      user={member}
+                      size="w-16 h-16"
+                      className="ring-4 ring-white shadow-xl flex-shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-gray-900 truncate">
+                        {member.fullName}
+                      </p>
+                      <p className="text-sm text-gray-500 truncate">
+                        {member.email}
+                      </p>
+                      {member.role === "owner" && (
+                        <span className="inline-flex items-center gap-1 mt-2 px-3 py-1 rounded-full text-xs font-bold bg-yellow-100 text-yellow-800">
+                          Owner
+                        </span>
+                      )}
+                      {member.skills && member.skills.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          {member.skills.map((s, i) => (
+                            <span
+                              key={i}
+                              className="px-3 py-1 bg-gradient-to-r from-violet-100 to-purple-100 text-indigo-700 text-xs font-medium rounded-full"
+                            >
+                              {s.skill}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Footer */}
+              <div className="p-4 border-t border-gray-200 bg-gray-50 text-right">
+                <button
+                  onClick={() => setShowAllMembers(false)}
+                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition"
+                >
+                  Đóng
+                </button>
+              </div>
+            </Motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </>
   );
 };

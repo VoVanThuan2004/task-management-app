@@ -7,7 +7,7 @@ const taskAssigneeController = require("../controllers/taskAssigneeController");
 router.post("/api/v1/task-assignee", auth, taskAssigneeController.assignMember)
 
 // Loại thành viên chỉ định cho task
-router.delete("/api/v1/task-assignee/:taskAssigneeId", auth, taskAssigneeController.removeMember);
+router.delete("/api/v1/task-assignee/:userId/:taskId", auth, taskAssigneeController.removeMember);
 
 // Lấy danh sách thành viên được giao
 router.get("/api/v1/task-assignee/:taskId", auth, taskAssigneeController.getAllTaskAssignees);

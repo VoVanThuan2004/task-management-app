@@ -8,11 +8,12 @@ const {
 const { getIO } = require("../config/socket");
 const mongoose = require("mongoose");
 const BoardMember = require("../models/boardMember");
+const activityLogQueue = require("../services/activityLogQueue");
 
 const assignMember = async (req, res) => {
   try {
-    const inviterId = req.user.userId;
     const inviterName = req.user.fullName;
+    const inviterId = req.user.userId;
     const { taskId, userId } = req.body;
     if (!taskId || !userId) {
       return res.status(400).json({
@@ -24,8 +25,8 @@ const assignMember = async (req, res) => {
 
     // 1. Kiểm tra task, user
     const [task, user] = await Promise.all([
-      await Task.findById(taskId).populate("boardId"),
-      await User.findById(userId),
+      await Task.findById(taskId).populate("boardId").lean(),
+      await User.findById(userId).lean(),
     ]);
 
     if (!task) {
@@ -58,10 +59,9 @@ const assignMember = async (req, res) => {
       inviterName
     );
 
-    // 4. Gửi socket - cập nhật realtime thông báo trên web
+    // 4. Gửi socket - cập nhật realtime thông tin thành viên
     const io = getIO();
-    io.to(task.boardId.toString()).emit("assignMember", {
-      _id: taskAssignee._id,
+    io.to(task.boardId._id.toString()).emit("assignMember", {
       taskId,
       userId,
       fullName: user.fullName,
@@ -69,12 +69,20 @@ const assignMember = async (req, res) => {
       avatar: user.avatar,
     });
 
+    // 5. Gửi qua queue Redis - tạo activity-log
+    await activityLogQueue.add("activityLog", {
+      userId: inviterId,
+      boardId: task.boardId._id,
+      taskId,
+      action: "MEMBER_ASSIGN_TASK",
+      target: user.fullName,
+    });
+
     return res.status(201).json({
       status: "success",
       code: 201,
       message: "Mời thành viên vào task thành công",
       data: {
-        _id: taskAssignee._id,
         taskId,
         userId,
         fullName: user.fullName,
@@ -93,12 +101,16 @@ const assignMember = async (req, res) => {
 
 const removeMember = async (req, res) => {
   try {
-    const taskAssigneeId = req.params.taskAssigneeId;
+    const inviterId = req.user.userId;
+    const { userId, taskId } = req.params;
     const inviterName = req.user.fullName;
 
-    // 1. Kiểm tra task assignee
-    const taskAssignee = await TaskAssignee.findById(taskAssigneeId);
-    if (!taskAssignee) {
+    // 1. Kiểm tra task, user
+    const [task, user] = await Promise.all([
+      await Task.findById(taskId).populate("boardId"),
+      await User.findById(userId).lean(),
+    ]);
+    if (!task) {
       return res.status(404).json({
         status: "error",
         code: 404,
@@ -106,18 +118,21 @@ const removeMember = async (req, res) => {
       });
     }
 
-    // Lấy ra task, user
-    // 1. Kiểm tra task, user
-    const [task, user] = await Promise.all([
-      await Task.findById(taskAssignee.taskId).populate("boardId"),
-      await User.findById(taskAssignee.userId),
-    ]);
+    // Kiểm tra Task Assignee
+    const taskAssignee = await TaskAssignee.findOne({ taskId, userId });
+    if (!taskAssignee) {
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Task assignee không tồn tại",
+      });
+    }
 
     // 2. Xóa Task Assignee
     await TaskAssignee.deleteOne({ _id: taskAssignee._id });
 
     // 3. Gửi email thông báo
-    // - Nếu người đang nhập và loại bỏ chính mình, không gửi email
+    // - Nếu người dùng đang nhập và loại bỏ chính mình, không gửi email
     if (req.user.userId.toString() !== taskAssignee.userId.toString()) {
       await sendRemoveMemberEmail(
         user.email,
@@ -129,10 +144,20 @@ const removeMember = async (req, res) => {
 
     // 4. Gửi socket - cập nhật realtime
     const io = getIO();
-    io.to(task.boardId.toString()).emit("removeMember", {
-      _id: taskAssignee._id,
+    io.to(task.boardId._id.toString()).emit("removeMember", {
       taskId: taskAssignee.taskId,
+      userId: taskAssignee.userId,
     });
+
+    // 5. Gửi qua queue Redis - tạo activity-log
+    await activityLogQueue.add("activityLog", {
+      userId: inviterId,
+      boardId: task.boardId._id,
+      taskId,
+      action: "MEMBER_UNASSIGN_TASK",
+      target: user.fullName,
+    });
+
 
     return res.status(200).json({
       status: "success",
@@ -140,6 +165,46 @@ const removeMember = async (req, res) => {
       message: "Loại bỏ thành viên khỏi task thành công",
       data: {
         _id: taskAssignee._id,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      code: 500,
+      message: "Lỗi hệ thống: " + error.message,
+    });
+  }
+};
+
+const getTaskMembers = async (req, res) => {
+  const { boardId, taskId } = req.params;
+
+  try {
+    // 1. Lấy tất cả member của board đã chấp nhận
+    const boardMembers = await BoardMember.find({
+      boardId,
+      status: "accepted",
+    }).populate("userId", "fullName avatar email");
+
+    // 2. Lấy danh sách assignees của task
+    const taskAssignees = await TaskAssignee.find({
+      taskId,
+    }).populate("userId", "fullName avatar email");
+
+    // 3. Tách ra 2 nhóm
+    const assignedUserIds = taskAssignees.map((a) => a.userId._id.toString());
+
+    const assigned = taskAssignees.map((a) => a.userId);
+    const available = boardMembers
+      .map((b) => b.userId)
+      .filter((u) => !assignedUserIds.includes(u._id.toString()));
+
+    return res.status(200).json({
+      status: "success",
+      code: 200,
+      data: {
+        assigned,
+        available,
       },
     });
   } catch (error) {
@@ -201,46 +266,6 @@ const getAllTaskAssignees = async (req, res) => {
       code: 200,
       message: "Lấy danh sách thành viên được giao trong task: " + task.title,
       data: taskAssignees,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      status: "error",
-      code: 500,
-      message: "Lỗi hệ thống: " + error.message,
-    });
-  }
-};
-
-const getTaskMembers = async (req, res) => {
-  const { boardId, taskId } = req.params;
-
-  try {
-    // 1. Lấy tất cả member của board đã chấp nhận
-    const boardMembers = await BoardMember.find({
-      boardId,
-      status: "accepted",
-    }).populate("userId", "fullName avatar email");
-
-    // 2. Lấy danh sách assignees của task
-    const taskAssignees = await TaskAssignee.find({
-      taskId,
-    }).populate("userId", "fullName avatar email");
-
-    // 3. Tách ra 2 nhóm
-    const assignedUserIds = taskAssignees.map((a) => a.userId._id.toString());
-
-    const assigned = taskAssignees.map((a) => a.userId);
-    const available = boardMembers
-      .map((b) => b.userId)
-      .filter((u) => !assignedUserIds.includes(u._id.toString()));
-
-    return res.status(200).json({
-      status: "success",
-      code: 200,
-      data: {
-        assigned,
-        available,
-      },
     });
   } catch (error) {
     return res.status(500).json({

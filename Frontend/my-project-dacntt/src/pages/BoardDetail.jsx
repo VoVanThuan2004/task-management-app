@@ -247,7 +247,18 @@ export default function BoardDetail() {
 
     // xử lý task khi status = Gần tới
     socket.on("taskNearDeadline", (data) => {
-      console.log("Task's deadline is upcomming:", data);
+      setColumns((prevColumns) =>
+        prevColumns.map((col) => ({
+          ...col,
+          tasks: col.tasks.map((task) =>
+            task._id === data.taskId ? { ...task, status: data.status } : task
+          ),
+        }))
+      );
+    });
+
+    // xử lý task khi status = Quá hạn
+    socket.on("taskOverdue", (data) => {
       setColumns((prevColumns) =>
         prevColumns.map((col) => ({
           ...col,
@@ -409,7 +420,7 @@ export default function BoardDetail() {
               t._id === data.taskId
                 ? {
                     ...t,
-                    isCompleted: t.isCompleted,
+                    isCompleted: data.isCompleted,
                   }
                 : t
             ),
@@ -464,6 +475,91 @@ export default function BoardDetail() {
           // Trả về column mới với tasks đã cập nhật
           return {
             ...col,
+            tasks: updatedTasks,
+          };
+        })
+      );
+    });
+
+    socket.on("deadlineTaskUpdated", (data) => {
+      setColumns((prevColumns) =>
+        prevColumns.map((col) => ({
+          ...col,
+          tasks: col.tasks.map((task) =>
+            task._id === data._id ? { ...task, dueDate: data.dueDate } : task
+          ),
+        }))
+      );
+    });
+
+    socket.on("assignMember", (data) => {
+      setColumns((prevColumns) =>
+        prevColumns.map((column) => {
+          // Tìm task trong column này có khớp taskId không
+          const taskIndex = column.tasks.findIndex(
+            (t) => t._id === data.taskId
+          );
+
+          if (taskIndex === -1) return column; // không có task này → bỏ qua
+
+          // Tạo assignee mới theo đúng cấu trúc frontend đang dùng
+          const newAssignee = {
+            userId: data.userId,
+            fullName: data.fullName,
+            avatar: data.avatar || null,
+          };
+
+          // Lấy task cũ
+          const updatedTasks = [...column.tasks];
+          const targetTask = updatedTasks[taskIndex];
+
+          // Kiểm tra tránh trùng (an toàn)
+          const isAlreadyAssigned = targetTask.taskAssignees?.some(
+            (a) => a.userId === data.userId
+          );
+
+          if (!isAlreadyAssigned) {
+            // Thêm assignee mới vào task
+            updatedTasks[taskIndex] = {
+              ...targetTask,
+              taskAssignees: [...(targetTask.taskAssignees || []), newAssignee],
+            };
+          }
+
+          return {
+            ...column,
+            tasks: updatedTasks,
+          };
+        })
+      );
+    });
+
+    socket.on("removeMember", (data) => {
+      // data thường có { taskId, userId } hoặc { taskId, _id }
+      console.log("removeMember socket:", data);
+
+      const userIdToRemove = data.userId || data._id; // linh hoạt tùy backend emit gì
+
+      setColumns((prevColumns) =>
+        prevColumns.map((column) => {
+          const taskIndex = column.tasks.findIndex(
+            (t) => t._id === data.taskId
+          );
+
+          if (taskIndex === -1) return column;
+
+          const updatedTasks = [...column.tasks];
+          const targetTask = updatedTasks[taskIndex];
+
+          updatedTasks[taskIndex] = {
+            ...targetTask,
+            taskAssignees: (targetTask.taskAssignees || []).filter(
+              (a) => a.userId !== userIdToRemove
+            ),
+          };
+
+          return {
+            ...column,
             tasks: updatedTasks,
           };
         })

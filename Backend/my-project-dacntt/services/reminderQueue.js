@@ -1,4 +1,3 @@
-// reminderQueue.js
 const { Queue, Worker } = require("bullmq");
 const { Redis } = require("ioredis");
 const Task = require("../models/task");
@@ -14,10 +13,6 @@ const connection = new Redis({
   maxRetriesPerRequest: null,
   enableReadyCheck: false,
 });
-// const connection = new Redis(process.env.REDIS_URL || "", {
-//   maxRetriesPerRequest: null,
-//   enableReadyCheck: false,
-// });
 
 // Queue để thêm job
 const reminderQueue = new Queue("taskReminderQueue", { connection });
@@ -61,7 +56,8 @@ const worker = new Worker(
         if (!task.isCompleted && new Date() < task.dueDate) {
           task.status = "Gần tới hạn";
           await task.save();
-          io.to(task.boardId.toString()).emit("taskNearDeadline", {
+
+          io.to(boardId.toString()).emit("taskNearDeadline", {
             taskId: task._id,
             status: "Gần tới hạn",
           });
@@ -74,7 +70,8 @@ const worker = new Worker(
         if (!task.isCompleted && new Date() >= task.dueDate) {
           task.status = "Quá hạn";
           await task.save();
-          io.to(task.boardId.toString()).emit("taskOverdue", {
+
+          io.to(boardId.toString()).emit("taskOverdue", {
             taskId: task._id,
             status: "Quá hạn",
           });

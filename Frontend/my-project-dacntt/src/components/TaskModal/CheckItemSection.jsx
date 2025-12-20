@@ -50,6 +50,10 @@ const CheckItemsSection = React.memo(
     const [boardMembers, setBoardMembers] = useState([]);
     const [membersPopupOpenFor, setMembersPopupOpenFor] = useState(null); // null hoặc checkItemId
 
+    // State cập nhật title
+    const [editingCheckItemId, setEditingCheckItemId] = useState(null);
+    const [editingTitle, setEditingTitle] = useState("");
+
     // Reset toàn bộ khi taskId thay đổi
     useEffect(() => {
       setCheckItems([]);
@@ -229,9 +233,7 @@ const CheckItemsSection = React.memo(
       };
     }, [socket, taskId]);
 
-    // ==========================
-    // ACTIONS (UPDATE UI FROM API RESPONSE)
-    // ==========================
+    // Các hàm gọi API
 
     const addCheckItem = async () => {
       if (isReadOnly || !newTitle.trim()) return;
@@ -299,6 +301,38 @@ const CheckItemsSection = React.memo(
         setCheckItems((prev) => prev.filter((i) => i._id !== id));
       } catch (err) {
         console.error("Lỗi khi xóa:", err);
+      }
+    };
+
+    // === Cập nhật title
+    const updateCheckItemTitle = async (checkItemId) => {
+      if (!editingTitle.trim()) return;
+
+      try {
+        await axios.put(
+          `${httpUrl}/api/v1/check-item/title/${checkItemId}`,
+          {
+            title: editingTitle.trim(),
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          }
+        );
+
+        setCheckItems((prev) =>
+          prev.map((item) =>
+            item._id === checkItemId
+              ? { ...item, title: editingTitle.trim() }
+              : item
+          )
+        );
+
+        setEditingCheckItemId(null);
+        setEditingTitle("");
+      } catch (error) {
+        console.log(error);
       }
     };
 
@@ -651,15 +685,46 @@ const CheckItemsSection = React.memo(
 
                           {/* Nội dung */}
                           <div className="flex-1 min-w-0">
-                            <p
-                              className={`text-sm font-medium break-words ${
-                                item.isCompleted
-                                  ? "line-through text-gray-500"
-                                  : "text-gray-800"
-                              }`}
-                            >
-                              {item.title}
-                            </p>
+                            {editingCheckItemId === item._id ? (
+                              <input
+                                type="text"
+                                value={editingTitle}
+                                onChange={(e) =>
+                                  setEditingTitle(e.target.value)
+                                }
+                                onBlur={() => updateCheckItemTitle(item._id)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    updateCheckItemTitle(item._id);
+                                  } else if (e.key === "Escape") {
+                                    setEditingCheckItemId(null);
+                                    setEditingTitle("");
+                                  }
+                                }}
+                                className="w-full px-2 py-1 text-sm font-medium border border-blue-500 rounded bg-white focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                autoFocus
+                                onClick={(e) => e.stopPropagation()} // ngăn drag khi edit
+                              />
+                            ) : (
+                              <p
+                                onDoubleClick={() => {
+                                  if (isReadOnly) return;
+                                  setEditingCheckItemId(item._id);
+                                  setEditingTitle(item.title);
+                                }}
+                                className={`text-sm font-medium break-words cursor-text select-text ${
+                                  item.isCompleted
+                                    ? "line-through text-gray-500"
+                                    : "text-gray-800"
+                                } ${
+                                  !isReadOnly
+                                    ? "hover:bg-gray-200 px-2 -mx-2 py-1 rounded transition"
+                                    : ""
+                                }`}
+                              >
+                                {item.title}
+                              </p>
+                            )}
 
                             {/* Assignee + Due Date - giữ nguyên */}
                             <div className="flex items-center gap-4 mt-2">
@@ -716,14 +781,13 @@ const CheckItemsSection = React.memo(
                                       )}
                                     </span>
                                   </div>
-                                  {item.status && (
+                                  {/* Chỉ hiển thị status nếu CHƯA hoàn thành */}
+                                  {!item.isCompleted && item.status && (
                                     <span
                                       className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium ${
                                         item.status === "Quá hạn"
                                           ? "bg-red-100 text-red-800"
-                                          : item.status === "Gần tới hạn"
-                                          ? "bg-amber-100 text-amber-800"
-                                          : "bg-gray-100 text-gray-700"
+                                          : "bg-amber-100 text-amber-800"
                                       }`}
                                     >
                                       {item.status}
