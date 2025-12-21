@@ -12,6 +12,7 @@ const reminderQueue = require("../services/reminderQueue");
 const createActivityLogTask = require("../utils/createActivityLogTask");
 const User = require("../models/user");
 const Board = require("../models/board");
+const activityLogQueue = require("../services/activityLogQueue");
 
 const addTask = async (req, res) => {
   try {
@@ -142,23 +143,13 @@ const updateTaskTitle = async (req, res) => {
     }
 
     // 1. Tìm task có tồn tại
-    const [task, user] = await Promise.all([
-      Task.findById(taskId),
-      User.findById(userId).select("fullName avatar"),
-    ]);
+    const task = await Task.findById(taskId);
 
     if (!task) {
       return res.status(404).json({
         status: "error",
         code: 404,
         message: "Task không tồn tại",
-      });
-    }
-    if (!user) {
-      return res.status(404).json({
-        status: "error",
-        code: 404,
-        message: "Người dùng không hợp lệ",
       });
     }
 
@@ -177,24 +168,13 @@ const updateTaskTitle = async (req, res) => {
       description: task.description,
     });
 
-    // 4. Gửi lên Socket - thông báo
-    const activityLog = await createActivityLogTask({
+    // 4. Gửi qua Redis queue - tạo activity log, socket
+    await activityLogQueue.add("activityLog", {
       userId,
       boardId: task.boardId,
       taskId: task._id,
       action: "TASK_UPDATE_TITLE",
       target: task.title,
-    });
-
-    io.to(task._id.toString()).emit("activityLogTask", {
-      userId,
-      fullName: user.fullName,
-      avatar: user.avatar,
-      taskId: activityLog.taskId,
-      boardId: activityLog.boardId,
-      action: activityLog.action,
-      description: activityLog.description,
-      createdAt: activityLog.createdAt,
     });
 
     return res.status(201).json({
@@ -448,22 +428,12 @@ const updateDeadlineTask = async (req, res) => {
       });
     }
 
-    const [task, user] = await Promise.all([
-      Task.findById(taskId),
-      User.findById(userId).select("fullName avatar").lean(),
-    ]);
+    const task = await Task.findById(taskId);
     if (!task) {
       return res.status(404).json({
         status: "error",
         code: 404,
         message: "Task không tồn tại",
-      });
-    }
-    if (!user) {
-      return res.status(404).json({
-        status: "error",
-        code: 404,
-        message: "Người dùng không hợp lệ",
       });
     }
 
@@ -501,16 +471,6 @@ const updateDeadlineTask = async (req, res) => {
 
       let delay = dueTime - now - reminderMs;
       if (delay < 0) delay = 0; // reminder quá hạn → chạy ngay
-
-      console.log(
-        `⏳ Task ${
-          task._id
-        }, dueDate: ${task.dueDate.toISOString()}, now: ${new Date(
-          now
-        ).toISOString()}, reminderTime: ${
-          task.reminderTime
-        } phút, delay: ${delay} ms`
-      );
 
       await reminderQueue.add(
         "sendReminder",
@@ -557,10 +517,6 @@ const updateDeadlineTask = async (req, res) => {
       );
     }
 
-    console.log(
-      `Đã thêm 3 job cho task ${task._id} (reminder, nearDeadline, overdue)`
-    );
-
     // Emit socket cập nhật
     const io = getIO();
     io.to(task.boardId.toString()).emit("deadlineTaskUpdated", {
@@ -576,26 +532,15 @@ const updateDeadlineTask = async (req, res) => {
       reminderTime: task.reminderTime,
     });
 
-    // Cập nhật socket Activity Log (Hoạt động thông báo)
-    const activityLog = await createActivityLogTask({
+    // Gửi lên Redis queue - cập nhật activity log
+    await activityLogQueue.add("activityLog", {
       userId,
       boardId: task.boardId,
       taskId: task._id,
       action: "DEADLINE_SET",
+      target: task.title,
     });
 
-    io.to(task._id.toString()).emit("activityLogTask", {
-      userId,
-      fullName: user.fullName,
-      avatar: user.avatar,
-      taskId: activityLog.taskId,
-      boardId: activityLog.boardId,
-      action: activityLog.action,
-      description: activityLog.description,
-      createdAt: activityLog.createdAt,
-    });
-
-    // Trả về response
     return res.status(200).json({
       status: "success",
       code: 200,
@@ -610,7 +555,7 @@ const updateDeadlineTask = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ Lỗi updateDeadlineTask:", error);
+    console.error("Lỗi updateDeadlineTask:", error);
     return res.status(500).json({
       status: "error",
       code: 500,
@@ -621,6 +566,7 @@ const updateDeadlineTask = async (req, res) => {
 
 const updateTaskDescription = async (req, res) => {
   try {
+    const userId = req.user.userId;
     const taskId = req.params.taskId;
     const { description } = req.body;
     // Kiểm tra chỉ khi description === undefined (nghĩa là không gửi field)
@@ -656,7 +602,14 @@ const updateTaskDescription = async (req, res) => {
       description: existingTask.description,
     });
 
-    // Gửi lên Socket - thông báo
+    // Gửi lên Redis queue - cập nhật activity log
+    await activityLogQueue.add("activityLog", {
+      userId,
+      boardId: existingTask.boardId,
+      taskId: existingTask._id,
+      action: "TASK_UPDATE_DESCRIPTION",
+      target: existingTask.title,
+    });
 
     return res.status(200).json({
       status: "success",
@@ -882,6 +835,7 @@ const getAllTaskLabels = async (req, res) => {
 const uploadFile = async (req, res) => {
   try {
     const userId = req.user.userId;
+
     // 1. Kiểm tra có upload file
     if (!req.file) {
       return res.status(400).json({
@@ -902,10 +856,7 @@ const uploadFile = async (req, res) => {
     }
 
     // 2. Kiểm tra task
-    const [task, user] = await Promise.all([
-      Task.findById(taskId),
-      User.findById(userId).select("fullName avatar"),
-    ]);
+    const [task, user] = await Task.findById(taskId);
 
     if (!task) {
       await deleteUploadedFileCloudinary(req.file);
@@ -913,15 +864,6 @@ const uploadFile = async (req, res) => {
         status: "error",
         code: 404,
         message: "Task không tồn tại",
-      });
-    }
-
-    if (!user) {
-      await deleteUploadedFileCloudinary(req.file);
-      return res.status(404).json({
-        status: "error",
-        code: 404,
-        message: "Người dùng không hợp lệ",
       });
     }
 
@@ -949,24 +891,13 @@ const uploadFile = async (req, res) => {
       message: "File mới được tải lên trong task",
     });
 
-    // 5. Gửi lên Socket - thông báo các thành viên khác
-    const activityLog = await createActivityLogTask({
+    // 5. Gửi lên Redis queue - cập nhật activity log
+    await activityLogQueue.add("activityLog", {
       userId,
       boardId: task.boardId,
       taskId: task._id,
       action: "ATTACHMENT_UPLOAD",
       target: attachment.fileName,
-    });
-
-    io.to(task._id.toString()).emit("activityLogTask", {
-      userId,
-      fullName: user.fullName,
-      avatar: user.avatar,
-      taskId: activityLog.taskId,
-      boardId: activityLog.boardId,
-      action: activityLog.action,
-      description: activityLog.description,
-      createdAt: activityLog.createdAt,
     });
 
     return res.status(200).json({
@@ -1297,24 +1228,13 @@ const toggleTask = async (req, res) => {
     }
 
     // 1. Kiểm tra task, user
-    const [task, user] = await Promise.all([
-      Task.findById(taskId),
-      User.findById(userId).select("fullName avatar").lean(),
-    ]);
+    const task = await Task.findById(taskId);
 
     if (!task) {
       return res.status(404).json({
         status: "error",
         code: 404,
         message: "Task không tồn tại",
-      });
-    }
-
-    if (!user) {
-      return res.status(404).json({
-        status: "error",
-        code: 404,
-        message: "Người dùng không hợp lệ",
       });
     }
 
@@ -1329,22 +1249,13 @@ const toggleTask = async (req, res) => {
       isCompleted: task.isCompleted,
     });
 
-    // 4. Gửi lên socket cập nhật thông báo
-    const activityLog = await createActivityLogTask({
+    // 4. Gửi lên Redis queue - cập nhật activity log
+    await activityLogQueue.add("activityLog", {
       userId,
       boardId: task.boardId,
       taskId,
       action: task.isCompleted ? "TASK_COMPLETE" : "TASK_UNCOMPLETE",
-    });
-    io.to(task._id.toString()).emit("activityLogTask", {
-      userId,
-      fullName: user.fullName,
-      avatar: user.avatar,
-      taskId: activityLog.taskId,
-      boardId: activityLog.boardId,
-      action: activityLog.action,
-      description: activityLog.description,
-      createdAt: activityLog.createdAt,
+      target: task.title,
     });
 
     return res.status(200).json({

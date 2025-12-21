@@ -78,7 +78,7 @@ const TaskCard = React.memo(({ task, index, onClick, onToggleComplete }) => {
               <div className="flex items-center gap-2 mt-2 text-xs flex-wrap">
                 <Clock className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
                 <span className="text-gray-600">
-                  {format(new Date(task.dueDate), "dd MMMM yyyy")}
+                  {format(new Date(task.dueDate), "dd/MM/yyyy")}
                 </span>
 
                 {/* Chỉ hiển thị badge nếu task CHƯA hoàn thành */}

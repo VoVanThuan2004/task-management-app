@@ -11,7 +11,7 @@ import {
   X,
   LogIn,
   Settings,
-  KeyRoundIcon
+  KeyRoundIcon,
 } from "lucide-react";
 import { useUser } from "../components/useUser";
 import { AnimatePresence, motion as Motion } from "framer-motion";
@@ -41,6 +41,7 @@ export default function HomePage() {
   const navigate = useNavigate();
 
   const backgroundColors = [
+    // Màu solid gốc của bạn
     "#026aa7",
     "#d29034",
     "#519839",
@@ -49,6 +50,12 @@ export default function HomePage() {
     "#cd5a91",
     "#4bbf6b",
     "#00aecc",
+
+    // 4 màu gradient mới - giống Trello, đẹp lung linh
+    "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", // Purple to Indigo (rất phổ biến trong Trello custom)
+    "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)", // Pink to Red (năng động, nữ tính)
+    "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)", // Blue to Cyan (tươi mát, hiện đại)
+    "linear-gradient(135deg, #43cea2 0%, #185a9d 100%)", // Green to Deep Blue (tươi sáng, chuyên nghiệp)
   ];
 
   useEffect(() => {
@@ -395,9 +402,7 @@ export default function HomePage() {
                       board.background?.startsWith("#")
                         ? { backgroundColor: board.background }
                         : {
-                            backgroundImage: board.background
-                              ? `url(${board.background})`
-                              : "linear-gradient(135deg, #c3e0e5, #a2d2ff)",
+                            backgroundImage: board.background,
                             backgroundSize: "cover",
                             backgroundPosition: "center",
                           }
@@ -485,8 +490,19 @@ export default function HomePage() {
               </div>
 
               <div
-                className="h-20 w-full rounded-t-lg"
-                style={{ backgroundColor: formData.background }}
+                className="h-32 w-full rounded-t-xl"
+                style={{
+                  background: formData.background.startsWith("linear-gradient")
+                    ? undefined
+                    : formData.background,
+                  backgroundImage: formData.background.startsWith(
+                    "linear-gradient"
+                  )
+                    ? formData.background
+                    : undefined,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                }}
               />
 
               <div className="p-6 space-y-4">
@@ -510,21 +526,30 @@ export default function HomePage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Màu nền
                   </label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {backgroundColors.map((color) => (
-                      <button
-                        key={color}
-                        onClick={() =>
-                          setFormData({ ...formData, background: color })
-                        }
-                        className={`w-12 h-8 rounded-lg border-2 ${
-                          formData.background === color
-                            ? "border-blue-500 ring-2 ring-blue-200"
-                            : "border-gray-300"
-                        }`}
-                        style={{ backgroundColor: color }}
-                      />
-                    ))}
+                  <div className="flex justify-center">
+                    <div className="grid grid-cols-4 gap-8">
+                      {backgroundColors.map((color) => (
+                        <button
+                          key={color}
+                          onClick={() =>
+                            setFormData({ ...formData, background: color })
+                          }
+                          className={`w-12 aspect-square rounded-lg border-2 transition-all duration-200 shadow-sm hover:shadow-md hover:scale-105 ${
+                            formData.background === color
+                              ? "border-blue-500 ring-2 ring-blue-200"
+                              : "border-gray-300"
+                          }`}
+                          style={{
+                            background: color.startsWith("linear-gradient")
+                              ? undefined
+                              : color,
+                            backgroundImage: color.startsWith("linear-gradient")
+                              ? color
+                              : undefined,
+                          }}
+                        />
+                      ))}
+                    </div>
                   </div>
                 </div>
 

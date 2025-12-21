@@ -840,7 +840,7 @@ export default function BoardDetail() {
     if (background?.startsWith("#")) return { backgroundColor: background };
     if (background)
       return {
-        backgroundImage: `url(${background})`,
+        backgroundImage: background,
         backgroundSize: "cover",
         backgroundPosition: "center",
       };

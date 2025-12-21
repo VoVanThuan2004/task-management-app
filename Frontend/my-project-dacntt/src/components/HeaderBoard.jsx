@@ -20,9 +20,12 @@ import {
   Check,
   Edit2,
   Trash2,
+  Globe,
+  Users,
+  Lock,
 } from "lucide-react";
-import { AnimatePresence } from "framer-motion";
 import { io } from "socket.io-client";
+import { motion as Motion, AnimatePresence } from "framer-motion";
 
 const HeaderBoard = ({
   board,
@@ -77,6 +80,56 @@ const HeaderBoard = ({
   const accessToken = localStorage.getItem("accessToken");
 
   const [boardMembers, setBoardMembers] = useState([]);
+
+  // Thêm vào đầu component HeaderBoard
+  const [boardVisibility, setBoardVisibility] = useState({
+    owner: false,
+    type: "private",
+  });
+  const [showVisibilityPopup, setShowVisibilityPopup] = useState(false);
+  const visibilityButtonRef = useRef(null);
+
+  // Fetch visibility khi mở board
+  useEffect(() => {
+    const fetchVisibility = async () => {
+      if (!board?._id || !accessToken) return;
+      try {
+        const res = await axios.get(
+          `${httpUrl}/api/v1/boards-visibility/${board._id}`,
+          {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          }
+        );
+        setBoardVisibility(res.data.data);
+      } catch (err) {
+        console.error("Lỗi lấy visibility:", err);
+      }
+    };
+
+    fetchVisibility();
+  }, [board?._id, accessToken]);
+
+  // Thay đổi visibility
+  const handleChangeVisibility = async (newType) => {
+    if (newType === boardVisibility.type) {
+      setShowVisibilityPopup(false);
+      return;
+    }
+
+    try {
+      await axios.put(
+        `${httpUrl}/api/v1/boards-visibility/${board._id}`,
+        { type: newType },
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+
+      setBoardVisibility((prev) => ({ ...prev, type: newType }));
+      // setShowVisibilityPopup(false);
+    } catch (err) {
+      console.log(err);
+      alert("Không thể thay đổi chế độ bảng");
+    }
+  };
 
   // Thêm useEffect để fetch thành viên
   useEffect(() => {
@@ -151,15 +204,6 @@ const HeaderBoard = ({
       }
     }
   };
-
-  // const handleInviteMember = async (email) => {
-  //   try {
-  //     console.log("Invite member:", email);
-  //     // await inviteMember(board._id, email);
-  //   } catch (error) {
-  //     console.error("Invite member error:", error);
-  //   }
-  // };
 
   // ===== UPDATE - DELETE BACKGROUND =====
   // Hàm xử lý chọn màu
@@ -306,21 +350,6 @@ const HeaderBoard = ({
         alert("Có lỗi xảy ra khi xóa background");
       }
     }
-  };
-
-  // Hàm lấy tên màu
-  const getColorName = (color) => {
-    const colorNames = {
-      "#026aa7": "Xanh dương",
-      "#d29034": "Cam",
-      "#519839": "Xanh lá",
-      "#b04632": "Đỏ",
-      "#89609e": "Tím",
-      "#cd5a91": "Hồng",
-      "#4bbf6b": "Xanh ngọc",
-      "#00aecc": "Xanh biển",
-    };
-    return colorNames[color] || color;
   };
 
   // ===== MỜI THÀNH VIÊN - CHIA SẺ BẢNG =====
@@ -714,7 +743,6 @@ const HeaderBoard = ({
           </h1>
         </div>
 
-        {/* Members List + Tooltip Skill - ĐẸP NHƯ CLICKUP 2025 */}
         <div className="flex items-center gap-6">
           {/* Chỉ hiện khi là thành viên */}
           {isMember && boardMembers.length > 0 && (
@@ -806,6 +834,25 @@ const HeaderBoard = ({
               >
                 <Filter size={18} className="text-gray-600" />
                 <span className="hidden sm:inline">Lọc</span>
+              </button>
+
+              <button
+                ref={visibilityButtonRef}
+                onClick={() => setShowVisibilityPopup(true)}
+                className={`flex items-center gap-2.5 px-5 py-2.5 rounded-xl font-medium text-white transition-all shadow-sm bg-orange-400 hover:bg-orange-500`}
+                title={
+                  boardVisibility.owner
+                    ? "Thay đổi chế độ bảng"
+                    : "Bạn không có quyền thay đổi"
+                }
+              >
+                <Globe size={18} />
+                <span className="hidden sm:inline">
+                  {boardVisibility.type === "private" && "Riêng tư"}
+                  {boardVisibility.type === "workspace" &&
+                    "Không gian làm việc"}
+                  {boardVisibility.type === "public" && "Công khai"}
+                </span>
               </button>
 
               <button
@@ -1564,11 +1611,11 @@ const HeaderBoard = ({
             </div>
 
             {/* Màu sắc mặc định */}
-            <div className="mb-6">
-              <h4 className="text-sm font-medium text-gray-700 mb-3">
-                Màu sắc
+            <div className="mb-8">
+              <h4 className="text-sm font-medium text-gray-700 mb-4">
+                Màu nền
               </h4>
-              <div className="grid grid-cols-8 gap-2">
+              <div className="grid grid-cols-6 gap-3">
                 {[
                   "#026aa7",
                   "#d29034",
@@ -1578,24 +1625,37 @@ const HeaderBoard = ({
                   "#cd5a91",
                   "#4bbf6b",
                   "#00aecc",
+
+                  // 4 gradient gộp vào chung
+                  "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                  "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
+                  "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
+                  "linear-gradient(135deg, #43cea2 0%, #185a9d 100%)",
                 ].map((color) => (
                   <button
                     key={color}
                     onClick={() => handleColorSelect(color)}
-                    className={`w-10 h-10 rounded-lg border-2 transition-all hover:scale-105 ${
+                    className={`w-full aspect-square rounded-xl border-4 transition-all duration-200 hover:scale-105 shadow-md ${
                       selectedColor === color ||
                       (!selectedColor && board?.background === color)
-                        ? "border-blue-500 ring-2 ring-blue-200"
+                        ? "border-blue-500 ring-4 ring-blue-200"
                         : "border-gray-300"
                     }`}
-                    style={{ backgroundColor: color }}
-                    title={getColorName(color)}
+                    style={{
+                      background: color.startsWith("linear-gradient")
+                        ? color
+                        : color,
+                    }}
+                    title={
+                      color.startsWith("linear-gradient")
+                        ? "Gradient"
+                        : "Màu đơn"
+                    }
                   />
                 ))}
               </div>
             </div>
 
-            {/* Upload ảnh */}
             {/* Upload ảnh */}
             <div className="mb-6">
               <h4 className="text-sm font-medium text-gray-700 mb-3">
@@ -2247,6 +2307,154 @@ const HeaderBoard = ({
           </div>
         )}
       </AnimatePresence>
+
+      {/* === POPUP CHẾ ĐỘ BẢNG - PHIÊN BẢN ĐƠN GIẢN (KHÔNG ANIMATION) === */}
+      {/* === POPUP CHẾ ĐỘ BẢNG - VỊ TRÍ NHƯ LỌC, MÀU BLUE === */}
+      {showVisibilityPopup && (
+        <>
+          {/* Overlay mờ - đóng khi click ngoài */}
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setShowVisibilityPopup(false)}
+          />
+
+          {/* Panel cố định vị trí như panel Lọc */}
+          <div className="fixed top-20 bottom-2 right-2 w-96 bg-white shadow-2xl border-l border-gray-200 z-50 flex flex-col  overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-gray-200 bg-gradient-to-br from-blue-50 to-indigo-50">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-blue-100 rounded-xl">
+                  <Globe className="w-7 h-7 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">
+                    Chế độ bảng
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Quyết định ai có thể xem và chỉnh sửa bảng này
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowVisibilityPopup(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
+
+            {/* Body - Scrollable */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+              {/* Private */}
+              <button
+                onClick={() =>
+                  boardVisibility.owner && handleChangeVisibility("private")
+                }
+                disabled={!boardVisibility.owner}
+                className={`w-full text-left p-5 rounded-2xl border-2 transition-all shadow-sm ${
+                  boardVisibility.type === "private"
+                    ? "border-blue-500 bg-blue-50 shadow-blue-100"
+                    : "border-gray-200 hover:border-gray-300 hover:shadow-md"
+                } ${
+                  !boardVisibility.owner ? "opacity-60 cursor-not-allowed" : ""
+                }`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-blue-100 rounded-xl flex-shrink-0">
+                    <Lock className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-semibold text-gray-900 text-lg">
+                      Riêng tư
+                    </p>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Chỉ thành viên được mời mới có thể xem và chỉnh sửa.
+                    </p>
+                  </div>
+                  {boardVisibility.type === "private" && (
+                    <Check className="w-6 h-6 text-blue-600 flex-shrink-0" />
+                  )}
+                </div>
+              </button>
+
+              {/* Workspace */}
+              <button
+                onClick={() =>
+                  boardVisibility.owner && handleChangeVisibility("workspace")
+                }
+                disabled={!boardVisibility.owner}
+                className={`w-full text-left p-5 rounded-2xl border-2 transition-all shadow-sm ${
+                  boardVisibility.type === "workspace"
+                    ? "border-blue-500 bg-blue-50 shadow-blue-100"
+                    : "border-gray-200 hover:border-gray-300 hover:shadow-md"
+                } ${
+                  !boardVisibility.owner ? "opacity-60 cursor-not-allowed" : ""
+                }`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-blue-100 rounded-xl flex-shrink-0">
+                    <Users className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-semibold text-gray-900 text-lg">
+                      Không gian làm việc
+                    </p>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Tất cả thành viên trong không gian làm việc đều có thể xem
+                      và chỉnh sửa.
+                    </p>
+                  </div>
+                  {boardVisibility.type === "workspace" && (
+                    <Check className="w-6 h-6 text-blue-600 flex-shrink-0" />
+                  )}
+                </div>
+              </button>
+
+              {/* Public */}
+              <button
+                onClick={() =>
+                  boardVisibility.owner && handleChangeVisibility("public")
+                }
+                disabled={!boardVisibility.owner}
+                className={`w-full text-left p-5 rounded-2xl border-2 transition-all shadow-sm ${
+                  boardVisibility.type === "public"
+                    ? "border-blue-500 bg-blue-50 shadow-blue-100"
+                    : "border-gray-200 hover:border-gray-300 hover:shadow-md"
+                } ${
+                  !boardVisibility.owner ? "opacity-60 cursor-not-allowed" : ""
+                }`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-blue-100 rounded-xl flex-shrink-0">
+                    <Globe className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-semibold text-gray-900 text-lg">
+                      Công khai
+                    </p>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Bất kỳ ai có liên kết đều có thể xem (không cần tài
+                      khoản).
+                    </p>
+                  </div>
+                  {boardVisibility.type === "public" && (
+                    <Check className="w-6 h-6 text-blue-600 flex-shrink-0" />
+                  )}
+                </div>
+              </button>
+
+              {/* Thông báo cho non-owner */}
+              {!boardVisibility.owner && (
+                <div className="mt-6 p-5 bg-blue-50 rounded-2xl text-center border border-blue-200">
+                  <p className="text-sm font-medium text-blue-800">
+                    Chỉ chủ sở hữu bảng mới có thể thay đổi chế độ xem.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 };

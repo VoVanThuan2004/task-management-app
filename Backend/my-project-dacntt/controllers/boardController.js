@@ -10,6 +10,7 @@ const { sendShareBoardEmail } = require("../config/mailConfig");
 const jwt = require("jsonwebtoken");
 const { ObjectId } = require("mongodb");
 const { sendRemoveFromBoardEmail } = require("../config/mailConfig");
+const emailQueue = require("../services/emailQueue");
 
 const createBoard = async (req, res) => {
   const userId = req.user.userId;
@@ -564,26 +565,29 @@ const shareBoard = async (req, res) => {
     }
 
     // 3️. Gửi email mời
-    const sharer = await User.findById(sharerId);
-    const invitedUsers = await User.find({ _id: { $in: userIds } });
+    // const inviterName = req.user.fullName;
+    // const invitedUsers = await User.find({ _id: { $in: userIds } });
 
     const frontendUrl = process.env.FE_URL;
     const boardLink = `${frontendUrl}/boards/${boardId}/${existingBoard.title}`;
 
-    for (const user of invitedUsers) {
-      // Giả lập gửi mail (chừa sẵn phần này để tích hợp sau)
-      console.log(
-        `[EMAIL MỜI] Gửi tới ${user.email} từ ${sharer.email} để tham gia bảng "${existingBoard.title}"`
-      );
+    // for (const user of invitedUsers) {
+    //   await sendShareBoardEmail(
+    //     user.email,
+    //     inviterName,
+    //     existingBoard.title,
+    //     message,
+    //     boardLink
+    //   );
+    // }
 
-      await sendShareBoardEmail(
-        user.email,
-        sharer.fullName,
-        existingBoard.title,
-        message,
-        boardLink
-      );
-    }
+    await emailQueue.add("shareBoardEmail", {
+      inviterName,
+      userIds,
+      boardLink,
+      boardTitle: existingBoard.title,
+      message,
+    });
 
     // Gửi lên Socket - thông báo realtime
 
@@ -709,7 +713,6 @@ const getBoardDetail = async (req, res) => {
       });
     }
   } catch (error) {
-    console.error("Lỗi getBoardDetail:", error);
     return res.status(500).json({
       status: "error",
       message: "Lỗi hệ thống: " + error,
@@ -882,7 +885,11 @@ const deleteBoardMember = async (req, res) => {
     });
 
     // 5. Gửi email thông báo đến thành viên đã xóa
-    await sendRemoveFromBoardEmail(user.email, board.title);
+    // await sendRemoveFromBoardEmail(user.email, board.title);
+    await emailQueue.add("removeMemberFromBoardEmail", {
+      email: user.email,
+      title: board.title,
+    });
 
     return res.status(200).json({
       status: "success",
@@ -901,6 +908,106 @@ const deleteBoardMember = async (req, res) => {
   }
 };
 
+const changeBoardVisibility = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const boardId = req.params.boardId;
+    if (!boardId) {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Thiếu boardId",
+      });
+    }
+
+    const { type } = req.body;
+    if (!type) {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Vui lòng nhập khả năng xem cần thay đổi",
+      });
+    }
+
+    // 1. Kiểm tra bảng làm việc
+    const board = await Board.findById(boardId);
+    if (!board) {
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Bảng làm việc không tồn tại",
+      });
+    }
+
+    // 2. Kiểm tra type có hợp lệ
+    if (type !== "private" && type !== "public" && type !== "workspace") {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Chế độ xem bảng không tồn tại",
+      });
+    }
+
+    // 3. Cập nhật type
+    board.type = type;
+    await board.save();
+
+    return res.status(200).json({
+      status: "success",
+      code: 200,
+      message: "Thay đổi khả năng xem của bảng thành công",
+      data: {
+        owner: userId === board.ownerId.toString(),
+        type,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      message: "Lỗi hệ thống: " + error,
+    });
+  }
+};
+
+async function getBoardVisibility(req, res) {
+  try {
+    const userId = req.user.userId;
+    const boardId = req.params.boardId;
+    if (!boardId) {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Thiếu boardId",
+      });
+    }
+
+    // 1. Kiểm tra bảng làm việc
+    const board = await Board.findById(boardId).lean();
+    if (!board) {
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Bảng làm việc không tồn tại",
+      });
+    }
+
+    return res.status(200).json({
+      status: "success",
+      code: 200,
+      message: "Khả năng xem của bảng làm việc",
+      data: {
+        owner: userId === board.ownerId.toString(),
+        type: board.type,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      message: "Lỗi hệ thống: " + error,
+    });
+  }
+}
+
 module.exports = {
   createBoard,
   updateBoard,
@@ -914,4 +1021,6 @@ module.exports = {
   getBoardDetail,
   getAllBoardMembers,
   deleteBoardMember,
+  changeBoardVisibility,
+  getBoardVisibility,
 };

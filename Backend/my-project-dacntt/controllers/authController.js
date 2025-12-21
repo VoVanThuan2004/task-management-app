@@ -12,6 +12,7 @@ const mongoose = require("mongoose");
 const { OAuth2Client } = require("google-auth-library");
 const client = new OAuth2Client(process.env.CLIENT_ID);
 const SocialAccount = require("../models/socialAccount");
+const emailQueue = require("../services/emailQueue");
 
 const login = async (req, res) => {
   const { email, password } = req.body;
@@ -134,7 +135,9 @@ const loginSocialAccount = async (req, res) => {
 
     // Lấy thông tin user từ google
     const email = payload.email;
-    const fullName = payload.name || `${payload.given_name || ""} ${payload.family_name || ""}`.trim();
+    const fullName =
+      payload.name ||
+      `${payload.given_name || ""} ${payload.family_name || ""}`.trim();
     const avatar = payload.avatar;
     const provider_user_id = payload.sub;
 
@@ -289,22 +292,9 @@ const registerAccount = async (req, res) => {
     }
 
     if (!user) {
-      // Tạo mã otp
-      const OTP = Math.floor(100000 + Math.random() * 900000).toString();
-      const OTPHashed = await bcrypt.hash(OTP, 10);
-
-      await User.create({
-        roleId: role._id,
-        email: email,
-        fullName: "",
-        password: "",
-        isActive: false,
-        resetOtp: OTPHashed,
-        resetOtpExpired: new Date(Date.now() + 5 * 60 * 1000), // 5 phút
+      await emailQueue.add("createAccountEmail", {
+        email,
       });
-
-      // Gửi email
-      await sendCreateAccount(email, OTP);
 
       return res.status(200).json({
         status: "success",
@@ -448,8 +438,11 @@ const recoveryPassword = async (req, res) => {
     user.resetOtpExpired = new Date(Date.now() + 5 * 60 * 1000); // 5 phút
     await user.save();
 
-    // gửi email
-    await sendRecoveryPassword(email, OTP);
+    // Gửi email - qua Redis queue
+    await emailQueue.add("recoveryPasswordEmail", {
+      email,
+      OTP,
+    });
 
     return res.status(200).json({
       status: "success",

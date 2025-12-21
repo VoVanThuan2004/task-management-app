@@ -1,10 +1,9 @@
 const { Queue, Worker } = require("bullmq");
 const { Redis } = require("ioredis");
-const ActivityLog = require("../models/activityLog");
-const User = require("../models/user");
 const { getIO } = require("../config/socket");
 const createActivityLogTask = require("../utils/createActivityLogTask");
 require("dotenv").config();
+const User = require("../models/user");
 
 // Kết nối Redis
 const connection = new Redis({
@@ -23,10 +22,11 @@ const activityLogQueue = new Queue("activityLogQueue", {
       type: "exponential",
       delay: 2000, // bắt đầu từ 2s, tăng gấp đôi mỗi lần
     },
-    removeOnComplete: 50, // giữ 50 job thành công gần nhất
-    removeOnFail: 100, // giữ 100 job thất bại để debug
+    removeOnComplete: 20, // giữ 50 job thành công gần nhất
+    removeOnFail: 30, // giữ 100 job thất bại để debug
   },
 });
+
 
 const worker = new Worker(
   "activityLogQueue",
@@ -74,7 +74,7 @@ const worker = new Worker(
       console.log(`Activity log job ${job.id} (${job.name}) thành công`);
     } catch (error) {
       console.error(`Activity log job ${job.id} thất bại:`, error.message);
-      throw error; // Quan trọng: phải throw để BullMQ biết job fail
+      throw error; 
     }
   },
   {

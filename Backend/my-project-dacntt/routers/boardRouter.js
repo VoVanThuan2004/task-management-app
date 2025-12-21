@@ -42,5 +42,11 @@ router.get("/api/v1/boards-member/:boardId", auth, boardController.getAllBoardMe
 // Xóa thành viên ra khỏi bảng làm việc
 router.delete("/api/v1/boards-member/:boardId/:userId", auth, boardController.deleteBoardMember);
 
+// Thay đổi khả năng xem bảng làm việc
+router.put("/api/v1/boards-visibility/:boardId", auth, boardController.changeBoardVisibility);
+
+// Lấy ra khả năng xem bảng làm việc hiện tại
+router.get("/api/v1/boards-visibility/:boardId", auth, boardController.getBoardVisibility);
+
 
 module.exports = router;
