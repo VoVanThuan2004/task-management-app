@@ -121,11 +121,10 @@ const updateTitleCheckItem = async (req, res) => {
     }
 
     // 1. Kiểm tra checklist-item
-    const checkItem = await CheckItem.findById(checkItemId)
-      .populate({
-        path: "taskId",
-        select: "boardId",
-      });
+    const checkItem = await CheckItem.findById(checkItemId).populate({
+      path: "taskId",
+      select: "boardId",
+    });
     if (!checkItem) {
       return res.status(404).json({
         status: "error",
@@ -206,6 +205,10 @@ const deleteCheckItem = async (req, res) => {
     const io = getIO();
     io.to(checkItem.taskId._id.toString()).emit("checkItemDeleted", {
       _id: checkItem._id,
+    });
+
+    io.to(checkItem.taskId.boardId.toString()).emit("totalCheckItemDeleted", {
+      taskId: checkItem.taskId._id,
     });
 
     // 4. Gửi qua queue Redis - cập nhật thông báo

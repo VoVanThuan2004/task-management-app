@@ -18,4 +18,7 @@ router.put("/api/v1/users", upload.single("avatar"), auth, userController.update
 // Tìm kiếm thông tin email user
 router.get("/api/v1/users/search", auth, userController.searchEmailUser);
 
+// Khóa - mở người dùng
+router.put("/api/v1/users/:userId/toggle-lock", auth, userController.toggleLockUser);
+
 module.exports = router;

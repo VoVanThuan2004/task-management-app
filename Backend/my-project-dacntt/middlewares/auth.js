@@ -1,9 +1,10 @@
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
+const redisClient = require("../config/redis");
 
 const SECRET_KEY = process.env.SECRET_KEY;
 
-module.exports = (req, res, next) => {
+module.exports = async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader) {
@@ -27,6 +28,18 @@ module.exports = (req, res, next) => {
   try {
     const decoded = jwt.verify(token, SECRET_KEY);
     req.user = decoded; // Gán vào req.user để dùng ở route khác
+
+    // Tích hợp Redis - kiểm tra tài khoản có khóa hay không
+    // const isBlacklisted = await redisClient.sIsMember("blacklisted_users", decoded.userId);
+    const isBlacklisted = await redisClient.sismember("blacklisted_users", decoded.userId);
+    if (isBlacklisted === 1) {
+      return res.status(401).json({
+        status: "error",
+        code: 401,
+        message: "Tài khoản người dùng đã bị khóa",
+      });
+    }
+
     next();
   } catch (error) {
     if (error.name === "TokenExpiredError") {
