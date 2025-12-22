@@ -385,7 +385,6 @@ export default function BoardDetail() {
     });
 
     socket.on("totalCheckItem", (data) => {
-      console.log(data);
       setColumns((prev) =>
         prev.map((col) => {
           const hasTask = col.tasks.some((t) => t._id === data.taskId);
@@ -398,6 +397,27 @@ export default function BoardDetail() {
                 ? {
                     ...t,
                     totalCheckItems: t.totalCheckItems + 1,
+                  }
+                : t
+            ),
+          };
+        })
+      );
+    });
+
+    socket.on("totalCheckItemDeleted", (data) => {
+      setColumns((prev) =>
+        prev.map((col) => {
+          const hasTask = col.tasks.some((t) => t._id === data.taskId);
+          if (!hasTask) return col;
+
+          return {
+            ...col,
+            tasks: col.tasks.map((t) =>
+              t._id === data.taskId
+                ? {
+                    ...t,
+                    totalCheckItems: t.totalCheckItems - 1,
                   }
                 : t
             ),
