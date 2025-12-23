@@ -14,6 +14,9 @@ import RecoveryPassword from "./pages/RecoveryPassword";
 import Register from "./pages/Register";
 import ProfilePage from "./pages/ProfilePage";
 import ChangePassword from "./pages/ChangePassword";
+import AdminPage from "./pages/admin/AdminPage";
+import PrivateRoute from "./components/PrivateRoutes";
+import UserPage from "./pages/admin/UserPage";
 
 function App() {
   return (
@@ -53,10 +56,20 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/change-password" element={<ChangePassword />} />
-
-            {/* <Route path="/recovery-password" element={<RecoveryPassword />} />
-            <Route path="/register" element={<RegisterPage />} /> */}
             <Route path="*" element={<Navigate to="/" replace />} />
+
+            {/* ADMIN */}
+            <Route
+              path="/admin"
+              element={
+                <PrivateRoute allowedRoles={["ADMIN"]}>
+                  <AdminPage />
+                </PrivateRoute>
+              }
+            >
+              <Route index element={<Navigate to="users" replace />} />
+              <Route path="users" element={<UserPage />} />
+            </Route>
           </Routes>
         </Router>
       </UserProvider>

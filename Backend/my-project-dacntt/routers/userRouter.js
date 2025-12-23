@@ -18,7 +18,15 @@ router.put("/api/v1/users", upload.single("avatar"), auth, userController.update
 // Tìm kiếm thông tin email user
 router.get("/api/v1/users/search", auth, userController.searchEmailUser);
 
+
+// ===== ADMIN ===== 
 // Khóa - mở người dùng
 router.put("/api/v1/users/:userId/toggle-lock", auth, userController.toggleLockUser);
+
+// Thêm người dùng
+router.post("/api/v1/users/admin", auth, upload.single("avatar"), userController.addUser);
+
+// Cập nhật người dùng
+router.put("/api/v1/users/admin/:userId", auth, upload.single("avatar"), userController.updateUserForAdmin);
 
 module.exports = router;

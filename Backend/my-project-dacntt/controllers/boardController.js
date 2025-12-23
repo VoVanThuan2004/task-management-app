@@ -1,15 +1,12 @@
 require("dotenv").config();
 const mongoose = require("mongoose");
 const Board = require("../models/board");
-const BoardPosition = require("../models/boardPosition");
 const BoardMember = require("../models/boardMember");
 const User = require("../models/user");
 const { getIO } = require("../config/socket");
 const cloudinary = require("../config/cloudinary");
-const { sendShareBoardEmail } = require("../config/mailConfig");
 const jwt = require("jsonwebtoken");
 const { ObjectId } = require("mongodb");
-const { sendRemoveFromBoardEmail } = require("../config/mailConfig");
 const emailQueue = require("../services/emailQueue");
 
 const createBoard = async (req, res) => {

@@ -6,7 +6,7 @@ function PrivateRoute({ children, allowedRoles }) {
   const location = useLocation();
 
   if (!token) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    return <Navigate to="/" state={{ from: location }} replace />;
   }
 
   try {
@@ -31,7 +31,7 @@ function PrivateRoute({ children, allowedRoles }) {
 
     // Kiểm tra role
     if (allowedRoles && !allowedRoles.includes(decoded.roleName)) {
-      return <Navigate to="/login" replace />;
+      return <Navigate to="/" replace />;
     }
 
     return children;
@@ -41,7 +41,7 @@ function PrivateRoute({ children, allowedRoles }) {
     localStorage.removeItem("refreshToken");
     localStorage.removeItem("userId");
     localStorage.removeItem("roleName");
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/" replace />;
   }
 }
 

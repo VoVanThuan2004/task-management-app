@@ -3,6 +3,7 @@ const Role = require("../models/role");
 const User = require("../models/user");
 const cloudinary = require("../config/cloudinary");
 const redisClient = require("../config/redis");
+const bcrypt = require("bcrypt");
 
 const getAllUsers = async (req, res) => {
   const roleName = req.user.roleName;
@@ -41,8 +42,6 @@ const getAllUsers = async (req, res) => {
       roleId: { $ne: role._id },
       ...searchCondition,
     };
-
-    
 
     const users = await User.aggregate([
       {
@@ -107,12 +106,11 @@ const getAllUsers = async (req, res) => {
                 avatar: 1,
                 isActive: 1,
                 totalBoards: 1,
+                createdAt: 1,
               },
             },
           ],
-          metadata: [
-            { $count: "totalUsers" },
-          ],
+          metadata: [{ $count: "totalUsers" }],
         },
       },
     ]);
@@ -334,10 +332,181 @@ const toggleLockUser = async (req, res) => {
   }
 };
 
+const addUser = async (req, res) => {
+  try {
+    if (req.user.roleName !== "ADMIN") {
+      await deleteUploadedFile(req.file);
+      return res.status(403).json({
+        status: "error",
+        code: 403,
+        message: "Không có quyền truy cập tài nguyên này",
+      });
+    }
+
+    const { email, fullName, password } = req.body;
+    if (!email || !fullName || !password) {
+      await deleteUploadedFile(req.file);
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Vui lòng nhập đầy đủ thông tin: email, fullName, password",
+      });
+    }
+
+    // 1. Xác thực email có tồn tại
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      await deleteUploadedFile(req.file);
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Email này đã tồn tại",
+      });
+    }
+
+    // 2. Kiểm tra password
+    if (password.length < 8) {
+      await deleteUploadedFile(req.file);
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Mật khẩu phải có ít nhất 8 ký tự",
+      });
+    }
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    const role = await Role.findOne({ roleName: "USER" }).select("_id").lean();
+    if (!role) {
+      await deleteUploadedFile(req.file);
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Vai trò không tồn tại",
+      });
+    }
+
+    // 3. Nếu có upload ảnh avatar
+    let avatar = null;
+    let avatarId = null;
+    if (req.file) {
+      avatar = req.file.path;
+      avatarId = req.file.filename;
+    }
+
+    // 4. Tạo người dùng
+    const newUser = await User.create({
+      roleId: role._id,
+      email,
+      fullName,
+      password: hashedPassword,
+      avatar,
+      avatarId,
+      isActive: true,
+    });
+
+    return res.status(201).json({
+      status: "success",
+      code: 201,
+      message: "Tạo tài khoản thành công",
+      data: {
+        _id: newUser._id,
+        email,
+        fullName,
+        avatar,
+        totalBoards: 0,
+        createdAt: newUser.createdAt,
+        isActive: newUser.isActive
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      code: 500,
+      message: "Lỗi hệ thống: " + error.message,
+    });
+  }
+};
+
+const updateUserForAdmin = async (req, res) => {
+  try {
+    if (req.user.roleName !== "ADMIN") {
+      await deleteUploadedFile(req.file);
+      return res.status(403).json({
+        status: "error",
+        code: 403,
+        message: "Không có quyền truy cập tài nguyên này",
+      });
+    }
+
+    const userId = req.params.userId;
+    if (!userId) {
+      await deleteUploadedFile(req.file);
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Thiếu tham số userId",
+      });
+    }
+
+    const { fullName } = req.body;
+    if (!fullName) {
+      await deleteUploadedFile(req.file);
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Vui lòng nhập thông tin fullName",
+      });
+    }
+
+    // 1. Xác thực người dùng có tồn tại
+    const existingUser = await User.findOne({ _id: userId });
+    if (!existingUser) {
+      await deleteUploadedFile(req.file);
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Người dùng không tồn tại",
+      });
+    }
+
+    // 2. Kiểm tra có upload ảnh avatar
+    if (req.file) {
+      if (existingUser.avatarId) {
+        await cloudinary.uploader.destroy(existingUser.avatarId);
+      }
+      existingUser.avatar = req.file.path;
+      existingUser.avatarId = req.file.filename;
+    }
+
+    // 3. Cập nhật người dùng
+    existingUser.fullName = fullName;
+    await existingUser.save();
+
+    return res.status(201).json({
+      status: "success",
+      code: 201,
+      message: "Cập nhật tài khoản thành công",
+      data: {
+        _id: existingUser._id,
+        fullName,
+        avatar: existingUser.avatar,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      code: 500,
+      message: "Lỗi hệ thống: " + error.message,
+    });
+  }
+};
+
 module.exports = {
   getAllUsers,
   getProfile,
   updateProfile,
   searchEmailUser,
   toggleLockUser,
+  addUser,
+  updateUserForAdmin,
 };
