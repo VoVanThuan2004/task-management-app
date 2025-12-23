@@ -443,6 +443,7 @@ const recoveryPassword = async (req, res) => {
       email,
       OTP,
     });
+    // await sendRecoveryPassword(email, OTP);
 
     return res.status(200).json({
       status: "success",
