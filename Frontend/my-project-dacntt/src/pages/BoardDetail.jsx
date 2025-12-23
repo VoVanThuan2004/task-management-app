@@ -7,6 +7,7 @@ import TaskModal from "../components/TaskModal";
 import HeaderBoard from "../components/HeaderBoard";
 import Column from "../components/Board/Column";
 import AddColumnButton from "../components/Board/AddColumnButton";
+import Snowfall from "react-snowfall";
 
 const httpUrl = import.meta.env.VITE_API_URL;
 
@@ -876,6 +877,23 @@ export default function BoardDetail() {
         isMember={isMember}
         socket={socket}
         onApplyFilters={fetchColumns}
+      />
+
+      {/* Tuyết rơi - phủ toàn màn hình, nhưng không che nội dung */}
+      <Snowfall
+        snowflakeCount={125} // số lượng tuyết (tùy chỉnh 100-300)
+        speed={[0.5, 2]} // tốc độ rơi chậm - nhanh
+        wind={[-0.5, 2]} // gió thổi nhẹ ngang
+        radius={[0.5, 4.0]} // kích thước tuyết nhỏ đến trung bình
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          pointerEvents: "none", // quan trọng: tuyết không block click chuột
+          zIndex: 1, // dưới header và nội dung chính
+        }}
       />
 
       <main className="flex-1 overflow-x-auto p-6" style={getBoardBackground()}>

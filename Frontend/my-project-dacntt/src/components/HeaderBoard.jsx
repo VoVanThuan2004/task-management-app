@@ -23,9 +23,11 @@ import {
   Globe,
   Users,
   Lock,
+  LogOutIcon
 } from "lucide-react";
 import { io } from "socket.io-client";
 import { motion as Motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 
 const HeaderBoard = ({
   board,
@@ -39,6 +41,7 @@ const HeaderBoard = ({
   const [showShareModal, setShowShareModal] = useState(false);
   const [showBackgroundModal, setShowBackgroundModal] = useState(false);
   const [showBoardSettings, setShowBoardSettings] = useState(false);
+  const navigate = useNavigate();
 
   // State update background
   const [selectedColor, setSelectedColor] = useState(null);
@@ -955,6 +958,14 @@ const HeaderBoard = ({
                           >
                             <Archive size={18} className="text-red-600" />
                             <span>Lưu trữ bảng</span>
+                          </button>
+
+                          <button
+                            onClick={() => navigate("/home")}
+                            className="flex items-center gap-3 w-full px-5 py-3.5 text-red-600 hover:bg-red-50 transition-all font-medium"
+                          >
+                            <LogOutIcon size={18} className="text-red-600" />
+                            <span>Thoát</span>
                           </button>
                         </div>
                       </div>
