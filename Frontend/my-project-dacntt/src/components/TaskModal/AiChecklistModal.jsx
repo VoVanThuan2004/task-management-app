@@ -5,7 +5,15 @@ import ManualAdd from "./ManualAdd";
 
 const httpUrl = import.meta.env.VITE_API_URL;
 
-export default function AiChecklistModal({ taskId, accessToken, onClose, onSaved, initialTitle = "", initialDescription = "" }) {
+export default function AiChecklistModal({
+  taskId,
+  accessToken,
+  onClose,
+  onSaved,
+  initialTitle = "",
+  initialDescription = "",
+  boardId,
+}) {
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState(null);
   const [title, setTitle] = useState("");
@@ -14,19 +22,44 @@ export default function AiChecklistModal({ taskId, accessToken, onClose, onSaved
   const generate = async () => {
     setLoading(true);
     setError(null);
+
+    // Gọi api lấy danh sách thành viên
+    let fetchedMembers = [];
+    try {
+      const res = await axios.get(
+        `${httpUrl}/api/v1/boards-member/${boardId}/AI`,
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }
+      );
+
+      fetchedMembers = res.data.data; // ← Lưu vào biến local
+    } catch (error) {
+      console.log(error);
+      setError("Không thể tải danh sách thành viên");
+      setLoading(false);
+      return;
+    }
+
     try {
       const payload = {
         // Send current task title/description so AI can base suggestion on it
         title: initialTitle || "",
         description: initialDescription || "",
-        users: [],
+        users: fetchedMembers,
         taskId,
       };
 
-      const res = await axios.post(`${httpUrl}/api/ai/generate-checklist`, payload, {
-        timeout: 60000,
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+      console.log("Payload gửi AI:", payload);
+
+      const res = await axios.post(
+        `${httpUrl}/api/ai/generate-checklist`,
+        payload,
+        {
+          timeout: 60000,
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }
+      );
 
       // Expect AI returns { title, items: [{ title, assignedTo, position, dueDate }] }
       const data = res.data || {};
@@ -34,33 +67,52 @@ export default function AiChecklistModal({ taskId, accessToken, onClose, onSaved
 
       // Title: prefer the current task title (initialTitle) so UI doesn't replace it unexpectedly.
       // If you want AI title instead, swap the order.
-      setTitle(initialTitle || data.title || data.checklist_text || "Checklist đề xuất");
+      setTitle(
+        initialTitle || data.title || data.checklist_text || "Checklist đề xuất"
+      );
 
-      // Normalize items from possible response shapes: data.items, data.checklist_items, data.checklistItems
-      const rawItems = data.items || data.checklist_items || data.checklistItems || [];
+      // Lấy danh sách các mục (string)
+      const rawItems = data.checklist_items || [];
+      if (!Array.isArray(rawItems) || rawItems.length === 0) {
+        setError("AI không trả về mục nào.");
+        setItems([]);
+        return;
+      }
 
-      // rawItems may be array of strings or array of objects
-      const normalized = Array.isArray(rawItems)
-        ? rawItems.map((it) => {
-            if (!it) return null;
-            if (typeof it === "string") return { title: it };
-            if (typeof it === "object") {
-              // if object has text field names
-              return {
-                title: it.title || it.text || it.name || it.checklist_text || "(Mục)",
-                assignedTo: it.assignedTo || it.assignee || null,
-                position: typeof it.position === "number" ? it.position : undefined,
-                dueDate: it.dueDate || it.deadline || null,
-              };
-            }
-            return null;
-          }).filter(Boolean)
-        : [];
+      // Tạo map: item title → thông tin người được gán + skills
+      const assignmentMap = new Map();
+      if (Array.isArray(data.assignments)) {
+        data.assignments.forEach((ass) => {
+          if (ass.item && ass.assigned_to) {
+            // Lấy skills từ danh sách users gốc (fetchedMembers)
+            const user = fetchedMembers.find(
+              (u) => u.id === ass.assigned_to.id
+            );
+            const skills = user?.skills || [];
+
+            assignmentMap.set(ass.item.trim(), {
+              name: ass.assigned_to.name,
+              skills: skills, // array skills thực tế của user đó
+            });
+          }
+        });
+      }
+
+      // Normalize items để hiển thị
+      const normalized = rawItems.map((itemTitle, index) => {
+        const title =
+          typeof itemTitle === "string" ? itemTitle.trim() : "(Mục)";
+        const assigned = assignmentMap.get(title);
+
+        return {
+          title,
+          assignedName: assigned?.name || null,
+          assignedSkills: assigned?.skills || [], // array string
+          position: index,
+        };
+      });
 
       setItems(normalized);
-      if (normalized.length === 0) {
-        setError("AI không trả về mục nào. Bạn có thể thêm mục thủ công bên dưới.");
-      }
     } catch (err) {
       console.error("AI generate error", err);
       setError("Không thể liên hệ AI service");
@@ -82,9 +134,13 @@ export default function AiChecklistModal({ taskId, accessToken, onClose, onSaved
     setError(null);
     try {
       const payload = { taskId, title: title || "Checklist AI", items };
-      const res = await axios.post(`${httpUrl}/api/ai/save-checklist`, payload, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+      const res = await axios.post(
+        `${httpUrl}/api/ai/save-checklist`,
+        payload,
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }
+      );
 
       if (res.data && res.data.success) {
         // Backend returns created items under `items`.
@@ -104,67 +160,159 @@ export default function AiChecklistModal({ taskId, accessToken, onClose, onSaved
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-lg w-96 max-h-[80vh] overflow-auto p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold">Gợi ý việc cần làm (AI)</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-800">
-            <X className="w-4 h-4" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      {/* Backdrop */}
+      <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
+
+      {/* Modal */}
+      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header - Trắng sạch */}
+        <div className="flex items-center justify-between p-5 border-b">
+          <h3 className="text-lg font-semibold text-gray-900">
+            Gợi ý việc cần làm từ AI
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg hover:bg-gray-100 transition"
+            aria-label="Đóng"
+          >
+            <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
 
-        <div className="mb-3">
-          <div className="flex gap-2">
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {/* Nút hành động */}
+          <div className="flex gap-3 mb-6">
             <button
               onClick={generate}
-              className="px-3 py-1 bg-blue-600 text-white rounded disabled:opacity-50"
               disabled={loading}
+              className="px-5 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
             >
-              Sinh việc cần làm
+              {loading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Đang tạo...
+                </>
+              ) : (
+                "Sinh việc cần làm"
+              )}
             </button>
+
             <button
-              onClick={() => { setItems(null); setTitle(""); setError(null); }}
-              className="px-3 py-1 bg-gray-100 rounded"
+              onClick={() => {
+                setItems(null);
+                setTitle("");
+                setError(null);
+              }}
+              className="px-5 py-2.5 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition"
             >
               Làm lại
             </button>
           </div>
+
+          {/* Lỗi */}
+          {error && (
+            <div className="mb-5 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
+
+          {/* Nội dung chính */}
+          {items ? (
+            <div className="space-y-5">
+              {/* Tiêu đề checklist */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Tiêu đề task
+                </label>
+                <input
+                  type="text"
+                  value={title}
+                  // onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Nhập tiêu đề..."
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                />
+              </div>
+
+              {/* Danh sách công việc */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-800 mb-3">
+                  Các công việc đề xuất ({items.length})
+                </h4>
+
+                <div className="space-y-3">
+                  {items.length === 0 ? (
+                    <p className="text-center text-gray-500 py-6">
+                      Chưa có mục nào. Hãy thử sinh lại hoặc thêm thủ công.
+                    </p>
+                  ) : (
+                    items.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="p-4 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition"
+                      >
+                        <div className="font-medium text-gray-900 mb-2">
+                          {idx + 1}. {item.title}
+                        </div>
+
+                        {item.assignedName ? (
+                          <div className="flex flex-wrap gap-2">
+                            <span className="inline-flex items-center px-3 py-1 text-xs font-medium text-blue-800 bg-blue-100 rounded-full">
+                              {item.assignedName}
+                            </span>
+                            {item.assignedSkills.length > 0 && (
+                              <span className="inline-flex items-center px-3 py-1 text-xs text-gray-700 bg-gray-200 rounded-full">
+                                {item.assignedSkills.join(", ")}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-500">
+                            Chưa gán người thực hiện
+                          </span>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Thêm thủ công */}
+              <div className="pt-2">
+                <ManualAdd onAdd={addManualItem} />
+              </div>
+            </div>
+          ) : (
+            !loading && (
+              <div className="text-center py-12 text-gray-500">
+                <p className="mb-2 text-lg">Chưa có gợi ý nào</p>
+                <p className="text-sm">
+                  Nhấn "Sinh việc cần làm" để AI tạo danh sách công việc phù
+                  hợp.
+                </p>
+              </div>
+            )
+          )}
         </div>
 
-        {loading && <div className="py-6 text-center">Đang xử lý...</div>}
-
-        {error && <div className="text-red-600 mb-2">{error}</div>}
-
+        {/* Footer - Chỉ hiện khi có items */}
         {items && (
-          <div>
-            <div className="mb-2 text-sm text-gray-600">Tiêu đề</div>
-            <input value={title} onChange={(e)=>setTitle(e.target.value)} className="w-full px-2 py-1 border rounded mb-3" />
-
-            <div className="space-y-2">
-              {items.length === 0 && (
-                <div className="p-2 text-sm text-gray-600 italic">AI không tạo được mục nào.</div>
-              )}
-
-              {items.map((it, idx) => (
-                <div key={idx} className="p-2 border rounded">
-                  <div className="text-sm font-medium">{it.title}</div>
-                  <div className="text-xs text-gray-500">{it.assignedTo ? `Đề xuất: ${it.assignedTo}` : "Chưa gán"}</div>
-                </div>
-              ))}
-
-              {/* Manual add */}
-              <ManualAdd onAdd={addManualItem} />
-            </div>
-
-            <div className="mt-4 flex justify-end gap-2">
-              <button onClick={onClose} className="px-3 py-1 rounded border">Từ chối</button>
-              <button onClick={save} className="px-3 py-1 bg-green-600 text-white rounded" disabled={loading}>Chấp nhận & Lưu</button>
-            </div>
+          <div className="flex justify-end gap-3 p-5 border-t bg-gray-50">
+            <button
+              onClick={onClose}
+              className="px-5 py-2.5 text-gray-700 font-medium border border-gray-300 rounded-lg hover:bg-gray-100 transition"
+            >
+              Từ chối
+            </button>
+            <button
+              onClick={save}
+              disabled={loading}
+              className="px-5 py-2.5 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition"
+            >
+              Chấp nhận & Lưu
+            </button>
           </div>
-        )}
-
-        {!items && !loading && (
-          <div className="text-sm text-gray-600">Nhấn "Sinh việc cần làm" để lấy đề xuất từ AI.</div>
         )}
       </div>
     </div>

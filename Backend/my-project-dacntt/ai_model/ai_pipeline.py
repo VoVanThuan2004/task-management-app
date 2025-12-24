@@ -29,7 +29,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # bert_path = os.path.join(BASE_DIR, "suggest_skill_model")
 # t5_path   = os.path.join(BASE_DIR, "checklist_generator_model")
 bert_path = "kerodat2004/suggest-skill-bert"
-t5_path   = "checklist-generator-t5"
+t5_path   = "kerodat2004/checklist-generator-t5"
 
 
 # ============================================================

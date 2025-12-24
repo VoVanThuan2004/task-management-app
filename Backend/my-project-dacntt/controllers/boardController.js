@@ -562,7 +562,7 @@ const shareBoard = async (req, res) => {
     }
 
     // 3️. Gửi email mời
-    // const inviterName = req.user.fullName;
+    const inviterName = req.user.fullName;
     // const invitedUsers = await User.find({ _id: { $in: userIds } });
 
     const frontendUrl = process.env.FE_URL;
@@ -738,12 +738,6 @@ const getAllBoardMembers = async (req, res) => {
       });
     }
 
-    // 2. Lấy danh sách users có trong board-member
-    // const boardMembers = await BoardMember.find({ boardId: board._id }).populate({
-    //   path: "userId",
-    //   select: "email fullName avatar"
-    // });
-
     const boardMembers = await BoardMember.aggregate([
       {
         $match: { boardId: new ObjectId(boardId) },
@@ -802,6 +796,85 @@ const getAllBoardMembers = async (req, res) => {
               },
             },
           },
+        },
+      },
+    ]);
+
+    return res.status(200).json({
+      status: "success",
+      code: 200,
+      message: "Lấy danh sách thành viên trong bảng làm việc",
+      data: boardMembers,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      code: 500,
+      message: "Lỗi hệ thống: " + error,
+    });
+  }
+};
+
+const getAllBoardMembersForAI = async (req, res) => {
+  try {
+    const boardId = req.params.boardId;
+    if (!boardId) {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Thiếu boardId",
+      });
+    }
+
+    // 1. Query lấy ra danh sách users + skill
+    const boardMembers = await BoardMember.aggregate([
+      {
+        $match: {
+          boardId: new ObjectId(boardId),
+        },
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "userId",
+          foreignField: "_id",
+          as: "user",
+        },
+      },
+      {
+        $unwind: {
+          path: "$user",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $lookup: {
+          from: "userskills",
+          let: {
+            userId: "$userId",
+            boardId: "$boardId",
+          },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$userId", "$$userId"] },
+                    { $eq: ["$boardId", "$$boardId"] },
+                  ],
+                },
+              },
+            },
+          ],
+          as: "userskill",
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          id: "$user._id",
+          name: "$user.fullName",
+          skills: "$userskill.skill",
         },
       },
     ]);
@@ -1017,6 +1090,7 @@ module.exports = {
   shareBoard,
   getBoardDetail,
   getAllBoardMembers,
+  getAllBoardMembersForAI,
   deleteBoardMember,
   changeBoardVisibility,
   getBoardVisibility,

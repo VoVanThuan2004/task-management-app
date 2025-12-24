@@ -851,6 +851,7 @@ const TaskModal = ({
                         setAiCreatedItems(created || []);
                         onTaskUpdate && onTaskUpdate();
                       }}
+                      boardId={editedTask?.boardId}
                     />
                   )}
                 </AnimatePresence>

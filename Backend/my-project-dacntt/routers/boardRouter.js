@@ -39,6 +39,9 @@ router.get("/api/v1/boards-detail/:boardId", boardController.getBoardDetail);
 // Lấy danh sách thành viên member trong bảng làm việc
 router.get("/api/v1/boards-member/:boardId", auth, boardController.getAllBoardMembers);
 
+// Lấy danh sách thành viên member cho AI gán thành viên
+router.get("/api/v1/boards-member/:boardId/AI", auth, boardController.getAllBoardMembersForAI);
+
 // Xóa thành viên ra khỏi bảng làm việc
 router.delete("/api/v1/boards-member/:boardId/:userId", auth, boardController.deleteBoardMember);
 

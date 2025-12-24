@@ -605,8 +605,6 @@ export default function BoardDetail() {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
 
-      console.log("Columns data from API:", res.data.data); // DEBUG
-
       const sortedColumns = (res.data.data || [])
         .sort((a, b) => a.position - b.position)
         .map((col) => {
