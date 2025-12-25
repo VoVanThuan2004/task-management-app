@@ -212,6 +212,21 @@ const CheckItemsSection = React.memo(
         );
       };
 
+      const handleUpdateAssignMember = (data) => {
+        setCheckItems((prev) =>
+          prev.map((item) =>
+            item._id === data._id
+              ? {
+                  ...item,
+                  assignedTo: data.assignedTo,
+                  fullName: data.fullName,
+                  avatar: data.avatar,
+                }
+              : item
+          )
+        );
+      };
+
       socket.on("checkItemAdded", handleAdded);
       socket.on("checkItemTitleUpdated", handleTitleUpdated);
       socket.on("checkItemCompleted", handleCompleted);
@@ -220,6 +235,7 @@ const CheckItemsSection = React.memo(
       socket.on("deadlineCheckItem", handleDeadlineUpdated);
       socket.on("checkItemNearDeadline", handleUpdateStatusDeadline);
       socket.on("checkItemOverdue", handleUpdateStatusDeadline);
+      socket.on("assingedToCheckItem", handleUpdateAssignMember);
 
       return () => {
         socket.off("checkItemAdded", handleAdded);
@@ -230,6 +246,7 @@ const CheckItemsSection = React.memo(
         socket.off("deadlineCheckItem", handleDeadlineUpdated);
         socket.off("checkItemNearDeadline", handleUpdateStatusDeadline);
         socket.off("checkItemOverdue", handleUpdateStatusDeadline);
+        socket.off("assingedToCheckItem", handleUpdateAssignMember);
       };
     }, [socket, taskId]);
 
@@ -730,7 +747,7 @@ const CheckItemsSection = React.memo(
                             <div className="flex items-center gap-4 mt-2">
                               {assignee && (
                                 <div className="flex items-center gap-1">
-                                  <Avatar user={assignee} size="sm" />
+                                  <Avatar user={assignee} size="w-10 h-10" />
                                   <span className="text-xs font-medium text-gray-700 truncate max-w-32">
                                     {assignee.fullName}
                                   </span>

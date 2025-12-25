@@ -746,21 +746,21 @@ const assignCheckItem = async (req, res) => {
     // 3. Cập nhật socket
     const io = getIO();
     io.to(checkItem.taskId.toString()).emit("assingedToCheckItem", {
-      checkItem,
-      userId: userId,
+      _id: checkItem._id,
+      assignedTo: userId,
       avatar: user.avatar,
       fullName: user.fullName,
     });
 
     // 4. Gửi email thông báo
     const fullName = req.user.fullName;
-    await sendAssignCheckItemEmail(
-      user.email,
-      fullName,
-      task.boardId.title,
-      task.title,
-      checkItem.title
-    );
+    // await sendAssignCheckItemEmail(
+    //   user.email,
+    //   fullName,
+    //   task.boardId.title,
+    //   task.title,
+    //   checkItem.title
+    // );
 
     return res.status(200).json({
       status: "success",

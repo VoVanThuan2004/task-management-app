@@ -91,6 +91,7 @@ export default function AiChecklistModal({
             const skills = user?.skills || [];
 
             assignmentMap.set(ass.item.trim(), {
+              id: ass.assigned_to.id,
               name: ass.assigned_to.name,
               skills: skills, // array skills thực tế của user đó
             });
@@ -106,12 +107,14 @@ export default function AiChecklistModal({
 
         return {
           title,
+          assignedTo: assigned?.id || null,
           assignedName: assigned?.name || null,
           assignedSkills: assigned?.skills || [], // array string
           position: index,
         };
       });
 
+      console.log("Items: ", normalized);
       setItems(normalized);
     } catch (err) {
       console.error("AI generate error", err);
@@ -229,7 +232,6 @@ export default function AiChecklistModal({
                 <input
                   type="text"
                   value={title}
-                  // onChange={(e) => setTitle(e.target.value)}
                   placeholder="Nhập tiêu đề..."
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
                 />

@@ -1,57 +1,10 @@
-// const express = require("express");
-// const axios = require("axios");
-// const router = express.Router();
-
-// router.post("/generate-checklist", async (req, res) => {
-//   try {
-//     const response = await axios.post(
-//       "http://localhost:8001/run", // vì Node chạy ngoài Docker
-//       req.body,
-//       { timeout: 60000 }
-//     );
-//     res.json(response.data);
-//   } catch (err) {
-//     console.error("AI ERROR:", err.message);
-//     res.status(500).json({ error: "AI service failed" });
-//   }
-// });
-
-// module.exports = router;
-
-// clean text 
-
-// const express = require("express");
-// const axios = require("axios");
-// const router = express.Router();
-// const cleanText = require("../utils/cleanText");
-
-// router.post("/generate-checklist", async (req, res) => {
-//   try {
-//     const cleanPayload = {
-//       title: cleanText(req.body.title),
-//       description: cleanText(req.body.description),
-//       users: req.body.users
-//     };
-
-//     const response = await axios.post(
-//       "http://localhost:8001/run",
-//       cleanPayload,
-//       { timeout: 60000 }
-//     );
-
-//     res.json(response.data);
-//   } catch (err) {
-//     console.error("AI ERROR:", err.response?.data || err.message);
-//     res.status(500).json({ error: "AI service failed" });
-//   }
-// });
-
-// module.exports = router;
-
 const express = require("express");
 const axios = require("axios");
 const cleanText = require("../utils/cleanText");
-
+const CheckItem = require("../models/checkItem");
+const { getIO } = require("../config/socket");
+const Task = require("../models/task");
+const assignCheckItemQueue = require("../services/assignCheckItemQueue");
 const router = express.Router();
 
 router.post("/generate-checklist", async (req, res) => {
@@ -59,7 +12,7 @@ router.post("/generate-checklist", async (req, res) => {
     const cleanPayload = {
       title: cleanText(req.body.title),
       description: cleanText(req.body.description),
-      users: req.body.users || []
+      users: req.body.users || [],
     };
 
     const response = await axios.post(
@@ -78,13 +31,24 @@ router.post("/generate-checklist", async (req, res) => {
 // Endpoint to save generated items to CheckItem when user accepts
 router.post("/save-checklist", async (req, res) => {
   try {
-    const CheckItem = require("../models/checkItem");
-    const { getIO } = require("../config/socket");
-
     const { taskId, title, items } = req.body;
 
     if (!taskId) {
-      return res.status(400).json({ error: "taskId is required" });
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "taskId is required",
+      });
+    }
+
+    // Kiểm tra task
+    const task = await Task.findById(taskId).lean();
+    if (!task) {
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Task không tồn tại",
+      });
     }
 
     // Create check items directly under the task
@@ -108,6 +72,16 @@ router.post("/save-checklist", async (req, res) => {
             ...it.toObject(),
             taskId,
           });
+          io.to(task.boardId.toString()).emit("totalCheckItem", {
+            taskId,
+          });
+
+          // Kiểm tra item có gán user - nếu có update socket user được gán
+          if (it.assignedTo) {
+            assignCheckItemQueue.add("assignCheckItemAI", {
+              checkItem: it.toObject(),
+            });
+          }
         });
       } catch (e) {
         console.warn("Socket emit failed:", e.message);
