@@ -39,6 +39,9 @@ router.delete("/api/v1/tasks-attachment/:attachmentId", auth, taskController.del
 // Lấy thông tin chi tiết task
 router.get("/api/v1/tasks/:taskId", auth, taskController.getTaskDetail);
 
+// Lấy gợi ý độ ưu tiên task (AI)
+router.get("/api/v1/tasks/:taskId/priority", auth, taskController.getPrioritySuggestion);
+
 // Đánh dấu hoàn thành - chưa hoàn thành task
 router.put("/api/v1/tasks/:taskId/toggle", auth, taskController.toggleTask);
 

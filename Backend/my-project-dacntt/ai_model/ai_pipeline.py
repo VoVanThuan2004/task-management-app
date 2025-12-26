@@ -330,7 +330,7 @@ def run_pipeline(task_title: str, task_description: str, users: List[Dict[str, A
     items = parse_checklist(checklist_text)
     weights = [auto_weight(x) for x in items]
 
-    # ✅ TRƯỜNG HỢP CHƯA CÓ USER
+    #  TRƯỜNG HỢP CHƯA CÓ USER
     if not users:
         return {
             "task": {"title": task_title, "description": task_description},
@@ -342,7 +342,7 @@ def run_pipeline(task_title: str, task_description: str, users: List[Dict[str, A
             "final_load": {}
         }
 
-    # ✅ CÓ USER → ASSIGN
+    #  CÓ USER → ASSIGN
     assigned, final_load = assign_items_to_users(
         items, cat, users, weights
     )

@@ -27,9 +27,18 @@ const CheckItemsSection = React.memo(
     socket,
     isReadOnly = false,
     aiCreatedItems = null,
+    onProgressChange, // New prop
   }) => {
     const [checkItems, setCheckItems] = useState([]);
     const [newTitle, setNewTitle] = useState("");
+
+    // Notify parent about progress
+    useEffect(() => {
+      if (onProgressChange) {
+        const completed = checkItems.filter(i => i.isCompleted).length;
+        onProgressChange(checkItems.length, completed);
+      }
+    }, [checkItems, onProgressChange]);
     const [isAdding, setIsAdding] = useState(false);
     const [loading, setLoading] = useState(false);
 
@@ -194,11 +203,11 @@ const CheckItemsSection = React.memo(
           prev.map((item) =>
             item._id === data._id
               ? {
-                  ...item,
-                  startDate: data.startDate || null,
-                  dueDate: data.dueDate || null,
-                  status: data.status || null,
-                }
+                ...item,
+                startDate: data.startDate || null,
+                dueDate: data.dueDate || null,
+                status: data.status || null,
+              }
               : item
           )
         );
@@ -217,11 +226,11 @@ const CheckItemsSection = React.memo(
           prev.map((item) =>
             item._id === data._id
               ? {
-                  ...item,
-                  assignedTo: data.assignedTo,
-                  fullName: data.fullName,
-                  avatar: data.avatar,
-                }
+                ...item,
+                assignedTo: data.assignedTo,
+                fullName: data.fullName,
+                avatar: data.avatar,
+              }
               : item
           )
         );
@@ -438,11 +447,11 @@ const CheckItemsSection = React.memo(
           prev.map((item) =>
             item._id === itemId
               ? {
-                  ...item,
-                  startDate: updatedItem.startDate || null,
-                  dueDate: updatedItem.dueDate || null,
-                  status: updatedItem.status || null,
-                }
+                ...item,
+                startDate: updatedItem.startDate || null,
+                dueDate: updatedItem.dueDate || null,
+                status: updatedItem.status || null,
+              }
               : item
           )
         );
@@ -537,11 +546,11 @@ const CheckItemsSection = React.memo(
           prev.map((i) =>
             i._id === checkItemId
               ? {
-                  ...i,
-                  assignedTo: updatedItem.checkItem?.assignedTo || null,
-                  fullName: updatedItem.fullName || null,
-                  avatar: updatedItem.avatar || null,
-                }
+                ...i,
+                assignedTo: updatedItem.checkItem?.assignedTo || null,
+                fullName: updatedItem.fullName || null,
+                avatar: updatedItem.avatar || null,
+              }
               : i
           )
         );
@@ -584,11 +593,11 @@ const CheckItemsSection = React.memo(
           prev.map((i) =>
             i._id === checkItemId
               ? {
-                  ...i,
-                  assignedTo: null,
-                  fullName: null,
-                  avatar: null,
-                }
+                ...i,
+                assignedTo: null,
+                fullName: null,
+                avatar: null,
+              }
               : i
           )
         );
@@ -625,9 +634,8 @@ const CheckItemsSection = React.memo(
             <div className="flex items-center gap-2 text-sm">
               <div className="w-32 bg-gray-200 rounded-full h-2">
                 <div
-                  className={`h-2 rounded-full transition-all duration-300 ${
-                    progress === 100 ? "bg-green-500" : "bg-blue-500"
-                  }`}
+                  className={`h-2 rounded-full transition-all duration-300 ${progress === 100 ? "bg-green-500" : "bg-blue-500"
+                    }`}
                   style={{ width: `${progress}%` }}
                 />
               </div>
@@ -650,10 +658,10 @@ const CheckItemsSection = React.memo(
                 {checkItems.map((item, index) => {
                   const assignee = item.assignedTo
                     ? {
-                        _id: item.assignedTo,
-                        fullName: item.fullName || "Unknown",
-                        avatar: item.avatar,
-                      }
+                      _id: item.assignedTo,
+                      fullName: item.fullName || "Unknown",
+                      avatar: item.avatar,
+                    }
                     : null;
 
                   const isDatePickerOpen = datePickerOpenFor === item._id;
@@ -669,11 +677,10 @@ const CheckItemsSection = React.memo(
                         <div
                           ref={provided.innerRef}
                           {...provided.draggableProps}
-                          className={`group flex items-center gap-3 p-3 rounded-lg bg-gray-50 transition-all relative ${
-                            snapshot.isDragging
+                          className={`group flex items-center gap-3 p-3 rounded-lg bg-gray-50 transition-all relative ${snapshot.isDragging
                               ? "shadow-lg bg-white ring-2 ring-blue-400 z-50"
                               : "hover:bg-gray-100"
-                          }`}
+                            }`}
                         >
                           {/* Drag handle */}
                           {!isReadOnly && (
@@ -689,11 +696,10 @@ const CheckItemsSection = React.memo(
                           <button
                             onClick={() => toggleComplete(item._id)}
                             disabled={isReadOnly}
-                            className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                              item.isCompleted
+                            className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${item.isCompleted
                                 ? "bg-green-500 border-green-500"
                                 : "border-gray-300 bg-white"
-                            }`}
+                              }`}
                           >
                             {item.isCompleted && (
                               <Check className="w-3 h-3 text-white" />
@@ -729,15 +735,13 @@ const CheckItemsSection = React.memo(
                                   setEditingCheckItemId(item._id);
                                   setEditingTitle(item.title);
                                 }}
-                                className={`text-sm font-medium break-words cursor-text select-text ${
-                                  item.isCompleted
+                                className={`text-sm font-medium break-words cursor-text select-text ${item.isCompleted
                                     ? "line-through text-gray-500"
                                     : "text-gray-800"
-                                } ${
-                                  !isReadOnly
+                                  } ${!isReadOnly
                                     ? "hover:bg-gray-200 px-2 -mx-2 py-1 rounded transition"
                                     : ""
-                                }`}
+                                  }`}
                               >
                                 {item.title}
                               </p>
@@ -801,11 +805,10 @@ const CheckItemsSection = React.memo(
                                   {/* Chỉ hiển thị status nếu CHƯA hoàn thành */}
                                   {!item.isCompleted && item.status && (
                                     <span
-                                      className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium ${
-                                        item.status === "Quá hạn"
+                                      className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium ${item.status === "Quá hạn"
                                           ? "bg-red-100 text-red-800"
                                           : "bg-amber-100 text-amber-800"
-                                      }`}
+                                        }`}
                                     >
                                       {item.status}
                                     </span>
@@ -935,11 +938,11 @@ const CheckItemsSection = React.memo(
                                   minDate={
                                     selectedStartDate
                                       ? new Date(
-                                          Math.max(
-                                            selectedStartDate.getTime(),
-                                            new Date().getTime()
-                                          )
+                                        Math.max(
+                                          selectedStartDate.getTime(),
+                                          new Date().getTime()
                                         )
+                                      )
                                       : new Date()
                                   }
                                 />
@@ -1005,13 +1008,13 @@ const CheckItemsSection = React.memo(
                                   parseInt(selectedStartTime.hour),
                                   parseInt(selectedStartTime.minute)
                                 ) >=
-                                  new Date(
-                                    selectedDueDate.getFullYear(),
-                                    selectedDueDate.getMonth(),
-                                    selectedDueDate.getDate(),
-                                    parseInt(selectedDueTime.hour),
-                                    parseInt(selectedDueTime.minute)
-                                  ) && (
+                                new Date(
+                                  selectedDueDate.getFullYear(),
+                                  selectedDueDate.getMonth(),
+                                  selectedDueDate.getDate(),
+                                  parseInt(selectedDueTime.hour),
+                                  parseInt(selectedDueTime.minute)
+                                ) && (
                                   <div className="mb-4 p-2 bg-red-50 border border-red-200 rounded text-red-600 text-xs">
                                     Thời gian bắt đầu phải nhỏ hơn thời gian hết
                                     hạn
@@ -1052,13 +1055,13 @@ const CheckItemsSection = React.memo(
                                         parseInt(selectedStartTime.hour),
                                         parseInt(selectedStartTime.minute)
                                       ) >=
-                                        new Date(
-                                          selectedDueDate.getFullYear(),
-                                          selectedDueDate.getMonth(),
-                                          selectedDueDate.getDate(),
-                                          parseInt(selectedDueTime.hour),
-                                          parseInt(selectedDueTime.minute)
-                                        ))
+                                      new Date(
+                                        selectedDueDate.getFullYear(),
+                                        selectedDueDate.getMonth(),
+                                        selectedDueDate.getDate(),
+                                        parseInt(selectedDueTime.hour),
+                                        parseInt(selectedDueTime.minute)
+                                      ))
                                   }
                                   className="px-4 py-2 text-sm bg-orange-400 text-white rounded hover:bg-orange-500 disabled:opacity-50"
                                 >
@@ -1088,11 +1091,10 @@ const CheckItemsSection = React.memo(
 
                               {/* Danh sách thành viên */}
                               <div
-                                className={`space-y-3 ${
-                                  loading
+                                className={`space-y-3 ${loading
                                     ? "opacity-50 pointer-events-none"
                                     : ""
-                                }`}
+                                  }`}
                               >
                                 {boardMembers.map((member) => {
                                   const isAssigned =
@@ -1108,20 +1110,18 @@ const CheckItemsSection = React.memo(
                                           member._id
                                         )
                                       }
-                                      className={`relative p-4 rounded-xl transition-all border ${
-                                        isAssigned
+                                      className={`relative p-4 rounded-xl transition-all border ${isAssigned
                                           ? "bg-orange-50 border-orange-200 shadow-sm cursor-default"
                                           : "cursor-pointer hover:bg-gray-50 hover:shadow-md hover:border-blue-200 border-transparent"
-                                      } ${loading ? "cursor-not-allowed" : ""}`}
+                                        } ${loading ? "cursor-not-allowed" : ""}`}
                                     >
                                       {/* Nội dung thành viên giữ nguyên */}
                                       <div className="flex items-start gap-3">
                                         <div
-                                          className={`flex-shrink-0 rounded-full overflow-hidden ring-3 ${
-                                            isAssigned
+                                          className={`flex-shrink-0 rounded-full overflow-hidden ring-3 ${isAssigned
                                               ? "ring-orange-400 w-12 h-12"
                                               : "ring-transparent hover:ring-blue-400 w-11 h-11"
-                                          } transition-all`}
+                                            } transition-all`}
                                         >
                                           <Avatar
                                             user={member}
@@ -1153,11 +1153,10 @@ const CheckItemsSection = React.memo(
                                               {member.skills.map((s) => (
                                                 <span
                                                   key={s._id}
-                                                  className={`inline-block px-3 py-1.5 text-xs font-medium rounded-full ${
-                                                    isAssigned
+                                                  className={`inline-block px-3 py-1.5 text-xs font-medium rounded-full ${isAssigned
                                                       ? "text-amber-800 bg-amber-200"
                                                       : "text-blue-800 bg-blue-100"
-                                                  }`}
+                                                    }`}
                                                 >
                                                   {s.skill}
                                                 </span>
@@ -1235,11 +1234,10 @@ const CheckItemsSection = React.memo(
                                 <button
                                   onClick={() => closeMembersPopup()}
                                   disabled={loading}
-                                  className={`px-6 py-2.5 text-sm font-medium rounded-lg transition ${
-                                    loading
+                                  className={`px-6 py-2.5 text-sm font-medium rounded-lg transition ${loading
                                       ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                                       : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                                  }`}
+                                    }`}
                                 >
                                   Đóng
                                 </button>

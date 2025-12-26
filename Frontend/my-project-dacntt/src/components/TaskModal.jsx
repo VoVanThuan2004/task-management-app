@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import { io } from "socket.io-client";
-import { ClockIcon, UserIcon, TagIcon, X, UserPlus } from "lucide-react";
+import { ClockIcon, UserIcon, TagIcon, X, UserPlus, Sparkles } from "lucide-react";
 import TaskHeader from "./TaskModal/TaskHeader";
 import TaskDatePickerPopup from "./TaskModal/TaskDatePickerPopup";
 import TaskDescription from "./TaskModal/TaskDescription";
@@ -121,13 +121,13 @@ const TaskModal = ({
         setEditedTask((prev) =>
           prev
             ? {
-                ...prev,
-                startDate: data.startDate,
-                dueDate: data.dueDate,
-                status: data.status,
-                reminderEnabled: data.reminderEnabled,
-                reminderTime: data.reminderTime,
-              }
+              ...prev,
+              startDate: data.startDate,
+              dueDate: data.dueDate,
+              status: data.status,
+              reminderEnabled: data.reminderEnabled,
+              reminderTime: data.reminderTime,
+            }
             : null
         );
       }
@@ -617,6 +617,23 @@ const TaskModal = ({
     }
   };
 
+  const handleChecklistProgress = useCallback((total, completed) => {
+    setEditedTask((prev) => {
+      // Prevent unnecessary updates/loops
+      if (
+        prev?.totalCheckItems === total &&
+        prev?.totalCheckItemsCompleted === completed
+      ) {
+        return prev;
+      }
+      return {
+        ...prev,
+        totalCheckItems: total,
+        totalCheckItemsCompleted: completed,
+      };
+    });
+  }, []);
+
   if (!isOpen) return null;
 
   if (!editedTask) {
@@ -688,6 +705,8 @@ const TaskModal = ({
             transition={{ delay: 0.1, duration: 0.3 }}
           >
             <TaskHeader
+              taskId={editedTask._id}
+              isCompleted={editedTask.isCompleted}
               title={editedTask.title}
               isEditingTitle={isEditingTitle}
               onTitleChange={(e) =>
@@ -705,6 +724,8 @@ const TaskModal = ({
                 setEditedTask((prev) => ({ ...prev, dueDate: date }))
               }
               isReadOnly={isReadOnly}
+              totalCheckItems={editedTask.totalCheckItems}
+              completedCheckItems={editedTask.totalCheckItemsCompleted}
             />
           </Motion.div>
 
@@ -724,11 +745,10 @@ const TaskModal = ({
                   ref={dateButtonRef} // ← THÊM REF ĐỂ LẤY VỊ TRÍ
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className={`flex items-center gap-1 px-3 py-2 rounded text-sm transition ${
-                    isReadOnly
-                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                      : "bg-gray-100 hover:bg-gray-200"
-                  }`}
+                  className={`flex items-center gap-1 px-3 py-2 rounded text-sm transition ${isReadOnly
+                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                    : "bg-gray-100 hover:bg-gray-200"
+                    }`}
                   onClick={() => !isReadOnly && setShowPopup(true)} // ← mở popup, không toggle (tránh nháy)
                   disabled={isReadOnly}
                 >
@@ -740,11 +760,10 @@ const TaskModal = ({
                   ref={labelsButtonRef}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className={`flex items-center gap-1 px-3 py-2 rounded text-sm transition ${
-                    isReadOnly
-                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                      : "bg-gray-100 hover:bg-gray-200"
-                  }`}
+                  className={`flex items-center gap-1 px-3 py-2 rounded text-sm transition ${isReadOnly
+                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                    : "bg-gray-100 hover:bg-gray-200"
+                    }`}
                   onClick={() => !isReadOnly && fetchLabelsForTask()} // ← Dùng hàm mới
                   disabled={isReadOnly}
                 >
@@ -758,11 +777,10 @@ const TaskModal = ({
                   ref={membersButtonRef}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className={`flex items-center gap-1 px-3 py-2 rounded text-sm transition ${
-                    isReadOnly
-                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                      : "bg-gray-100 hover:bg-gray-200"
-                  }`}
+                  className={`flex items-center gap-1 px-3 py-2 rounded text-sm transition ${isReadOnly
+                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                    : "bg-gray-100 hover:bg-gray-200"
+                    }`}
                   onClick={() => !isReadOnly && handleOpenMembers()}
                   disabled={isReadOnly}
                 >
@@ -773,15 +791,15 @@ const TaskModal = ({
                 <Motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className={`flex items-center gap-1 px-3 py-2 rounded text-sm transition ${
-                    isReadOnly
-                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                      : "bg-gray-100 hover:bg-gray-200"
-                  }`}
+                  className={`flex items-center gap-1 px-3 py-2 rounded text-sm transition ${isReadOnly
+                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                    : "bg-gray-100 hover:bg-gray-200"
+                    }`}
                   onClick={() => !isReadOnly && setShowAiModal(true)}
                   disabled={isReadOnly}
                 >
-                  Gợi ý việc cần làm (AI)
+                  <Sparkles className="w-4 h-4 text-purple-600" />
+                  Gợi ý việc cần làm
                 </Motion.button>
 
                 {/* === POPUP THỜI GIAN – CHỈ HIỆN KHI ĐƯỢC PHÉP === */}
@@ -796,7 +814,7 @@ const TaskModal = ({
                       style={{
                         top: dateButtonRef.current
                           ? dateButtonRef.current.getBoundingClientRect()
-                              .bottom + 8
+                            .bottom + 8
                           : 0,
                         left: dateButtonRef.current
                           ? dateButtonRef.current.getBoundingClientRect().left
@@ -913,11 +931,11 @@ const TaskModal = ({
                         style={{
                           left: labelsButtonRef.current
                             ? labelsButtonRef.current.getBoundingClientRect()
-                                .left
+                              .left
                             : 0,
                           top: labelsButtonRef.current
                             ? labelsButtonRef.current.getBoundingClientRect()
-                                .bottom + 8
+                              .bottom + 8
                             : 0,
                         }}
                         // Quan trọng: ngăn sự kiện click lan ra overlay khi click vào popup
@@ -1020,18 +1038,17 @@ const TaskModal = ({
                         }}
                         className={`
             text-xs px-3 py-1 rounded font-medium
-            ${
-              label.color &&
-              label.color.toLowerCase() !== "#ffffff" &&
-              label.color.toLowerCase() !== "#fff"
-                ? `bg-[${label.color}] text-white shadow-sm` // Dùng màu custom từ DB cho nền
-                : "bg-gray-200 text-gray-700" // Màu mặc định nếu không có màu hoặc màu trắng
-            }
+            ${label.color &&
+                            label.color.toLowerCase() !== "#ffffff" &&
+                            label.color.toLowerCase() !== "#fff"
+                            ? `bg-[${label.color}] text-white shadow-sm` // Dùng màu custom từ DB cho nền
+                            : "bg-gray-200 text-gray-700" // Màu mặc định nếu không có màu hoặc màu trắng
+                          }
           `}
                         style={
                           label.color &&
-                          label.color.toLowerCase() !== "#ffffff" &&
-                          label.color.toLowerCase() !== "#fff"
+                            label.color.toLowerCase() !== "#ffffff" &&
+                            label.color.toLowerCase() !== "#fff"
                             ? { backgroundColor: label.color }
                             : {}
                         }
@@ -1166,15 +1183,14 @@ const TaskModal = ({
                       transition={{ delay: 0.25, duration: 0.3 }}
                       className={`
           inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium
-          ${
-            editedTask.isCompleted === true
-              ? "bg-green-100 text-green-700"
-              : editedTask.status === "Quá hạn"
-              ? "bg-red-100 text-red-700"
-              : editedTask.status === "Gần tới hạn"
-              ? "bg-yellow-100 text-yellow-700"
-              : "bg-gray-100 text-gray-700"
-          }
+          ${editedTask.isCompleted === true
+                          ? "bg-green-100 text-green-700"
+                          : editedTask.status === "Quá hạn"
+                            ? "bg-red-100 text-red-700"
+                            : editedTask.status === "Gần tới hạn"
+                              ? "bg-yellow-100 text-yellow-700"
+                              : "bg-gray-100 text-gray-700"
+                        }
         `}
                     >
                       {editedTask.isCompleted === true && (
@@ -1266,11 +1282,10 @@ const TaskModal = ({
                     <Motion.label
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
-                      className={`text-sm px-3 py-1.5 rounded transition-colors select-none cursor-pointer ${
-                        uploadingFile
-                          ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                          : "bg-gray-100 hover:bg-gray-200"
-                      }`}
+                      className={`text-sm px-3 py-1.5 rounded transition-colors select-none cursor-pointer ${uploadingFile
+                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                        : "bg-gray-100 hover:bg-gray-200"
+                        }`}
                     >
                       {uploadingFile ? "Đang tải lên..." : "Thêm"}
                       <input
@@ -1370,6 +1385,7 @@ const TaskModal = ({
                   socket={socket}
                   isReadOnly={isReadOnly}
                   aiCreatedItems={aiCreatedItems}
+                  onProgressChange={handleChecklistProgress}
                 />
               </Motion.div>
 
@@ -1423,13 +1439,12 @@ const TaskModal = ({
             animate={{ opacity: 1, x: 0, y: 0 }}
             exit={{ opacity: 0, x: 400, y: -20 }}
             transition={{ duration: 0.3, type: "spring", stiffness: 300 }}
-            className={`fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 max-w-sm ${
-              toast.type === "success"
-                ? "bg-green-500 text-white"
-                : toast.type === "error"
+            className={`fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 max-w-sm ${toast.type === "success"
+              ? "bg-green-500 text-white"
+              : toast.type === "error"
                 ? "bg-red-500 text-white"
                 : "bg-blue-500 text-white"
-            }`}
+              }`}
           >
             <div className="flex items-center gap-2">
               {toast.type === "success" && (

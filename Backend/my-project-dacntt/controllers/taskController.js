@@ -1,10 +1,12 @@
 const Task = require("../models/task");
+const axios = require("axios");
 const Column = require("../models/column");
 const Label = require("../models/label");
 const TaskLabel = require("../models/taskLabel");
 const Attachment = require("../models/attachment");
 const Comment = require("../models/comment");
 const Checklist = require("../models/checklist");
+const CheckItem = require("../models/checkItem");
 const { getIO } = require("../config/socket");
 const cloudinary = require("../config/cloudinary");
 const { ObjectId } = require("mongodb");
@@ -253,14 +255,19 @@ const getFullTaskWithTotals = async (taskId) => {
     },
   ]);
 
+  // Logic mới dùng CheckItem model
+  const totalItems = await CheckItem.countDocuments({ taskId: new ObjectId(taskId) });
+  const completedItems = await CheckItem.countDocuments({ taskId: new ObjectId(taskId), isCompleted: true });
+
   return {
     _id: task._id,
     title: task.title,
     position: task.position,
     isCompleted: task.isCompleted,
     dueDate: task.dueDate,
-    totalChecklists: checklists.length,
-    totalChecklistItems: checklists.reduce((sum, c) => sum + c.totalItems, 0),
+    totalChecklists: 1, // Dummy or legacy
+    totalCheckItems: totalItems,
+    totalCheckItemsCompleted: completedItems, // Add this field
     totalComments: comments.length,
     totalAttachments: attachments.length,
     taskLabels,
@@ -494,8 +501,7 @@ const updateDeadlineTask = async (req, res) => {
         { delay: nearDeadlineDelay, jobId: `${task._id}-nearDeadline` }
       );
       console.log(
-        `⏳ [markNearDeadline] Task ${task.title} (ID: ${
-          task._id
+        `⏳ [markNearDeadline] Task ${task.title} (ID: ${task._id
         }), dueDate: ${task.dueDate.toISOString()}, now: ${new Date(
           now
         ).toISOString()}, delay: ${nearDeadlineDelay} ms`
@@ -509,8 +515,7 @@ const updateDeadlineTask = async (req, res) => {
         { delay: overdueDelay, jobId: `${task._id}-overdue` }
       );
       console.log(
-        `⏳ [markOverdue] Task ${task.title} (ID: ${
-          task._id
+        `⏳ [markOverdue] Task ${task.title} (ID: ${task._id
         }), dueDate: ${task.dueDate.toISOString()}, now: ${new Date(
           now
         ).toISOString()}, delay: ${overdueDelay} ms`
@@ -728,9 +733,8 @@ const toggleLabelOnTask = async (req, res) => {
 
     return res.status(200).json({
       status: "success",
-      message: `Label ${
-        action === "added" ? "được gắn vào" : "bị gỡ khỏi"
-      } task thành công`,
+      message: `Label ${action === "added" ? "được gắn vào" : "bị gỡ khỏi"
+        } task thành công`,
       data: { taskId, labelId, title: label.title, color: label.color, action },
     });
   } catch (error) {
@@ -1278,6 +1282,65 @@ const toggleTask = async (req, res) => {
   }
 };
 
+
+const getPrioritySuggestion = async (req, res) => {
+  try {
+    const taskId = req.params.taskId;
+
+    // 1. Lấy Full info của task
+    const fullTask = await getFullTaskWithTotals(taskId);
+
+    if (!fullTask) {
+      return res.status(404).json({ status: "error", message: "Task không tồn tại" });
+    }
+
+    // 2. Tính toán số liệu checklist (Dùng CheckItem model)
+    const totalItems = fullTask.totalCheckItems;
+    const completedItems = fullTask.totalCheckItemsCompleted;
+
+    // 3. Chuẩn bị payload gửi sang AI Service
+    const payload = {
+      tasks: [
+        {
+          taskId: fullTask._id.toString(),
+          dueDate: fullTask.dueDate ? fullTask.dueDate.toISOString() : null,
+          isCompleted: fullTask.isCompleted,
+          totalCheckItems: totalItems,
+          completedCheckItems: completedItems
+        }
+      ]
+    };
+
+    // 4. Gọi AI Service
+    // URL AI Service: Lấy từ biến môi trường hoặc mặc định
+    const aiUrl = process.env.AI_SERVICE_URL || "http://localhost:8001";
+
+    // Lưu ý: Nếu chạy trong Docker Network thì dùng http://ai-service:8001, nhưng nodejs chạy ngoài thì localhost là đúng.
+    const aiResponse = await axios.post(`${aiUrl}/predict-priority`, payload);
+
+    if (aiResponse.data.status === 'success' && aiResponse.data.data.length > 0) {
+      const result = aiResponse.data.data[0];
+
+      return res.status(200).json({
+        status: "success",
+        data: {
+          taskId: result.taskId,
+          priorityScore: result.priorityScore,
+          priorityLabel: result.priorityScore >= 80 ? "Critical" :
+            result.priorityScore >= 50 ? "High" :
+              result.priorityScore >= 20 ? "Medium" : "Low"
+        }
+      });
+    } else {
+      return res.status(500).json({ status: "error", message: "AI Service không trả về kết quả" });
+    }
+
+  } catch (error) {
+    console.error("AI Priority Error:", error.message);
+    return res.status(500).json({ status: "error", message: "Lỗi khi gọi AI: " + error.message });
+  }
+};
+
 module.exports = {
   addTask,
   updateTaskTitle,
@@ -1291,4 +1354,5 @@ module.exports = {
   getTaskDetail,
   toggleTask,
   getAllTaskLabels,
+  getPrioritySuggestion,
 };

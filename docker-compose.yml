@@ -2,12 +2,22 @@ version: "3.8"
 
 services:
   redis:
-    image: redis:7-alpine  # Dùng image-alpine cho nhẹ
+    image: redis:7-alpine # Dùng image-alpine cho nhẹ
     container_name: trello-redis-dev
     ports:
       - "6379:6379" # Ánh xạ cổng 6379 của container ra máy thật
     volumes:
       - redis-data:/data # Volume để lưu dữ liệu Redis (persistent)
+    restart: unless-stopped
+
+  ai-service:
+    build: ./Backend/my-project-dacntt/ai_model
+    container_name: ai-service
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./Backend/my-project-dacntt/ai_model:/app
+    command: uvicorn api:app --host 0.0.0.0 --port 8001 --reload
     restart: unless-stopped
 
 volumes:
