@@ -5,9 +5,10 @@ const boardController = require("../controllers/boardController");
 const storage = require("../config/storage");
 const multer = require("multer");
 const upload = multer({ storage });
+const { limitBoards } = require("../middlewares/vipMiddleware");
 
 // Tạo bảng
-router.post("/api/v1/boards", auth, boardController.createBoard);
+router.post("/api/v1/boards", auth, limitBoards, boardController.createBoard);
 
 // Cập nhật thông tin bảng
 router.put("/api/v1/boards/:boardId", auth, boardController.updateBoard);

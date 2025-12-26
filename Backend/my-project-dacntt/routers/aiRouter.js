@@ -6,8 +6,10 @@ const { getIO } = require("../config/socket");
 const Task = require("../models/task");
 const assignCheckItemQueue = require("../services/assignCheckItemQueue");
 const router = express.Router();
+const { requireVip } = require("../middlewares/vipMiddleware");
+const auth = require("../middlewares/auth");
 
-router.post("/generate-checklist", async (req, res) => {
+router.post("/generate-checklist", auth, requireVip, async (req, res) => {
   try {
     const cleanPayload = {
       title: cleanText(req.body.title),

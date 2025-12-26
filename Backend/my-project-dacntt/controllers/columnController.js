@@ -19,14 +19,14 @@ const addColumn = async (req, res) => {
 
   try {
     // 1. Kiểm tra board có tồn tại
-    const board = await Board.findById(boardId);
-    if (!board) {
-      return res.status(404).json({
-        status: "error",
-        code: 404,
-        message: "Bảng làm việc không tồn tại",
-      });
-    }
+    // const board = await Board.findById(boardId);
+    // if (!board) {
+    //   return res.status(404).json({
+    //     status: "error",
+    //     code: 404,
+    //     message: "Bảng làm việc không tồn tại",
+    //   });
+    // }
 
     // 2. Lấy danh sách columns đang làm việc
     const columns = await Column.find({ boardId, isArchived: false }).sort({

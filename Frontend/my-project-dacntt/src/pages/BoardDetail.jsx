@@ -8,6 +8,9 @@ import HeaderBoard from "../components/HeaderBoard";
 import Column from "../components/Board/Column";
 import AddColumnButton from "../components/Board/AddColumnButton";
 import Snowfall from "react-snowfall";
+import { AnimatePresence, motion as Motion } from "framer-motion";
+import toast from "react-hot-toast";
+import { CreditCard, Crown, Check } from "lucide-react";
 
 const httpUrl = import.meta.env.VITE_API_URL;
 
@@ -29,6 +32,14 @@ export default function BoardDetail() {
   const isDraggingRef = useRef(false);
   const [editingColumnId, setEditingColumnId] = useState(null);
   const [isMember, setIsMember] = useState(false);
+
+  // State mua gói vip
+  const [showVipModal, setShowVipModal] = useState(false);
+  const [vipModalData, setVipModalData] = useState({
+    message: "",
+    title: "Nâng cấp lên gói VIP",
+  });
+  const [loadingPayment, setLoadingPayment] = useState(false);
 
   const startEditColumn = (id, title) => {
     setEditingColumnId(id);
@@ -634,7 +645,26 @@ export default function BoardDetail() {
       setNewTitle("");
       setIsAddingColumn(false);
     } catch (err) {
-      console.error("❌ Lỗi khi thêm column:", err);
+      console.error("Lỗi khi thêm column:", err);
+
+      const errorResponse = err.response?.data;
+
+      if (
+        err.response?.status === 403 &&
+        errorResponse?.error === "COLUMN_LIMIT_EXCEEDED"
+      ) {
+        setNewTitle("");
+        setIsAddingColumn(false);
+        setVipModalData({
+          message:
+            errorResponse.message ||
+            "Bạn đã đạt giới hạn tạo tối đa 10 thẻ trong 1 bảng làm việc. Vui lòng nâng cấp gói VIP để tạo thêm thẻ.",
+          title: "Đạt giới hạn số lượng thẻ miễn phí",
+        });
+        setShowVipModal(true);
+      } else {
+        alert("Lỗi hệ thống");
+      }
     } finally {
       setLoading(false);
     }
@@ -866,6 +896,26 @@ export default function BoardDetail() {
     return { backgroundColor: "#f0f2f5" };
   };
 
+  // API thanh toán vnpay
+  const handleUpgradeVip = async () => {
+    setLoadingPayment(true);
+    try {
+      const res = await axios.post(
+        `${httpUrl}/api/v1/payment/vip`,
+        { amount: 100000 },
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+
+      if (res.data.data) {
+        window.location.href = res.data.data;
+      }
+    } catch (err) {
+      console.log(err);
+      toast.error("Không thể tạo link thanh toán. Vui lòng thử lại.");
+      setLoadingPayment(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-screen overflow-hidden">
       <HeaderBoard
@@ -956,6 +1006,94 @@ export default function BoardDetail() {
         onTaskUpdate={handleTaskUpdate}
         isMember={isMember}
       />
+
+      {/* Modal Nâng cấp VIP */}
+      <AnimatePresence>
+        {showVipModal && (
+          <Motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowVipModal(false)}
+          >
+            <Motion.div
+              initial={{ scale: 0.9, y: 30, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.9, y: 30, opacity: 0 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header đẹp */}
+              <div className="bg-orange-400 text-white p-6 text-center">
+                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Crown className="w-10 h-10" />
+                </div>
+                <h2 className="text-2xl font-bold">{vipModalData.title}</h2>
+              </div>
+
+              {/* Body */}
+              <div className="p-6 space-y-5">
+                <div className="text-center text-gray-600">
+                  <p className="text-lg leading-relaxed">
+                    {vipModalData.message}
+                  </p>
+                </div>
+
+                <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-5">
+                  <div className="text-center">
+                    <p className="text-md text-amber-600 font-medium uppercase tracking-wide mb-2">
+                      Gói VIP - Chỉ
+                    </p>
+                    <p className="text-4xl font-bold text-amber-700">
+                      100.000{" "}
+                      <span className="text-lg font-normal">VND/ tháng</span>
+                    </p>
+                    {/* <p className="text-sm text-amber-600 mt-1">/ month</p> */}
+                  </div>
+
+                  <ul className="mt-5 space-y-3 text-sm text-gray-700">
+                    <li className="flex items-center gap-3">
+                      <Check className="w-5 h-5 text-green-600 flex-shrink-0" />
+                      Tạo không giới hạn số lượng bảng làm việc
+                    </li>
+                    <li className="flex items-center gap-3">
+                      <Check className="w-5 h-5 text-green-600 flex-shrink-0" />
+                      Mỗi bảng không giới hạn thẻ (task)
+                    </li>
+                    <li className="flex items-center gap-3">
+                      <Check className="w-5 h-5 text-green-600 flex-shrink-0" />
+                      Sử dụng AI gợi ý việc cần làm thông minh
+                    </li>
+                    <li className="flex items-center gap-3">
+                      <Check className="w-5 h-5 text-green-600 flex-shrink-0" />
+                      Ưu tiên hỗ trợ & cập nhật tính năng mới
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowVipModal(false)}
+                    className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition font-medium"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    onClick={() => handleUpgradeVip()}
+                    disabled={loadingPayment}
+                    className="flex-1 py-3 bg-orange-400 text-white rounded-xl hover:bg-orange-500 transition font-medium shadow-lg flex items-center justify-center gap-2 disabled:opacity-70"
+                  >
+                    <CreditCard size={18} />
+                    Thanh toán ngay
+                  </button>
+                </div>
+              </div>
+            </Motion.div>
+          </Motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

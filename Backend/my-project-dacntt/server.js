@@ -20,6 +20,7 @@ const aiRouter = require("./routers/aiRouter.js");
 const checkItemRouter = require("./routers/checkItemRouter");
 const activityLogRouter = require("./routers/activityLogRouter.js");
 const userSkillRouter = require("./routers/userSkillRouter.js");
+const paymentOrderRouter = require("./routers/paymentOrderRouter.js");
 
 
 const PORT = process.env.PORT;
@@ -59,6 +60,7 @@ app.use(checklistItemRouter);
 app.use(checkItemRouter);
 app.use(activityLogRouter);
 app.use(userSkillRouter);
+app.use(paymentOrderRouter);
 
 
 server.listen(PORT, () => {

@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const auth = require("../middlewares/auth");
 const columnController = require("../controllers/columnController");
+const { limitColumnsInBoard } = require("../middlewares/vipMiddleware");
 
 // Lấy danh sách columns tăng dần theo position
 router.get("/api/v1/columns/:boardId", auth, columnController.getAllColumns);
@@ -9,7 +10,7 @@ router.get("/api/v1/columns/:boardId", auth, columnController.getAllColumns);
 router.get("/api/v2/columns/:boardId", auth, columnController.getAllColumnsAndFilter);
 
 // Thêm column của 1 board 
-router.post("/api/v1/columns", auth, columnController.addColumn);
+router.post("/api/v1/columns", auth, limitColumnsInBoard, columnController.addColumn);
 
 // Cập nhật tên title cho column
 router.put("/api/v1/columns/:columnId", auth, columnController.updateTitleColumn);

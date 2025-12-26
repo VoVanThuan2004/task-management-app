@@ -1,9 +1,15 @@
 require("dotenv").config();
 const { Queue, Worker } = require("bullmq");
 const { Redis } = require("ioredis");
-const { sendShareBoardEmail, sendCreateAccount, sendRecoveryPassword, sendRemoveFromBoardEmail } = require("../config/mailConfig");
+const {
+  sendShareBoardEmail,
+  sendCreateAccount,
+  sendRecoveryPassword,
+  sendRemoveFromBoardEmail,
+  sendRegisterVipEmail,
+} = require("../config/mailConfig");
 const User = require("../models/user");
-const bcrypt = require("bcrypt"); 
+const bcrypt = require("bcrypt");
 
 const connection = new Redis({
   host: process.env.REDIS_HOST,
@@ -46,8 +52,7 @@ const worker = new Worker(
             boardLink
           );
         }
-      } 
-      else if (job.name === "createAccountEmail") {
+      } else if (job.name === "createAccountEmail") {
         const { email } = job.data;
 
         // Tạo mã otp
@@ -66,21 +71,31 @@ const worker = new Worker(
 
         // Gửi email
         await sendCreateAccount(email, OTP);
-      }
-      else if (job.name === "recoveryPasswordEmail") {
+      } else if (job.name === "recoveryPasswordEmail") {
         const { email, OTP } = job.data;
         if (!email || !OTP) {
           throw new Error("Email or OTP is null");
         }
 
         await sendRecoveryPassword(email, OTP);
-      }
-      else if (job.name === "removeMemberFromBoardEmail") {
+      } else if (job.name === "removeMemberFromBoardEmail") {
         const { email, title } = job.data;
         if (!email || !title) {
           throw new Error("Email or board's title is null");
         }
-        await sendRemoveFromBoardEmail(email, title); 
+        await sendRemoveFromBoardEmail(email, title);
+      } else if (job.name === "sendVipSuccessEmail") {
+        const { userId, orderCode, amount, expirationDate, paymentMethod } = job.data;
+        if (!orderCode || !amount || !expirationDate) {
+          throw new Error("orderCode or amount or expirationDate is null");
+        }
+
+        // 1. Kiểm tra user - lấy thông tin
+        const user = await User.findById(userId).select("_id email").lean();
+        if (!user) {
+          console.warn(`User ${user._id} không tồn tại`);
+        }
+        await sendRegisterVipEmail(user.email, orderCode, amount, expirationDate, paymentMethod);
       }
     } catch (error) {
       console.log("Email queue thất bại: " + error);

@@ -12,10 +12,14 @@ import {
   LogIn,
   Settings,
   KeyRoundIcon,
+  CreditCard,
+  Crown,
+  Check,
 } from "lucide-react";
 import { useUser } from "../components/useUser";
 import { AnimatePresence, motion as Motion } from "framer-motion";
 import Avatar from "../components/Avatar";
+import toast from "react-hot-toast";
 
 export default function HomePage() {
   const [myBoards, setMyBoards] = useState([]);
@@ -30,8 +34,16 @@ export default function HomePage() {
     background: "#026aa7",
   });
 
-  // Thêm state để chuyển tab
+  // State để chuyển tab
   const [activeSection, setActiveSection] = useState("my");
+
+  // State mua gói vip
+  const [showVipModal, setShowVipModal] = useState(false);
+  const [vipModalData, setVipModalData] = useState({
+    message: "",
+    title: "Nâng cấp lên gói VIP",
+  });
+  const [loadingPayment, setLoadingPayment] = useState(false);
 
   const httpUrl = import.meta.env.VITE_API_URL;
   const accessToken = localStorage.getItem("accessToken");
@@ -131,16 +143,40 @@ export default function HomePage() {
         setFormData({ title: "", type: "private", background: "#026aa7" });
         fetchBoards();
       }
-    } catch (error) {
-      console.error("Lỗi khi tạo bảng:", error);
-      if (error.response?.status === 401) {
-        navigate("/login");
+    } catch (err) {
+      const errorResponse = err.response?.data;
+
+      if (
+        err.response?.status === 403 &&
+        errorResponse?.error === "BOARD_LIMIT_EXCEEDED"
+      ) {
+        // MỞ MODAL VIP + truyền message từ backend
+        setVipModalData({
+          message:
+            errorResponse.message || "Bạn đã đạt giới hạn tạo bảng miễn phí.",
+          title: "Đạt giới hạn bảng miễn phí",
+        });
+        setShowVipModal(true);
+        handleCloseCreateModal();
       } else {
-        alert("Có lỗi xảy ra khi tạo bảng");
+        if (err.response?.status === 403) {
+          navigate("/login");
+        } else {
+          alert("Lỗi hệ thống");
+        }
       }
     } finally {
       setCreating(false);
     }
+  };
+
+  const handleCloseCreateModal = () => {
+    setShowCreateModal(false);
+    setFormData({
+      title: "",
+      type: "private",
+      background: "#026aa7",
+    });
   };
 
   const handleBoardClick = (board) => {
@@ -173,6 +209,26 @@ export default function HomePage() {
 
   const handleLogin = () => {
     navigate("/login");
+  };
+
+  const handleUpgradeVip = async () => {
+    setLoadingPayment(true);
+    try {
+      const res = await axios.post(
+        `${httpUrl}/api/v1/payment/vip`,
+        { amount: 100000 },
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+
+      if (res.data.data) {
+        
+        window.location.href = res.data.data;
+      }
+    } catch (err) {
+      console.log(err);
+      toast.error("Không thể tạo link thanh toán. Vui lòng thử lại.");
+      setLoadingPayment(false);
+    }
   };
 
   // Dữ liệu board hiện tại
@@ -467,7 +523,7 @@ export default function HomePage() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25 }}
             className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-            onClick={() => setShowCreateModal(false)}
+            onClick={() => handleCloseCreateModal()}
           >
             <Motion.div
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
@@ -482,7 +538,7 @@ export default function HomePage() {
                   Tạo bảng
                 </h3>
                 <button
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={() => handleCloseCreateModal()}
                   className="text-gray-400 hover:text-gray-600"
                 >
                   <X size={20} />
@@ -577,6 +633,94 @@ export default function HomePage() {
                 >
                   {creating ? "Đang tạo..." : "Tạo bảng"}
                 </button>
+              </div>
+            </Motion.div>
+          </Motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal Nâng cấp VIP */}
+      <AnimatePresence>
+        {showVipModal && (
+          <Motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowVipModal(false)}
+          >
+            <Motion.div
+              initial={{ scale: 0.9, y: 30, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.9, y: 30, opacity: 0 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header đẹp */}
+              <div className="bg-orange-400 text-white p-6 text-center">
+                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Crown className="w-10 h-10" />
+                </div>
+                <h2 className="text-2xl font-bold">{vipModalData.title}</h2>
+              </div>
+
+              {/* Body */}
+              <div className="p-6 space-y-5">
+                <div className="text-center text-gray-600">
+                  <p className="text-lg leading-relaxed">
+                    {vipModalData.message}
+                  </p>
+                </div>
+
+                <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-5">
+                  <div className="text-center">
+                    <p className="text-md text-amber-600 font-medium uppercase tracking-wide mb-2">
+                      Gói VIP - Chỉ
+                    </p>
+                    <p className="text-4xl font-bold text-amber-700">
+                      100.000{" "}
+                      <span className="text-lg font-normal">VND/ tháng</span>
+                    </p>
+                    {/* <p className="text-sm text-amber-600 mt-1">/ month</p> */}
+                  </div>
+
+                  <ul className="mt-5 space-y-3 text-sm text-gray-700">
+                    <li className="flex items-center gap-3">
+                      <Check className="w-5 h-5 text-green-600 flex-shrink-0" />
+                      Tạo không giới hạn số lượng bảng làm việc
+                    </li>
+                    <li className="flex items-center gap-3">
+                      <Check className="w-5 h-5 text-green-600 flex-shrink-0" />
+                      Mỗi bảng không giới hạn thẻ (task)
+                    </li>
+                    <li className="flex items-center gap-3">
+                      <Check className="w-5 h-5 text-green-600 flex-shrink-0" />
+                      Sử dụng AI gợi ý việc cần làm thông minh
+                    </li>
+                    <li className="flex items-center gap-3">
+                      <Check className="w-5 h-5 text-green-600 flex-shrink-0" />
+                      Ưu tiên hỗ trợ & cập nhật tính năng mới
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowVipModal(false)}
+                    className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition font-medium"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    onClick={() => handleUpgradeVip()}
+                    disabled={loadingPayment}
+                    className="flex-1 py-3 bg-orange-400 text-white rounded-xl hover:bg-orange-500 transition font-medium shadow-lg flex items-center justify-center gap-2 disabled:opacity-70"
+                  >
+                    <CreditCard size={18} />
+                    Thanh toán ngay
+                  </button>
+                </div>
               </div>
             </Motion.div>
           </Motion.div>
