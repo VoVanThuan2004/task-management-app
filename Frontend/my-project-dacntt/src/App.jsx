@@ -17,6 +17,8 @@ import ChangePassword from "./pages/ChangePassword";
 import AdminPage from "./pages/admin/AdminPage";
 import PrivateRoute from "./components/PrivateRoutes";
 import UserPage from "./pages/admin/UserPage";
+import PaymentHistory from "./pages/PaymentHistory";
+import DashboardPage from "./pages/admin/DashboardPage";
 
 function App() {
   return (
@@ -27,22 +29,81 @@ function App() {
           <Toaster
             position="top-right"
             reverseOrder={false}
+            gutter={12}
+            containerStyle={{ marginTop: "20px" }}
             toastOptions={{
+              duration: 4000,
+
+              // Style chung cho tất cả toast
+              style: {
+                background: "#fff",
+                color: "#1f2937",
+                borderRadius: "6px",
+                boxShadow:
+                  "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
+                padding: "16px 28px",
+                maxWidth: "420px",
+                border: "none",
+                fontSize: "15px",
+                fontWeight: "500",
+              },
+
+              // Thành công - giống ảnh
               success: {
-                duration: 4000,
+                icon: (
+                  <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center mr-3 flex-shrink-0">
+                    <svg
+                      className="w-5 h-5 text-white"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={3}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  </div>
+                ),
                 style: {
-                  marginTop: "40px",
-                  background: "#4ade80",
-                  color: "#fff",
+                  borderLeft: "5px solid #22c55e",
+                  background: "#fff",
                 },
               },
+
+              // Thất bại - giống ảnh
               error: {
+                icon: (
+                  <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center mr-3 flex-shrink-0">
+                    <svg
+                      className="w-5 h-5 text-white"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </div>
+                ),
                 style: {
-                  duration: 4000,
-                  marginTop: "40px",
-                  background: "#ef4444",
-                  color: "#fff",
+                  borderLeft: "5px solid #ef4444",
+                  background: "#fff",
                 },
+              },
+
+              // Nút X đóng - đẹp, hover mượt
+              closeButton: {
+                color: "#9ca3af",
+                hoverColor: "#4b5563",
+                background: "transparent",
+                hoverBackground: "#f3f4f6",
+                padding: "4px",
+                borderRadius: "8px",
               },
             }}
           />
@@ -56,6 +117,7 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/change-password" element={<ChangePassword />} />
+            <Route path="/payment-history" element={<PaymentHistory />} />
             <Route path="*" element={<Navigate to="/" replace />} />
 
             {/* ADMIN */}
@@ -69,6 +131,7 @@ function App() {
             >
               <Route index element={<Navigate to="users" replace />} />
               <Route path="users" element={<UserPage />} />
+              <Route path="dashboard" element={<DashboardPage />} />
             </Route>
           </Routes>
         </Router>

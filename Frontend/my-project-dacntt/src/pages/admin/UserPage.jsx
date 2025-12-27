@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import Avatar from "../../components/Avatar";
 import { motion as Motion, AnimatePresence } from "framer-motion";
+import toast from "react-hot-toast";
 
 const httpUrl = import.meta.env.VITE_API_URL;
 
@@ -83,7 +84,7 @@ const UserPage = () => {
 
     setLockingUserId(user._id);
     try {
-      await axios.put(
+      const res = await axios.put(
         `${httpUrl}/api/v1/users/${user._id}/toggle-lock`,
         {},
         {
@@ -98,6 +99,7 @@ const UserPage = () => {
           u._id === user._id ? { ...u, isActive: !user.isActive } : u
         )
       );
+      toast.success(res.data.message);
     } catch (error) {
       console.log(error);
     } finally {
@@ -201,7 +203,6 @@ const UserPage = () => {
       setAddAvatar(null);
       setAddAvatarPreview("");
       setShowAddModal(false);
-
     } catch (err) {
       const msg = err.response?.data?.message || "Tạo người dùng thất bại";
       alert(msg);
@@ -221,7 +222,6 @@ const UserPage = () => {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-              <Users className="w-9 h-9 text-blue-600" />
               Quản lý người dùng
             </h1>
             <p className="text-gray-600 mt-2">
@@ -266,7 +266,7 @@ const UserPage = () => {
                     Email
                   </th>
                   <th className="px-8 py-5 text-center text-sm font-semibold text-gray-700">
-                    Board sở hữu
+                    Số bảng sở hữu
                   </th>
                   <th className="px-8 py-5 text-center text-sm font-semibold text-gray-700">
                     Trạng thái

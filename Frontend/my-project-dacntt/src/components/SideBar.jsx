@@ -1,13 +1,10 @@
-// SideBar.jsx
-import React, { useState } from "react";
-import { Users, LogOut, Menu, X } from "lucide-react";
+import { Users, LogOut, Menu, X, LayoutDashboardIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
 const httpUrl = import.meta.env.VITE_API_URL;
 
-const SideBar = () => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+const SideBar = ({ isCollapsed, setIsCollapsed }) => {
   const navigate = useNavigate();
   const currentPath = window.location.pathname;
 
@@ -32,30 +29,25 @@ const SideBar = () => {
     navigate("/");
   };
 
-  // Tự động collapse trên màn hình nhỏ (tùy chọn)
-  // useEffect(() => {
-  //   const handleResize = () => {
-  //     setIsCollapsed(window.innerWidth < 1024);
-  //   };
-  //   handleResize();
-  //   window.addEventListener("resize", handleResize);
-  //   return () => window.removeEventListener("resize", handleResize);
-  // }, []);
-
   const menuItems = [
     {
       href: "/admin/users",
       label: "Quản lý người dùng",
       icon: Users,
     },
-    // Thêm mục khác ở đây sau này
+    {
+      href: "/admin/dashboard",
+      label: "Xem thống kê",
+      icon: LayoutDashboardIcon,
+    },
   ];
 
   return (
     <aside
-      className={`bg-gray-900 h-screen flex flex-col text-white transition-all duration-300 ease-in-out ${
-        isCollapsed ? "w-20" : "w-64"
-      }`}
+      className={`fixed inset-y-0 left-0 z-40 flex flex-col bg-gray-900 text-white
+      transition-all duration-300 ease-in-out
+      ${isCollapsed ? "w-18" : "w-64"}
+      overflow-y-auto`}
     >
       {/* Header + Toggle Button */}
       <div className="relative px-6 py-6 border-b border-gray-800">

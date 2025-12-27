@@ -13,6 +13,8 @@ const mongoose = require("mongoose");
 const VipSubscription = require("../models/vipSubscription");
 const emailQueue = require("../services/emailQueue");
 const vipSubscriptionQueue = require("../services/vipSubscriptionQueue");
+const User = require("../models/user");
+const { ObjectId } = require("mongodb");
 
 const createVnpayPayment = async (vnpTxnRef, orderCode, amount, req) => {
   if (!vnp_TmnCode || !vnp_HashSecret || !vnp_ReturnUrl) {
@@ -204,7 +206,7 @@ const vnpayReturn = async (req, res) => {
     // 1. Kiểm tra chữ ký
     if (secureHash !== signed) {
       console.warn("VNPay Return - Sai chữ ký:", vnp_Params);
-      await session.abortTransaction();        
+      await session.abortTransaction();
       session.endSession();
       await cleanupPendingOrder(vnp_Params["vnp_TxnRef"], session);
       return res.redirect(
@@ -312,7 +314,7 @@ const vnpayReturn = async (req, res) => {
         "expireVip",
         {
           userId: paymentOrder.userId,
-          expirationDate: paymentOrder.expirationDate
+          expirationDate: paymentOrder.expirationDate,
         },
         { delay: expireDelay }
       );
@@ -343,8 +345,97 @@ async function cleanupPendingOrder(vnpTxnRef, session) {
   }
 }
 
+async function getPaymentOrders(req, res) {
+  try {
+    const userId = req.user.userId;
+    if (!userId) {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Thiếu userId",
+      });
+    }
+
+    let { page, limit } = req.query;
+    page = Number(page) || 1;
+    limit = Number(limit) || 10;
+
+    const skip = (page - 1) * limit;
+
+    // 1. Xác thực người dùng
+    const existingUser = await User.findById(userId).select("_id").lean();
+    if (!existingUser) {
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Người dùng không tồn tại",
+      });
+    }
+
+    // 2. Lấy danh sách payment orders
+    // const paymentOrders = await PaymentOrder.find({ userId }).sort({ createdAt: -1 })
+
+    const paymentOrders = await PaymentOrder.aggregate([
+      {
+        $match: {
+          userId: new ObjectId(userId),
+        },
+      },
+      {
+        $facet: {
+          data: [
+            {
+              $sort: { createdAt: -1 },
+            },
+            {
+              $skip: skip,
+            },
+            {
+              $limit: limit,
+            },
+            {
+              $project: {
+                orderCode: 1,
+                amount: 1,
+                paymentDate: 1,
+                paymentMethod: 1,
+                expirationDate: 1,
+              },
+            },
+          ],
+          metadata: [{ $count: "totalPaymentOrders" }],
+        },
+      },
+    ]);
+
+    const totalPaymentOrders =
+      paymentOrders[0].metadata[0]?.totalPaymentOrders || 0;
+    const totalPages = Math.ceil(totalPaymentOrders / limit);
+
+    return res.status(200).json({
+      status: "success",
+      code: 200,
+      message: "Lấy danh sách thông tin lịch sử thanh toán của người dùng",
+      data: paymentOrders[0].data,
+      pagination: {
+        page,
+        limit,
+        totalPaymentOrders,
+        totalPages,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      code: 500,
+      message: "Lỗi hệ thống: " + error,
+    });
+  }
+}
+
 module.exports = {
   createVnpayPayment,
   createVipPayment,
   vnpayReturn,
+  getPaymentOrders,
 };
