@@ -18,6 +18,9 @@ router.put("/api/v1/users", upload.single("avatar"), auth, userController.update
 // Tìm kiếm thông tin email user
 router.get("/api/v1/users/search", auth, userController.searchEmailUser);
 
+// Lấy trạng thái tài khoản vip hiện tại
+router.get("/api/v1/users/vip", auth, userController.getUserVip);
+
 
 // ===== ADMIN ===== 
 // Khóa - mở người dùng

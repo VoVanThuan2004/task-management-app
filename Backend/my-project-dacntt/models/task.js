@@ -23,14 +23,13 @@ const taskSchema = new mongoose.Schema(
     title: { type: String, required: true },
     background: { type: String, default: null },
     description: { type: String, default: null },
-    // Thêm các trường mới
     startDate: { type: Date, default: null }, // Ngày bắt đầu
     dueDate: { type: Date, default: null }, // Ngày kết thúc
     reminderEnabled: { type: Boolean, default: false }, // Bật/tắt nhắc nhở
     reminderTime: { type: Number, default: 30 }, // Số phút trước khi nhắc
     reminderSent: { type: Boolean, default: false }, // Đã gửi nhắc nhở chưa
     position: { type: Number, required: true },
-    isArchived: { type: Boolean, default: false },
+    isArchived: { type: Boolean, default: false },  // Xóa mềm (đưa vào thùng rác)
     isCompleted: { type: Boolean, default: false },
     status: { type: String, default: null },
   },

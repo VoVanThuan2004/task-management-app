@@ -9,16 +9,13 @@ import {
   LogOut,
   Plus,
   X,
-  LogIn,
-  KeyRoundIcon,
   CreditCard,
   Crown,
   Check,
-  Wallet
+  Wallet,
 } from "lucide-react";
 import { useUser } from "../components/useUser";
 import { AnimatePresence, motion as Motion } from "framer-motion";
-import Avatar from "../components/Avatar";
 import toast from "react-hot-toast";
 import Profile from "../components/Profile";
 
@@ -45,6 +42,9 @@ export default function HomePage() {
     title: "Nâng cấp lên gói VIP",
   });
   const [loadingPayment, setLoadingPayment] = useState(false);
+
+  const [vipStatus, setVipStatus] = useState(null);
+  const [loadingVip, setLoadingVip] = useState(false);
 
   const httpUrl = import.meta.env.VITE_API_URL;
   const accessToken = localStorage.getItem("accessToken");
@@ -208,10 +208,6 @@ export default function HomePage() {
     }
   };
 
-  // const handleLogin = () => {
-  //   navigate("/login");
-  // };
-
   const handleUpgradeVip = async () => {
     setLoadingPayment(true);
     try {
@@ -222,7 +218,6 @@ export default function HomePage() {
       );
 
       if (res.data.data) {
-        
         window.location.href = res.data.data;
       }
     } catch (err) {
@@ -232,10 +227,34 @@ export default function HomePage() {
     }
   };
 
+  // Hàm lấy trạng thái VIP
+  const fetchVipStatus = async () => {
+    if (activeSection !== "vip") return;
+    setLoadingVip(true);
+    try {
+      const res = await axios.get(`${httpUrl}/api/v1/users/vip`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (res.data.status === "success") {
+        setVipStatus(res.data.data);
+      }
+    } catch (err) {
+      console.log(err);
+      toast.error("Không thể tải thông tin gói VIP");
+      setVipStatus(null);
+    } finally {
+      setLoadingVip(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeSection === "vip") {
+      fetchVipStatus();
+    }
+  }, [activeSection]);
+
   // Dữ liệu board hiện tại
   const currentBoards = activeSection === "my" ? myBoards : invitedBoards;
-  const sectionTitle =
-    activeSection === "my" ? "Bảng của bạn" : "Bảng được mời";
 
   return (
     <div className="flex min-h-screen bg-gray-50 pb-20 md:pb-0">
@@ -313,6 +332,19 @@ export default function HomePage() {
               )}
             </ul>
           </div>
+
+          {/* Nâng cấp VIP - thêm vào dưới "Được mời vào" */}
+          <div className="mt-6">
+            <div
+              onClick={() => setActiveSection("vip")}
+              className={`flex items-center gap-2 text-gray-600 font-medium mb-2 cursor-pointer hover:text-blue-600 transition-colors ${
+                activeSection === "vip" ? "text-blue-600" : ""
+              }`}
+            >
+              <Wallet size={18} />
+              <span>Nâng cấp tài khoản VIP</span>
+            </div>
+          </div>
         </div>
       </aside>
 
@@ -321,77 +353,222 @@ export default function HomePage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
           <h1 className="text-xl md:text-2xl font-bold text-gray-800">
-            {sectionTitle}
+            {activeSection === "my"
+              ? "Bảng của tôi"
+              : activeSection === "invited"
+              ? "Bảng được mời vào"
+              : "Nâng cấp tài khoản VIP"}
           </h1>
 
-          {/* Profile / Login */}
-          <Profile isLoggedIn={isLoggedIn} user={user} setShowProfileMenu={setShowProfileMenu} showProfileMenu={showProfileMenu} handleLogout={handleLogout}/>
+          <Profile
+            isLoggedIn={isLoggedIn}
+            user={user}
+            setShowProfileMenu={setShowProfileMenu}
+            showProfileMenu={showProfileMenu}
+            handleLogout={handleLogout}
+          />
         </div>
 
-        {/* Boards Grid */}
-        {loading ? (
-          <div className="flex justify-center items-center h-64">
-            <Loader2 className="animate-spin text-gray-400" size={32} />
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
-            {/* Nút Tạo bảng - CHỈ HIỆN KHI Ở TAB "CÁ NHÂN" */}
-            {activeSection === "my" && isLoggedIn && (
-              <div
-                onClick={() => setShowCreateModal(true)}
-                className="rounded-xl shadow-sm border-2 border-dashed border-gray-300 hover:border-gray-400 transition-all cursor-pointer bg-gray-50 hover:bg-gray-100 flex items-center justify-center min-h-[100px]"
-              >
-                <div className="text-center p-4">
-                  <Plus size={32} className="mx-auto text-gray-400 mb-2" />
-                  <p className="text-gray-600 font-medium text-sm">
-                    Tạo bảng mới
-                  </p>
-                </div>
-              </div>
-            )}
+        {/* Nội dung chính theo activeSection */}
+        {activeSection === "vip" ? (
+          loadingVip ? (
+            <div className="flex justify-center items-center py-32">
+              <Loader2 className="animate-spin text-orange-600" size={48} />
+            </div>
+          ) : (
+            <div className="flex items-center justify-center min-h-[80vh] px-4 py-8">
+              <div className="w-full max-w-lg">
+                {" "}
+                {/* ← To hơn modal (max-w-md → max-w-lg ≈ 512px) */}
+                <div className="bg-white rounded-3xl shadow-2xl border border-gray-300 overflow-hidden">
+                  {/* Header VIP */}
+                  <div className="bg-orange-400 text-white p-10 text-center">
+                    <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-5">
+                      <Crown size={48} />
+                    </div>
+                    <h2 className="text-3xl font-extrabold">
+                      {vipStatus?.isVip
+                        ? "Bạn đang là thành viên VIP"
+                        : "Nâng cấp lên gói VIP"}
+                    </h2>
+                    <p className="text-white/90 mt-3 text-lg">
+                      Trải nghiệm không giới hạn với các tính năng cao cấp
+                    </p>
+                  </div>
 
-            {/* Danh sách board */}
-            {currentBoards.length > 0 ? (
-              currentBoards.map((board) => (
-                <div
-                  key={board._id}
-                  onClick={() => handleBoardClick(board)}
-                  className="rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-all cursor-pointer overflow-hidden flex flex-col"
-                >
-                  <div
-                    className="h-[100px] w-full"
-                    style={
-                      board.background?.startsWith("#")
-                        ? { backgroundColor: board.background }
-                        : {
-                            backgroundImage: board.background,
-                            backgroundSize: "cover",
-                            backgroundPosition: "center",
-                          }
-                    }
-                  />
-                  <div className="bg-white p-3 md:p-4">
-                    <h3 className="font-semibold text-gray-800 truncate text-sm md:text-base">
-                      {board.title}
-                    </h3>
-                    {board.ownerName && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Chủ sở hữu: {board.ownerName}
-                      </p>
+                  {/* Body */}
+                  <div className="p-8 space-y-8">
+                    {vipStatus?.isVip ? (
+                      /* ĐÃ LÀ VIP */
+                      <div className="text-center py-6">
+                        
+                        <p className="text-3xl font-semibold text-green-600 mb-5">
+                          Đã kích hoạt thành công!
+                        </p>
+                        <p className="text-xl text-gray-700 mb-3">
+                          Gói VIP của bạn sẽ hết hạn vào:
+                        </p>
+                        <p className="text-3xl font-extrabold text-orange-500 mb-8">
+                          {vipStatus.expirationDate
+                            ? new Date(
+                                vipStatus.expirationDate
+                              ).toLocaleDateString("vi-VN", {
+                                weekday: "long",
+                                day: "2-digit",
+                                month: "2-digit",
+                                year: "numeric",
+                              })
+                            : "Chưa xác định"}
+                        </p>
+
+                        <div className="bg-white-50 border-2 border-orange-200 rounded-3xl p-8">
+                          <p className="text-xl text-black font-semibold">
+                            Bạn đang sử dụng đầy đủ các tính năng cao cấp
+                          </p>
+                          <p className="text-black mt-3">
+                            Không giới hạn bảng, thẻ và AI gợi ý thông minh
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      /* CHƯA LÀ VIP */
+                      <>
+                        <div className="text-center">
+                          <p className="text-xl text-gray-700 leading-relaxed">
+                            Nâng cấp ngay để mở khóa toàn bộ sức mạnh của hệ
+                            thống!
+                          </p>
+                        </div>
+
+                        {/* Giá gói */}
+                        <div className="bg-gradient-to-br from-amber-50 to-orange-50 border-4 border-amber-300 rounded-3xl p-8 text-center">
+                          <p className="text-amber-600 font-bold uppercase tracking-widest mb-3">
+                            Gói VIP - 30 ngày
+                          </p>
+                          <p className="text-6xl font-extrabold text-amber-700">
+                            100.000
+                            <span className="text-3xl font-normal"> VND</span>
+                          </p>
+                        </div>
+
+                        {/* Lợi ích */}
+                        <div className="grid md:grid-cols-2 gap-6 mt-6">
+                          {[
+                            "Tạo không giới hạn số lượng bảng làm việc",
+                            "Mỗi bảng không giới hạn số lượng thẻ (task)",
+                            "Sử dụng AI gợi ý việc cần làm thông minh",
+                            "Ưu tiên hỗ trợ kỹ thuật & cập nhật tính năng mới",
+                          ].map((benefit, i) => (
+                            <div
+                              key={i}
+                              className="flex items-start gap-4 bg-gray-50 rounded-2xl p-5"
+                            >
+                              <Check
+                                size={28}
+                                className="text-green-600 flex-shrink-0 mt-0.5"
+                              />
+                              <p className="text-gray-800 font-medium">
+                                {benefit}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Nút nâng cấp */}
+                        <div className="text-center mt-10">
+                          <button
+                            onClick={handleUpgradeVip}
+                            disabled={loadingPayment}
+                            className="inline-flex items-center gap-3 px-10 py-5 bg-orange-500 text-white text-xl font-bold rounded-3xl hover:bg-orange-600 transition-all shadow-xl disabled:opacity-70 disabled:cursor-not-allowed"
+                          >
+                            {loadingPayment ? (
+                              <>
+                                <Loader2 className="animate-spin" size={28} />
+                                Đang chuyển đến thanh toán...
+                              </>
+                            ) : (
+                              <>
+                                <CreditCard size={32} />
+                                Nâng cấp ngay
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </>
                     )}
                   </div>
                 </div>
-              ))
+              </div>
+            </div>
+          )
+        ) : (
+          /* ==================== BOARD GRID (my / invited) ==================== */
+          <>
+            {loading ? (
+              <div className="flex justify-center items-center h-64">
+                <Loader2 className="animate-spin text-gray-400" size={32} />
+              </div>
             ) : (
-              <div className="col-span-full text-center py-12">
-                <p className="text-gray-500">
-                  {activeSection === "my"
-                    ? "Bạn chưa có bảng nào. Hãy tạo bảng mới!"
-                    : "Chưa có bảng nào mời bạn."}
-                </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
+                {/* Nút Tạo bảng */}
+                {activeSection === "my" && isLoggedIn && (
+                  <div
+                    onClick={() => setShowCreateModal(true)}
+                    className="rounded-xl shadow-sm border-2 border-dashed border-gray-300 hover:border-gray-400 transition-all cursor-pointer bg-gray-50 hover:bg-gray-100 flex items-center justify-center min-h-[100px]"
+                  >
+                    <div className="text-center p-4">
+                      <Plus size={32} className="mx-auto text-gray-400 mb-2" />
+                      <p className="text-gray-600 font-medium text-sm">
+                        Tạo bảng mới
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Danh sách board */}
+                {currentBoards.length > 0 ? (
+                  currentBoards.map((board) => (
+                    <div
+                      key={board._id}
+                      onClick={() => handleBoardClick(board)}
+                      className="rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-all cursor-pointer overflow-hidden flex flex-col"
+                    >
+                      <div
+                        className="h-[100px] w-full"
+                        style={
+                          board.background?.startsWith("#")
+                            ? { backgroundColor: board.background }
+                            : {
+                                backgroundImage: board.background,
+                                backgroundSize: "cover",
+                                backgroundPosition: "center",
+                              }
+                        }
+                      />
+                      <div className="bg-white p-3 md:p-4">
+                        <h3 className="font-semibold text-gray-800 truncate text-sm md:text-base">
+                          {board.title}
+                        </h3>
+                        {board.ownerName && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Chủ sở hữu: {board.ownerName}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="col-span-full text-center py-12">
+                    <p className="text-gray-500 text-xl">
+                      {activeSection === "my"
+                        ? "Bạn chưa có bảng nào. Hãy tạo bảng mới!"
+                        : "Chưa có bảng nào mời bạn tham gia."}
+                    </p>
+                  </div>
+                )}
               </div>
             )}
-          </div>
+          </>
         )}
       </main>
 
@@ -415,6 +592,15 @@ export default function HomePage() {
           >
             <Users size={20} />
             <span className="text-xs mt-1">Mời vào</span>
+          </button>
+          <button
+            onClick={() => setActiveSection("vip")}
+            className={`flex flex-col items-center p-2 rounded-lg transition-colors ${
+              activeSection === "vip" ? "text-blue-600" : "text-gray-600"
+            }`}
+          >
+            <Wallet size={20} />
+            <span className="text-xs mt-1">Gói VIP</span>
           </button>
         </div>
       </div>

@@ -7,7 +7,7 @@ const paymentOrderController = require("../controllers/paymentOrderController");
 router.post("/api/v1/payment/vip", auth, paymentOrderController.createVipPayment);
 
 // Sau khi thanh toán thành công
-router.get("api/v1/vnpay/return", paymentOrderController.vnpayReturn);
+router.get("/api/v1/vnpay/return", paymentOrderController.vnpayReturn);
 
 // API lấy danh sách lịch sử thanh toán của 1 user
 router.get("/api/v1/payment-orders", auth, paymentOrderController.getPaymentOrders);

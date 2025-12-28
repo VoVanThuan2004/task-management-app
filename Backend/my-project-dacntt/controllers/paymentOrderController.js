@@ -379,6 +379,7 @@ async function getPaymentOrders(req, res) {
       {
         $match: {
           userId: new ObjectId(userId),
+          status: "paid"
         },
       },
       {
