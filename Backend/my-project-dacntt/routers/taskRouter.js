@@ -21,9 +21,6 @@ router.put("/api/v1/tasks/:taskId/description", auth, taskController.updateTaskD
 // Cập nhật vị trí task
 router.put("/api/v1/tasks/:taskId/position", auth, taskController.moveTask);
 
-// Xóa task
-router.delete("/api/v1/tasks/:taskId", auth, taskController.deleteTask);
-
 // Gán label (nhãn dán) cho task
 router.post("/api/v1/tasks-label", auth, taskController.toggleLabelOnTask);
 
@@ -44,5 +41,8 @@ router.get("/api/v1/tasks/:taskId/priority", auth, taskController.getPrioritySug
 
 // Đánh dấu hoàn thành - chưa hoàn thành task
 router.put("/api/v1/tasks/:taskId/toggle", auth, taskController.toggleTask);
+
+// Xóa task
+router.delete("/api/v1/tasks/:taskId", auth, taskController.deleteTask);
 
 module.exports = router;

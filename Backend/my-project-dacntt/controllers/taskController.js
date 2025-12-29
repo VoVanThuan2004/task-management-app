@@ -13,8 +13,11 @@ const { ObjectId } = require("mongodb");
 const reminderQueue = require("../services/reminderQueue");
 const createActivityLogTask = require("../utils/createActivityLogTask");
 const User = require("../models/user");
-const Board = require("../models/board");
 const activityLogQueue = require("../services/activityLogQueue");
+const TaskAssignee = require("../models/taskAssignee");
+const EmojiReaction = require("../models/emojiReaction");
+const ActivityLog = require("../models/activityLog");
+const mongoose = require("mongoose");
 
 const addTask = async (req, res) => {
   try {
@@ -256,8 +259,13 @@ const getFullTaskWithTotals = async (taskId) => {
   ]);
 
   // Logic mới dùng CheckItem model
-  const totalItems = await CheckItem.countDocuments({ taskId: new ObjectId(taskId) });
-  const completedItems = await CheckItem.countDocuments({ taskId: new ObjectId(taskId), isCompleted: true });
+  const totalItems = await CheckItem.countDocuments({
+    taskId: new ObjectId(taskId),
+  });
+  const completedItems = await CheckItem.countDocuments({
+    taskId: new ObjectId(taskId),
+    isCompleted: true,
+  });
 
   return {
     _id: task._id,
@@ -501,7 +509,8 @@ const updateDeadlineTask = async (req, res) => {
         { delay: nearDeadlineDelay, jobId: `${task._id}-nearDeadline` }
       );
       console.log(
-        `⏳ [markNearDeadline] Task ${task.title} (ID: ${task._id
+        `⏳ [markNearDeadline] Task ${task.title} (ID: ${
+          task._id
         }), dueDate: ${task.dueDate.toISOString()}, now: ${new Date(
           now
         ).toISOString()}, delay: ${nearDeadlineDelay} ms`
@@ -515,7 +524,8 @@ const updateDeadlineTask = async (req, res) => {
         { delay: overdueDelay, jobId: `${task._id}-overdue` }
       );
       console.log(
-        `⏳ [markOverdue] Task ${task.title} (ID: ${task._id
+        `⏳ [markOverdue] Task ${task.title} (ID: ${
+          task._id
         }), dueDate: ${task.dueDate.toISOString()}, now: ${new Date(
           now
         ).toISOString()}, delay: ${overdueDelay} ms`
@@ -635,53 +645,6 @@ const updateTaskDescription = async (req, res) => {
   }
 };
 
-// Xóa task - chuyển trạng thái isArchived = true
-const deleteTask = async (req, res) => {
-  try {
-    const taskId = req.params.taskId;
-
-    const existingTask = await Task.findById(taskId);
-    if (!existingTask) {
-      return res.status(404).json({
-        status: "error",
-        code: 404,
-        message: "Task không tồn tại",
-      });
-    }
-
-    existingTask.isArchived = true;
-    await existingTask.save();
-
-    // Gửi lên Socket
-    const io = getIO();
-    io.to(existingTask.boardId.toString()).emit("taskDeleted", {
-      _id: existingTask._id,
-      columnId: existingTask.columnId,
-      boardId: existingTask.boardId,
-    });
-
-    // Gửi thông báo socket
-
-    return res.status(200).json({
-      status: "success",
-      code: 200,
-      message: "Xóa task thành công",
-      data: {
-        _id: existingTask._id,
-        columnId: existingTask.columnId,
-        boardId: existingTask.boardId,
-        isArchived: true,
-      },
-    });
-  } catch (error) {
-    return res.status(500).json({
-      status: "error",
-      code: 500,
-      message: "Lỗi hệ thống: " + error.message,
-    });
-  }
-};
-
 const toggleLabelOnTask = async (req, res) => {
   try {
     const { taskId, labelId } = req.body;
@@ -733,8 +696,9 @@ const toggleLabelOnTask = async (req, res) => {
 
     return res.status(200).json({
       status: "success",
-      message: `Label ${action === "added" ? "được gắn vào" : "bị gỡ khỏi"
-        } task thành công`,
+      message: `Label ${
+        action === "added" ? "được gắn vào" : "bị gỡ khỏi"
+      } task thành công`,
       data: { taskId, labelId, title: label.title, color: label.color, action },
     });
   } catch (error) {
@@ -860,8 +824,7 @@ const uploadFile = async (req, res) => {
     }
 
     // 2. Kiểm tra task
-    const [task, user] = await Task.findById(taskId);
-
+    const task = await Task.findById(taskId).lean();
     if (!task) {
       await deleteUploadedFileCloudinary(req.file);
       return res.status(404).json({
@@ -1282,7 +1245,6 @@ const toggleTask = async (req, res) => {
   }
 };
 
-
 const getPrioritySuggestion = async (req, res) => {
   try {
     const taskId = req.params.taskId;
@@ -1291,7 +1253,9 @@ const getPrioritySuggestion = async (req, res) => {
     const fullTask = await getFullTaskWithTotals(taskId);
 
     if (!fullTask) {
-      return res.status(404).json({ status: "error", message: "Task không tồn tại" });
+      return res
+        .status(404)
+        .json({ status: "error", message: "Task không tồn tại" });
     }
 
     // 2. Tính toán số liệu checklist (Dùng CheckItem model)
@@ -1306,9 +1270,9 @@ const getPrioritySuggestion = async (req, res) => {
           dueDate: fullTask.dueDate ? fullTask.dueDate.toISOString() : null,
           isCompleted: fullTask.isCompleted,
           totalCheckItems: totalItems,
-          completedCheckItems: completedItems
-        }
-      ]
+          completedCheckItems: completedItems,
+        },
+      ],
     };
 
     // 4. Gọi AI Service
@@ -1318,7 +1282,10 @@ const getPrioritySuggestion = async (req, res) => {
     // Lưu ý: Nếu chạy trong Docker Network thì dùng http://ai-service:8001, nhưng nodejs chạy ngoài thì localhost là đúng.
     const aiResponse = await axios.post(`${aiUrl}/predict-priority`, payload);
 
-    if (aiResponse.data.status === 'success' && aiResponse.data.data.length > 0) {
+    if (
+      aiResponse.data.status === "success" &&
+      aiResponse.data.data.length > 0
+    ) {
       const result = aiResponse.data.data[0];
 
       return res.status(200).json({
@@ -1326,18 +1293,128 @@ const getPrioritySuggestion = async (req, res) => {
         data: {
           taskId: result.taskId,
           priorityScore: result.priorityScore,
-          priorityLabel: result.priorityScore >= 80 ? "Critical" :
-            result.priorityScore >= 50 ? "High" :
-              result.priorityScore >= 20 ? "Medium" : "Low"
-        }
+          priorityLabel:
+            result.priorityScore >= 80
+              ? "Critical"
+              : result.priorityScore >= 50
+              ? "High"
+              : result.priorityScore >= 20
+              ? "Medium"
+              : "Low",
+        },
       });
     } else {
-      return res.status(500).json({ status: "error", message: "AI Service không trả về kết quả" });
+      return res
+        .status(500)
+        .json({ status: "error", message: "AI Service không trả về kết quả" });
     }
-
   } catch (error) {
     console.error("AI Priority Error:", error.message);
-    return res.status(500).json({ status: "error", message: "Lỗi khi gọi AI: " + error.message });
+    return res
+      .status(500)
+      .json({ status: "error", message: "Lỗi khi gọi AI: " + error.message });
+  }
+};
+
+const deleteTask = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const taskId = req.params.taskId;
+    if (!taskId) {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Thiếu taskId",
+      });
+    }
+
+    // 1. Kiểm tra task có tồn tại
+    const task = await Task.findById(taskId).session(session);
+    if (!task) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Task không tồn tại",
+      });
+    }
+
+    // 2. TaskAssignee
+    await TaskAssignee.deleteMany({ taskId }).session(session);
+    
+    // 3. Attachment
+    const attachments = await Attachment.find({ taskId }).session(session);
+    if (attachments.length > 0) {
+      for (const a of attachments) {
+        if (a.filePublicId) {
+          await cloudinary.uploader.destroy(a.filePublicId);
+          await Attachment.deleteOne({ _id: a._id }).session(session);
+        }
+      }
+    }
+
+    // 4. Comments
+    const comments = await Comment.find({ taskId }).session(session);
+    if (comments.length > 0) {
+      const commentIds = comments.map((c) => c._id);
+      await EmojiReaction.deleteMany({
+        commentId: { $in: commentIds },
+      }).session(session);
+      await Comment.deleteMany({ taskId }).session(session);
+    }
+
+    // 5. ActivityLog
+    await ActivityLog.deleteMany({ taskId }).session(session);
+
+    // 6. Task Label
+    await TaskLabel.deleteMany({ taskId }).session(session);
+
+    // 7. Check Item
+    await CheckItem.deleteMany({ taskId }).session(session);
+
+    // 8. Xóa task chính
+    await Task.deleteOne({ _id: taskId });
+
+    await session.commitTransaction();
+
+    // Emit socket
+    const io = getIO();
+    io.to(task.boardId.toString()).emit("deleteTask", {
+      taskId,
+    });
+
+    // Xóa jobId queue redis chạy nền (task, checkItem)
+    const jobIds = [
+      `${task._id}-reminder`,
+      `${task._id}-nearDeadline`,
+      `${task._id}-overdue`,
+    ];
+    for (const id of jobIds) {
+      const oldJob = await reminderQueue.getJob(id);
+      if (oldJob) {
+        await oldJob.remove();
+        console.log(`Đã xóa job cũ: ${id}`);
+      }
+    }
+
+    return res.status(200).json({
+      status: "success",
+      code: 200,
+      message: "Xóa task thành công",
+      data: {
+        taskId,
+      },
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    return res.status(500).json({
+      status: "error",
+      code: 500,
+      message: "Lỗi hệ thống: " + error,
+    });
+  } finally {
+    await session.endSession();
   }
 };
 

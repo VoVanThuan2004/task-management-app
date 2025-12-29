@@ -22,6 +22,7 @@ const Column = React.memo(
     onTaskClick,
     isMember = false,
     loading,
+    onDeleteTask
   }) => {
     const isReadOnly = !isMember;
 
@@ -118,6 +119,7 @@ const Column = React.memo(
                         index={idx}
                         onClick={onTaskClick}
                         onToggleComplete={onToggleTaskComplete}
+                        onDeleteTask={onDeleteTask}
                         isReadOnly={isReadOnly}
                       />
                     ))}
