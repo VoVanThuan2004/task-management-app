@@ -118,6 +118,35 @@ const getAllActivityLogsTask = async (req, res) => {
   }
 };
 
+const getTotalActivityLogs = async (req, res) => {
+  try {
+    const taskId = req.params.taskId;
+    if (!taskId) {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Thiếu taskId"
+      })
+    }
+
+    const totalActivityLogs = await ActivityLog.countDocuments({ taskId });
+
+    return res.status(200).json({
+      status: "success",
+      code: 200,
+      message: "Lấy tổng số hoạt động của task",
+      data: totalActivityLogs
+    })
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      code: 500,
+      message: "Lỗi hệ thống: " + error,
+    })
+  }
+}
+
 module.exports = {
   getAllActivityLogsTask,
+  getTotalActivityLogs,
 };

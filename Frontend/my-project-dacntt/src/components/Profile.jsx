@@ -126,7 +126,7 @@ const Profile = ({
       ) : (
         <button
           onClick={handleLogin}
-          className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full px-6 py-2.5 shadow-lg hover:shadow-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 font-medium"
+          className="flex items-center gap-2 bg-blue-600 cursor-pointer text-white rounded-full px-6 py-2.5 shadow-lg hover:shadow-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 font-medium"
         >
           <LogIn size={18} />
           <span>Đăng nhập</span>

@@ -6,7 +6,7 @@ import { vi } from "date-fns/locale";
 import { ActionConfig } from "./ActionConfig";
 import Avatar from "../Avatar";
 
-const TaskActivityLog = ({ taskId, socket }) => {
+const TaskActivityLog = ({ taskId, socket, onTotalChange }) => {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -20,6 +20,13 @@ const TaskActivityLog = ({ taskId, socket }) => {
 
   const httpUrl = import.meta.env.VITE_API_URL;
   const accessToken = localStorage.getItem("accessToken");
+
+  // Mỗi khi totalActivityLogs thay đổi → báo lên component cha
+  useEffect(() => {
+    if (onTotalChange) {
+      onTotalChange(pagination.totalActivityLogs);
+    }
+  }, [pagination.totalActivityLogs, onTotalChange]);
 
   useEffect(() => {
     fetchActivityLogs(1);
@@ -111,8 +118,8 @@ const TaskActivityLog = ({ taskId, socket }) => {
         <>
           {/* Timeline Header */}
           {/* === HEADER – Lịch sử hoạt động === */}
-          <div className="flex items-center justify-between mb-4 sticky top-0 bg-white z-20 py-3 border-b border-gray-100">
-            <div className="flex items-center gap-3">
+          {/* <div className="flex items-center justify-between mb-4 sticky top-0 bg-white z-20 py-3 border-b border-gray-100">
+            <div className="flex items-center gap-3 px-2">
               <h3 className="font-semibold text-gray-800 flex items-center gap-2">
                 <Clock size={18} />
                 <span>Lịch sử hoạt động</span>
@@ -121,10 +128,10 @@ const TaskActivityLog = ({ taskId, socket }) => {
                 {pagination.totalActivityLogs} sự kiện
               </span>
             </div>
-          </div>
+          </div> */}
 
           {/* Timeline */}
-          <div className="relative">
+          <div className="relative mt-1">
             {/* Timeline line */}
             <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-gradient-to-b from-blue-400 to-purple-500"></div>
 

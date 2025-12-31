@@ -12,6 +12,7 @@ import axios from "axios";
 import Picker from "emoji-picker-react";
 import TaskActivityLog from "../TaskModal/TaskActivityLog";
 import Avatar from "../Avatar";
+import toast from "react-hot-toast";
 
 const TABS = { COMMENTS: "comments", ACTIVITY: "activity" };
 
@@ -37,11 +38,11 @@ const TaskActivityPanel = ({
   const commentEditorRef = useRef(null);
   const [files, setFiles] = useState([]); // File đính kèm
   const fileInputRef = useRef(null);
-
   const httpUrl = import.meta.env.VITE_API_URL;
   const userId = localStorage.getItem("userId");
-
   const limit = 10; // cố định
+
+  const [activityCount, setActivityCount] = useState(0);
 
   // === Tải comment ===
   const fetchComments = useCallback(
@@ -77,6 +78,29 @@ const TaskActivityPanel = ({
       fetchComments(1, false);
     }
   }, [activeTab, taskId, fetchComments]);
+
+  // === Tải tổng số hoạt động ===
+  const fetchTotalActivityLogs = async () => {
+    try {
+      const res = await axios.get(
+        `${httpUrl}/api/v1/activity-log/${taskId}/count`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      setActivityCount(res.data.data);
+    } catch (error) {
+      console.log(error);
+      toast.error("Lỗi hệ thống khi tải hoạt động task");
+    }
+  };
+
+  useEffect(() => {
+    fetchTotalActivityLogs();
+  }, [taskId]);
 
   // === Socket: nhận comment mới ===
   useEffect(() => {
@@ -257,6 +281,11 @@ const TaskActivityPanel = ({
         >
           <Bell size={16} />
           Thông báo hoạt động
+          {activityCount > 0 && (
+            <span className="ml-1 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">
+              {activityCount}
+            </span>
+          )}
         </button>
       </div>
 
@@ -377,7 +406,11 @@ const TaskActivityPanel = ({
             </div>
           </>
         ) : (
-          <TaskActivityLog taskId={taskId} socket={socket} />
+          <TaskActivityLog
+            taskId={taskId}
+            socket={socket}
+            onTotalChange={setActivityCount}
+          />
         )}
       </div>
     </div>
@@ -390,6 +423,8 @@ const CommentItem = ({ comment, onDelete, handleEmojiReaction }) => {
   const currentUserId = localStorage.getItem("userId");
   const isMyComment = comment.user._id === currentUserId;
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const pickerRef = useRef(null);
+  const commentRef = useRef(null);
 
   const time = new Date(comment.createdAt).toLocaleString("vi-VN", {
     hour: "2-digit",
@@ -408,8 +443,13 @@ const CommentItem = ({ comment, onDelete, handleEmojiReaction }) => {
     if (!showEmojiPicker) return;
 
     const handleClickOutside = (e) => {
-      // Nếu click ngoài vùng comment item
-      if (!e.target.closest(".comment-item")) {
+      // Nếu click KHÔNG nằm trong comment item HOẶC picker → đóng
+      if (
+        commentRef.current &&
+        !commentRef.current.contains(e.target) &&
+        pickerRef.current &&
+        !pickerRef.current.contains(e.target)
+      ) {
         setShowEmojiPicker(false);
       }
     };
@@ -419,7 +459,7 @@ const CommentItem = ({ comment, onDelete, handleEmojiReaction }) => {
   }, [showEmojiPicker]);
 
   return (
-    <div className="flex gap-3 group relative">
+    <div className="flex gap-3 group relative" ref={commentRef}>
       {/* Avatar */}
       <Avatar user={user} size="w-10 h-10" />
 
@@ -502,7 +542,7 @@ const CommentItem = ({ comment, onDelete, handleEmojiReaction }) => {
             )}
 
             {/* Nút mở Emoji Picker */}
-            <div className="relative">
+            <div className="relative" ref={pickerRef}>
               <button
                 onClick={(e) => {
                   e.stopPropagation();

@@ -228,6 +228,7 @@ export default function HomePage() {
 
   // Hàm lấy trạng thái VIP
   const fetchVipStatus = async () => {
+    if (!accessToken) return;
     if (activeSection !== "vip") return;
     setLoadingVip(true);
     try {
@@ -350,7 +351,6 @@ export default function HomePage() {
       {/* Main Content */}
       <main className="flex-1 p-4 md:p-8 overflow-y-auto">
         {/* Header */}
-        {/* Header - Đã tối ưu responsive cho mobile */}
         <div className="flex items-center justify-between mb-6">
           {/* Tiêu đề - chiếm hết không gian còn lại, căn trái */}
           <h1 className="text-xl md:text-2xl font-bold text-gray-800 flex-1 truncate pr-4">
@@ -383,7 +383,7 @@ export default function HomePage() {
             <div className="flex items-center justify-center min-h-[80vh] px-4 py-8">
               <div className="w-full max-w-lg">
                 {!accessToken ? (
-                  <h2 className="text-xl font-bold text-gray-800 text-center">
+                  <h2 className="text-2xl font-bold text-gray-800 text-center">
                     Vui lòng đăng nhập
                   </h2>
                 ) : (
