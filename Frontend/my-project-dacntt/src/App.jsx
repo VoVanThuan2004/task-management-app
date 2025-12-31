@@ -19,6 +19,7 @@ import PrivateRoute from "./components/PrivateRoutes";
 import UserPage from "./pages/admin/UserPage";
 import PaymentHistory from "./pages/PaymentHistory";
 import DashboardPage from "./pages/admin/DashboardPage";
+import HeaderTest from "./pages/HeaderTest";
 
 function App() {
   return (
@@ -119,6 +120,7 @@ function App() {
             <Route path="/change-password" element={<ChangePassword />} />
             <Route path="/payment-history" element={<PaymentHistory />} />
             <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="/test" element={<HeaderTest />} />
 
             {/* ADMIN */}
             <Route

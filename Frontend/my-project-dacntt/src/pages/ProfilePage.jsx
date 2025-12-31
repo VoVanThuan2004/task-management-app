@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import Avatar from "../components/Avatar";
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 
 const httpUrl = import.meta.env.VITE_API_URL;
 const accessToken = localStorage.getItem("accessToken");
@@ -22,7 +23,6 @@ export default function ProfilePage() {
   const [fullName, setFullName] = useState("");
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
-  const [toast, setToast] = useState({ show: false, type: "", message: "" });
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
 
@@ -44,7 +44,7 @@ export default function ProfilePage() {
         setFullName(user.fullName || "");
         setAvatarPreview(user.avatar || null);
       } catch (err) {
-        showToast("error", "Không thể tải thông tin cá nhân");
+        toast.error("Không thể tải thông tin cá nhân")
         console.log(err);
       } finally {
         setLoading(false);
@@ -53,10 +53,7 @@ export default function ProfilePage() {
     fetchProfile();
   }, []);
 
-  const showToast = (type, message) => {
-    setToast({ show: true, type, message });
-    setTimeout(() => setToast({ show: false, type: "", message: "" }), 4000);
-  };
+  
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -64,7 +61,7 @@ export default function ProfilePage() {
 
     // Kiểm tra kích thước (5MB)
     if (file.size > 5 * 1024 * 1024) {
-      showToast("error", "Ảnh không được vượt quá 5MB");
+      toast.error("Ảnh không được vượt quá 5MB")
       return;
     }
 
@@ -80,7 +77,7 @@ export default function ProfilePage() {
 
   const handleSave = async () => {
     if (!fullName.trim()) {
-      showToast("error", "Vui lòng nhập họ tên");
+      toast.error("Vui lòng nhập họ tên")
       return;
     }
 
@@ -106,11 +103,12 @@ export default function ProfilePage() {
         avatar: selectedFile ? avatarPreview : prev.avatar,
       }));
 
-      showToast("success", "Cập nhật thông tin thành công!");
       setSelectedFile(null);
+      toast.success("Cập nhật thông tin thành công!")
+      
     } catch (err) {
       const msg = err.response?.data?.message || "Cập nhật thất bại";
-      showToast("error", msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }

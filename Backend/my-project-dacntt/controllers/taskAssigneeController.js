@@ -52,12 +52,12 @@ const assignMember = async (req, res) => {
     });
 
     // 3. Gửi thông báo email
-    // await sendAssignTaskEmail(
-    //   user.email,
-    //   task,
-    //   task.boardId.title,
-    //   inviterName
-    // );
+    await sendAssignTaskEmail(
+      user.email,
+      task,
+      task.boardId.title,
+      inviterName
+    );
 
     // 4. Gửi socket - cập nhật realtime thông tin thành viên
     const io = getIO();

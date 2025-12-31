@@ -167,7 +167,7 @@ export default function BoardDetail() {
     });
 
     socket.on("taskAdded", (data) => {
-      console.log("➕ Task added:", data);
+      console.log("Task added:", data);
       setColumns((prevColumns) =>
         prevColumns.map((col) =>
           col._id === data.columnId
@@ -180,6 +180,12 @@ export default function BoardDetail() {
                     title: data.title,
                     position: data.position,
                     isCompleted: data.isCompleted,
+                    totalCheckItems: 0,
+                    totalCheckItemsCompleted: 0,
+                    totalComments: 0,
+                    totalAttachments: 0,
+                    taskLabels: [],
+                    taskAssignees: [],
                   },
                 ].sort((a, b) => a.position - b.position),
               }
@@ -728,7 +734,7 @@ export default function BoardDetail() {
         [columnId]: "",
       }));
     } catch (err) {
-      console.error("❌ Lỗi khi thêm task:", err);
+      console.error("Lỗi khi thêm task:", err);
     } finally {
       setLoading(false);
     }
@@ -980,8 +986,8 @@ export default function BoardDetail() {
       />
 
       {/* Tuyết rơi - phủ toàn màn hình, nhưng không che nội dung */}
-      {/* <Snowfall
-        snowflakeCount={125} // số lượng tuyết (tùy chỉnh 100-300)
+      <Snowfall
+        snowflakeCount={115} // số lượng tuyết (tùy chỉnh 100-300)
         speed={[0.5, 2]} // tốc độ rơi chậm - nhanh
         wind={[-0.5, 2]} // gió thổi nhẹ ngang
         radius={[0.5, 4.0]} // kích thước tuyết nhỏ đến trung bình
@@ -994,11 +1000,10 @@ export default function BoardDetail() {
           pointerEvents: "none", // quan trọng: tuyết không block click chuột
           zIndex: 1, // dưới header và nội dung chính
         }}
-      /> */}
+      />
 
       <main className="flex-1 overflow-x-auto p-6" style={getBoardBackground()}>
         <DragDropContext onDragEnd={handleDragEnd}>
-          {/* BỌC TOÀN BỘ BẢNG + NÚT THÊM TRONG 1 FLEX CONTAINER */}
           <div className="flex gap-4 items-start min-w-max">
             {/* === DANH SÁCH CÁC COLUMN (có thể drag) === */}
             <Droppable droppableId="board" type="COLUMN" direction="horizontal">

@@ -1,12 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import Avatar from "./Avatar";
-import {
-  User,
-  LogOut,
-  LogIn,
-  KeyRoundIcon,
-  Wallet
-} from "lucide-react";
+import { User, LogOut, LogIn, KeyRoundIcon, Wallet } from "lucide-react";
+import { useEffect, useRef } from "react";
 
 const Profile = ({
   isLoggedIn,
@@ -16,6 +11,27 @@ const Profile = ({
   handleLogout,
 }) => {
   const navigate = useNavigate();
+
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    // Hàm đóng menu khi click ra ngoài
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setShowProfileMenu(false);
+      }
+    };
+
+    // Chỉ thêm listener khi menu đang mở
+    if (showProfileMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    // Cleanup: xóa listener khi component unmount hoặc menu đóng
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showProfileMenu]);
 
   const handleLogin = () => {
     navigate("/login");
@@ -41,7 +57,7 @@ const Profile = ({
 
           {/* Profile Menu Dropdown */}
           {showProfileMenu && (
-            <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden z-50">
+            <div ref={menuRef} className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden z-50">
               {/* Header */}
               <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-4 bg-gradient-to-r from-blue-50 to-indigo-50">
                 <Avatar

@@ -12,10 +12,11 @@ import {
   CheckSquare,
   UserPlus,
   CalendarClock,
+  Loader2
 } from "lucide-react";
 import Avatar from "../Avatar";
-import DatePicker from "react-datepicker"; // ← Thêm
-import "react-datepicker/dist/react-datepicker.css"; // ← Thêm
+import DatePicker from "react-datepicker"; 
+import "react-datepicker/dist/react-datepicker.css";
 
 const httpUrl = import.meta.env.VITE_API_URL;
 
@@ -35,7 +36,7 @@ const CheckItemsSection = React.memo(
     // Notify parent about progress
     useEffect(() => {
       if (onProgressChange) {
-        const completed = checkItems.filter(i => i.isCompleted).length;
+        const completed = checkItems.filter((i) => i.isCompleted).length;
         onProgressChange(checkItems.length, completed);
       }
     }, [checkItems, onProgressChange]);
@@ -62,6 +63,11 @@ const CheckItemsSection = React.memo(
     // State cập nhật title
     const [editingCheckItemId, setEditingCheckItemId] = useState(null);
     const [editingTitle, setEditingTitle] = useState("");
+
+    // State xóa việc cần làm
+    // const [showDeleteItemPopup, setShowDeleteItemPopup] = useState(null);
+    const [itemIdDelete, setItemIdDelete] = useState(null);
+    const [itemTitleDelete, setItemTitleDelete] = useState("");
 
     // Reset toàn bộ khi taskId thay đổi
     useEffect(() => {
@@ -203,11 +209,11 @@ const CheckItemsSection = React.memo(
           prev.map((item) =>
             item._id === data._id
               ? {
-                ...item,
-                startDate: data.startDate || null,
-                dueDate: data.dueDate || null,
-                status: data.status || null,
-              }
+                  ...item,
+                  startDate: data.startDate || null,
+                  dueDate: data.dueDate || null,
+                  status: data.status || null,
+                }
               : item
           )
         );
@@ -226,11 +232,11 @@ const CheckItemsSection = React.memo(
           prev.map((item) =>
             item._id === data._id
               ? {
-                ...item,
-                assignedTo: data.assignedTo,
-                fullName: data.fullName,
-                avatar: data.avatar,
-              }
+                  ...item,
+                  assignedTo: data.assignedTo,
+                  fullName: data.fullName,
+                  avatar: data.avatar,
+                }
               : item
           )
         );
@@ -313,20 +319,27 @@ const CheckItemsSection = React.memo(
       }
     };
 
-    const deleteCheckItem = async (id) => {
-      if (!confirm("Xóa checklist này?")) return;
+    const deleteCheckItem = async () => {
+      // if (!confirm("Xóa checklist này?")) return;
+      console.log("itemId: ", itemIdDelete);
+      if (!itemIdDelete) return;
 
       if (isReadOnly) return;
-
+      setLoading(true);
       try {
-        await axios.delete(`${httpUrl}/api/v1/check-item/${id}`, {
+        await axios.delete(`${httpUrl}/api/v1/check-item/${itemIdDelete}`, {
           headers: { Authorization: `Bearer ${accessToken}` },
         });
 
-        // 👉 Update UI local ngay lập tức
-        setCheckItems((prev) => prev.filter((i) => i._id !== id));
+        // Update UI local ngay lập tức
+        setCheckItems((prev) => prev.filter((i) => i._id !== itemIdDelete));
+        setItemIdDelete("");
       } catch (err) {
         console.error("Lỗi khi xóa:", err);
+        setItemIdDelete("");
+        setItemTitleDelete("");
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -447,11 +460,11 @@ const CheckItemsSection = React.memo(
           prev.map((item) =>
             item._id === itemId
               ? {
-                ...item,
-                startDate: updatedItem.startDate || null,
-                dueDate: updatedItem.dueDate || null,
-                status: updatedItem.status || null,
-              }
+                  ...item,
+                  startDate: updatedItem.startDate || null,
+                  dueDate: updatedItem.dueDate || null,
+                  status: updatedItem.status || null,
+                }
               : item
           )
         );
@@ -546,11 +559,11 @@ const CheckItemsSection = React.memo(
           prev.map((i) =>
             i._id === checkItemId
               ? {
-                ...i,
-                assignedTo: updatedItem.checkItem?.assignedTo || null,
-                fullName: updatedItem.fullName || null,
-                avatar: updatedItem.avatar || null,
-              }
+                  ...i,
+                  assignedTo: updatedItem.checkItem?.assignedTo || null,
+                  fullName: updatedItem.fullName || null,
+                  avatar: updatedItem.avatar || null,
+                }
               : i
           )
         );
@@ -593,11 +606,11 @@ const CheckItemsSection = React.memo(
           prev.map((i) =>
             i._id === checkItemId
               ? {
-                ...i,
-                assignedTo: null,
-                fullName: null,
-                avatar: null,
-              }
+                  ...i,
+                  assignedTo: null,
+                  fullName: null,
+                  avatar: null,
+                }
               : i
           )
         );
@@ -606,6 +619,17 @@ const CheckItemsSection = React.memo(
       } finally {
         setLoading(false);
       }
+    };
+
+    // Hàm mở popup xóa việc cần làm
+    const handleOpenPopupDeleteItem = (itemId, itemTitle) => {
+      setItemIdDelete(itemId);
+      setItemTitleDelete(itemTitle);
+    };
+
+    const handleCloseDeleteItemPopup = () => {
+      setItemIdDelete(null);
+      setItemTitleDelete("");
     };
 
     // ==========================
@@ -634,8 +658,9 @@ const CheckItemsSection = React.memo(
             <div className="flex items-center gap-2 text-sm">
               <div className="w-32 bg-gray-200 rounded-full h-2">
                 <div
-                  className={`h-2 rounded-full transition-all duration-300 ${progress === 100 ? "bg-green-500" : "bg-blue-500"
-                    }`}
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    progress === 100 ? "bg-green-500" : "bg-blue-500"
+                  }`}
                   style={{ width: `${progress}%` }}
                 />
               </div>
@@ -658,10 +683,10 @@ const CheckItemsSection = React.memo(
                 {checkItems.map((item, index) => {
                   const assignee = item.assignedTo
                     ? {
-                      _id: item.assignedTo,
-                      fullName: item.fullName || "Unknown",
-                      avatar: item.avatar,
-                    }
+                        _id: item.assignedTo,
+                        fullName: item.fullName || "Unknown",
+                        avatar: item.avatar,
+                      }
                     : null;
 
                   const isDatePickerOpen = datePickerOpenFor === item._id;
@@ -677,10 +702,11 @@ const CheckItemsSection = React.memo(
                         <div
                           ref={provided.innerRef}
                           {...provided.draggableProps}
-                          className={`group flex items-center gap-3 p-3 rounded-lg bg-gray-50 transition-all relative ${snapshot.isDragging
+                          className={`group flex items-center gap-3 p-3 rounded-lg bg-gray-50 transition-all relative ${
+                            snapshot.isDragging
                               ? "shadow-lg bg-white ring-2 ring-blue-400 z-50"
                               : "hover:bg-gray-100"
-                            }`}
+                          }`}
                         >
                           {/* Drag handle */}
                           {!isReadOnly && (
@@ -696,10 +722,11 @@ const CheckItemsSection = React.memo(
                           <button
                             onClick={() => toggleComplete(item._id)}
                             disabled={isReadOnly}
-                            className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${item.isCompleted
+                            className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                              item.isCompleted
                                 ? "bg-green-500 border-green-500"
                                 : "border-gray-300 bg-white"
-                              }`}
+                            }`}
                           >
                             {item.isCompleted && (
                               <Check className="w-3 h-3 text-white" />
@@ -735,13 +762,15 @@ const CheckItemsSection = React.memo(
                                   setEditingCheckItemId(item._id);
                                   setEditingTitle(item.title);
                                 }}
-                                className={`text-sm font-medium break-words cursor-text select-text ${item.isCompleted
+                                className={`text-sm font-medium break-words cursor-text select-text ${
+                                  item.isCompleted
                                     ? "line-through text-gray-500"
                                     : "text-gray-800"
-                                  } ${!isReadOnly
+                                } ${
+                                  !isReadOnly
                                     ? "hover:bg-gray-200 px-2 -mx-2 py-1 rounded transition"
                                     : ""
-                                  }`}
+                                }`}
                               >
                                 {item.title}
                               </p>
@@ -805,10 +834,11 @@ const CheckItemsSection = React.memo(
                                   {/* Chỉ hiển thị status nếu CHƯA hoàn thành */}
                                   {!item.isCompleted && item.status && (
                                     <span
-                                      className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium ${item.status === "Quá hạn"
+                                      className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium ${
+                                        item.status === "Quá hạn"
                                           ? "bg-red-100 text-red-800"
                                           : "bg-amber-100 text-amber-800"
-                                        }`}
+                                      }`}
                                     >
                                       {item.status}
                                     </span>
@@ -839,7 +869,9 @@ const CheckItemsSection = React.memo(
                               </button>
 
                               <button
-                                onClick={() => deleteCheckItem(item._id)}
+                                onClick={() =>
+                                  handleOpenPopupDeleteItem(item._id, item.title)
+                                }
                                 className="p-2 hover:bg-gray-200 rounded transition"
                                 title="Xóa mục"
                               >
@@ -850,399 +882,506 @@ const CheckItemsSection = React.memo(
 
                           {/* POPUP DATE PICKER */}
                           {isDatePickerOpen && (
-                            <div className="absolute top-full right-1 z-50 bg-white rounded-lg shadow-xl border border-gray-200 p-4 w-80">
-                              <h4 className="text-sm font-semibold mb-3">
-                                Thời hạn hoàn thành
-                              </h4>
+                            <>
+                              <div
+                                className="fixed inset-0 z-40"
+                                onClick={() => {
+                                  setDatePickerOpenFor(null);
+                                  setSelectedStartDate(null);
+                                  setSelectedDueDate(null);
+                                  setSelectedStartTime({
+                                    hour: "00",
+                                    minute: "00",
+                                  });
+                                  setSelectedDueTime({
+                                    hour: "23",
+                                    minute: "59",
+                                  });
+                                }}
+                              />
 
-                              {/* Start Date (tùy chọn) */}
-                              <div className="mb-4">
-                                <label className="text-xs text-gray-600 mb-1 block">
-                                  Ngày bắt đầu (tùy chọn)
-                                </label>
-                                <DatePicker
-                                  selected={selectedStartDate}
-                                  onChange={(date) =>
-                                    setSelectedStartDate(date)
-                                  }
-                                  placeholderText="Chọn ngày bắt đầu"
-                                  dateFormat="dd/MM/yyyy"
-                                  className="w-full px-3 py-2 border border-orange-400 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-                                  popperPlacement="bottom-start"
-                                  minDate={new Date()}
-                                />
-                                {selectedStartDate && (
-                                  <div className="mt-2 grid grid-cols-2 gap-2">
-                                    <div>
-                                      <label className="text-xs text-gray-600 mb-1 block">
-                                        Giờ
-                                      </label>
-                                      <select
-                                        value={selectedStartTime.hour}
-                                        onChange={(e) =>
-                                          setSelectedStartTime((prev) => ({
-                                            ...prev,
-                                            hour: e.target.value,
-                                          }))
-                                        }
-                                        className="w-full px-3 py-2 border border-orange-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
-                                      >
-                                        {Array.from({ length: 24 }, (_, i) =>
-                                          i.toString().padStart(2, "0")
-                                        ).map((hour) => (
-                                          <option key={hour} value={hour}>
-                                            {hour}
-                                          </option>
-                                        ))}
-                                      </select>
+                              <div className="absolute top-full right-1 z-50 bg-white rounded-lg shadow-xl border border-gray-200 p-4 w-80">
+                                <h4 className="text-sm font-semibold mb-3">
+                                  Thời hạn hoàn thành
+                                </h4>
+
+                                {/* Start Date (tùy chọn) */}
+                                <div className="mb-4">
+                                  <label className="text-xs text-gray-600 mb-1 block">
+                                    Ngày bắt đầu (tùy chọn)
+                                  </label>
+                                  <DatePicker
+                                    selected={selectedStartDate}
+                                    onChange={(date) =>
+                                      setSelectedStartDate(date)
+                                    }
+                                    placeholderText="Chọn ngày bắt đầu"
+                                    dateFormat="dd/MM/yyyy"
+                                    className="w-full px-3 py-2 border border-orange-400 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                    popperPlacement="bottom-start"
+                                    minDate={new Date()}
+                                  />
+                                  {selectedStartDate && (
+                                    <div className="mt-2 grid grid-cols-2 gap-2">
+                                      <div>
+                                        <label className="text-xs text-gray-600 mb-1 block">
+                                          Giờ
+                                        </label>
+                                        <select
+                                          value={selectedStartTime.hour}
+                                          onChange={(e) =>
+                                            setSelectedStartTime((prev) => ({
+                                              ...prev,
+                                              hour: e.target.value,
+                                            }))
+                                          }
+                                          className="w-full px-3 py-2 border border-orange-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
+                                        >
+                                          {Array.from({ length: 24 }, (_, i) =>
+                                            i.toString().padStart(2, "0")
+                                          ).map((hour) => (
+                                            <option key={hour} value={hour}>
+                                              {hour}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                      <div>
+                                        <label className="text-xs text-gray-600 mb-1 block">
+                                          Phút
+                                        </label>
+                                        <select
+                                          value={selectedStartTime.minute}
+                                          onChange={(e) =>
+                                            setSelectedStartTime((prev) => ({
+                                              ...prev,
+                                              minute: e.target.value,
+                                            }))
+                                          }
+                                          className="w-full px-3 py-2 border border-orange-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
+                                        >
+                                          {Array.from({ length: 60 }, (_, i) =>
+                                            i.toString().padStart(2, "0")
+                                          ).map((minute) => (
+                                            <option key={minute} value={minute}>
+                                              {minute}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </div>
                                     </div>
-                                    <div>
-                                      <label className="text-xs text-gray-600 mb-1 block">
-                                        Phút
-                                      </label>
-                                      <select
-                                        value={selectedStartTime.minute}
-                                        onChange={(e) =>
-                                          setSelectedStartTime((prev) => ({
-                                            ...prev,
-                                            minute: e.target.value,
-                                          }))
-                                        }
-                                        className="w-full px-3 py-2 border border-orange-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
-                                      >
-                                        {Array.from({ length: 60 }, (_, i) =>
-                                          i.toString().padStart(2, "0")
-                                        ).map((minute) => (
-                                          <option key={minute} value={minute}>
-                                            {minute}
-                                          </option>
-                                        ))}
-                                      </select>
+                                  )}
+                                </div>
+
+                                {/* Due Date (chính) */}
+                                <div className="mb-4">
+                                  <label className="text-xs text-gray-600 mb-1 block">
+                                    Ngày hết hạn
+                                  </label>
+                                  <DatePicker
+                                    selected={selectedDueDate}
+                                    onChange={(date) =>
+                                      setSelectedDueDate(date)
+                                    }
+                                    placeholderText="Chọn ngày hết hạn"
+                                    dateFormat="dd/MM/yyyy"
+                                    className="w-full px-3 py-2 border border-orange-400 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                    popperPlacement="bottom-start"
+                                    minDate={
+                                      selectedStartDate
+                                        ? new Date(
+                                            Math.max(
+                                              selectedStartDate.getTime(),
+                                              new Date().getTime()
+                                            )
+                                          )
+                                        : new Date()
+                                    }
+                                  />
+                                  {selectedDueDate && (
+                                    <div className="mt-2 grid grid-cols-2 gap-2">
+                                      <div>
+                                        <label className="text-xs text-gray-600 mb-1 block">
+                                          Giờ
+                                        </label>
+                                        <select
+                                          value={selectedDueTime.hour}
+                                          onChange={(e) =>
+                                            setSelectedDueTime((prev) => ({
+                                              ...prev,
+                                              hour: e.target.value,
+                                            }))
+                                          }
+                                          className="w-full px-3 py-2 border border-orange-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
+                                        >
+                                          {Array.from({ length: 24 }, (_, i) =>
+                                            i.toString().padStart(2, "0")
+                                          ).map((hour) => (
+                                            <option key={hour} value={hour}>
+                                              {hour}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                      <div>
+                                        <label className="text-xs text-gray-600 mb-1 block">
+                                          Phút
+                                        </label>
+                                        <select
+                                          value={selectedDueTime.minute}
+                                          onChange={(e) =>
+                                            setSelectedDueTime((prev) => ({
+                                              ...prev,
+                                              minute: e.target.value,
+                                            }))
+                                          }
+                                          className="w-full px-3 py-2 border border-orange-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
+                                        >
+                                          {Array.from({ length: 60 }, (_, i) =>
+                                            i.toString().padStart(2, "0")
+                                          ).map((minute) => (
+                                            <option key={minute} value={minute}>
+                                              {minute}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </div>
                                     </div>
-                                  </div>
-                                )}
+                                  )}
+                                </div>
+
+                                {/* Validation message */}
+                                {selectedStartDate &&
+                                  selectedDueDate &&
+                                  new Date(
+                                    selectedStartDate.getFullYear(),
+                                    selectedStartDate.getMonth(),
+                                    selectedStartDate.getDate(),
+                                    parseInt(selectedStartTime.hour),
+                                    parseInt(selectedStartTime.minute)
+                                  ) >=
+                                    new Date(
+                                      selectedDueDate.getFullYear(),
+                                      selectedDueDate.getMonth(),
+                                      selectedDueDate.getDate(),
+                                      parseInt(selectedDueTime.hour),
+                                      parseInt(selectedDueTime.minute)
+                                    ) && (
+                                    <div className="mb-4 p-2 bg-red-50 border border-red-200 rounded text-red-600 text-xs">
+                                      Thời gian bắt đầu phải nhỏ hơn thời gian
+                                      hết hạn
+                                    </div>
+                                  )}
+
+                                <div className="flex justify-end gap-2">
+                                  <button
+                                    onClick={() => {
+                                      setDatePickerOpenFor(null);
+                                      setSelectedStartDate(null);
+                                      setSelectedDueDate(null);
+                                      setSelectedStartTime({
+                                        hour: "00",
+                                        minute: "00",
+                                      });
+                                      setSelectedDueTime({
+                                        hour: "23",
+                                        minute: "59",
+                                      });
+                                    }}
+                                    className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded"
+                                  >
+                                    Hủy
+                                  </button>
+                                  <button
+                                    onClick={() =>
+                                      updateDeadlineCheckItem(item._id)
+                                    }
+                                    disabled={
+                                      !selectedDueDate ||
+                                      (selectedStartDate &&
+                                        selectedDueDate &&
+                                        new Date(
+                                          selectedStartDate.getFullYear(),
+                                          selectedStartDate.getMonth(),
+                                          selectedStartDate.getDate(),
+                                          parseInt(selectedStartTime.hour),
+                                          parseInt(selectedStartTime.minute)
+                                        ) >=
+                                          new Date(
+                                            selectedDueDate.getFullYear(),
+                                            selectedDueDate.getMonth(),
+                                            selectedDueDate.getDate(),
+                                            parseInt(selectedDueTime.hour),
+                                            parseInt(selectedDueTime.minute)
+                                          ))
+                                    }
+                                    className="px-4 py-2 text-sm bg-orange-400 text-white rounded hover:bg-orange-500 disabled:opacity-50"
+                                  >
+                                    Lưu
+                                  </button>
+                                </div>
                               </div>
-
-                              {/* Due Date (chính) */}
-                              <div className="mb-4">
-                                <label className="text-xs text-gray-600 mb-1 block">
-                                  Ngày hết hạn
-                                </label>
-                                <DatePicker
-                                  selected={selectedDueDate}
-                                  onChange={(date) => setSelectedDueDate(date)}
-                                  placeholderText="Chọn ngày hết hạn"
-                                  dateFormat="dd/MM/yyyy"
-                                  className="w-full px-3 py-2 border border-orange-400 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-                                  popperPlacement="bottom-start"
-                                  minDate={
-                                    selectedStartDate
-                                      ? new Date(
-                                        Math.max(
-                                          selectedStartDate.getTime(),
-                                          new Date().getTime()
-                                        )
-                                      )
-                                      : new Date()
-                                  }
-                                />
-                                {selectedDueDate && (
-                                  <div className="mt-2 grid grid-cols-2 gap-2">
-                                    <div>
-                                      <label className="text-xs text-gray-600 mb-1 block">
-                                        Giờ
-                                      </label>
-                                      <select
-                                        value={selectedDueTime.hour}
-                                        onChange={(e) =>
-                                          setSelectedDueTime((prev) => ({
-                                            ...prev,
-                                            hour: e.target.value,
-                                          }))
-                                        }
-                                        className="w-full px-3 py-2 border border-orange-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
-                                      >
-                                        {Array.from({ length: 24 }, (_, i) =>
-                                          i.toString().padStart(2, "0")
-                                        ).map((hour) => (
-                                          <option key={hour} value={hour}>
-                                            {hour}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    </div>
-                                    <div>
-                                      <label className="text-xs text-gray-600 mb-1 block">
-                                        Phút
-                                      </label>
-                                      <select
-                                        value={selectedDueTime.minute}
-                                        onChange={(e) =>
-                                          setSelectedDueTime((prev) => ({
-                                            ...prev,
-                                            minute: e.target.value,
-                                          }))
-                                        }
-                                        className="w-full px-3 py-2 border border-orange-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
-                                      >
-                                        {Array.from({ length: 60 }, (_, i) =>
-                                          i.toString().padStart(2, "0")
-                                        ).map((minute) => (
-                                          <option key={minute} value={minute}>
-                                            {minute}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Validation message */}
-                              {selectedStartDate &&
-                                selectedDueDate &&
-                                new Date(
-                                  selectedStartDate.getFullYear(),
-                                  selectedStartDate.getMonth(),
-                                  selectedStartDate.getDate(),
-                                  parseInt(selectedStartTime.hour),
-                                  parseInt(selectedStartTime.minute)
-                                ) >=
-                                new Date(
-                                  selectedDueDate.getFullYear(),
-                                  selectedDueDate.getMonth(),
-                                  selectedDueDate.getDate(),
-                                  parseInt(selectedDueTime.hour),
-                                  parseInt(selectedDueTime.minute)
-                                ) && (
-                                  <div className="mb-4 p-2 bg-red-50 border border-red-200 rounded text-red-600 text-xs">
-                                    Thời gian bắt đầu phải nhỏ hơn thời gian hết
-                                    hạn
-                                  </div>
-                                )}
-
-                              <div className="flex justify-end gap-2">
-                                <button
-                                  onClick={() => {
-                                    setDatePickerOpenFor(null);
-                                    setSelectedStartDate(null);
-                                    setSelectedDueDate(null);
-                                    setSelectedStartTime({
-                                      hour: "00",
-                                      minute: "00",
-                                    });
-                                    setSelectedDueTime({
-                                      hour: "23",
-                                      minute: "59",
-                                    });
-                                  }}
-                                  className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded"
-                                >
-                                  Hủy
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    updateDeadlineCheckItem(item._id)
-                                  }
-                                  disabled={
-                                    !selectedDueDate ||
-                                    (selectedStartDate &&
-                                      selectedDueDate &&
-                                      new Date(
-                                        selectedStartDate.getFullYear(),
-                                        selectedStartDate.getMonth(),
-                                        selectedStartDate.getDate(),
-                                        parseInt(selectedStartTime.hour),
-                                        parseInt(selectedStartTime.minute)
-                                      ) >=
-                                      new Date(
-                                        selectedDueDate.getFullYear(),
-                                        selectedDueDate.getMonth(),
-                                        selectedDueDate.getDate(),
-                                        parseInt(selectedDueTime.hour),
-                                        parseInt(selectedDueTime.minute)
-                                      ))
-                                  }
-                                  className="px-4 py-2 text-sm bg-orange-400 text-white rounded hover:bg-orange-500 disabled:opacity-50"
-                                >
-                                  Lưu
-                                </button>
-                              </div>
-                            </div>
+                            </>
                           )}
 
                           {membersPopupOpenFor === item._id && (
-                            <div className="absolute top-full right-1 mt-2 z-50 bg-white rounded-lg shadow-xl border border-gray-200 p-4 w-96 max-h-96 overflow-y-auto">
-                              <h4 className="text-sm font-semibold mb-4 text-center">
-                                Giao nhiệm vụ cho thành viên
-                              </h4>
-
-                              {/* Overlay loading toàn popup khi đang assign */}
-                              {loading && (
-                                <div className="absolute inset-0 bg-white/50 rounded-lg flex items-center justify-center z-50">
-                                  <div className="flex flex-col items-center gap-3">
-                                    <div className="w-10 h-10 border-4 border-orange-400 border-t-transparent rounded-full animate-spin"></div>
-                                    <p className="text-sm text-gray-700 font-medium">
-                                      Đang giao nhiệm vụ...
-                                    </p>
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Danh sách thành viên */}
+                            <>
                               <div
-                                className={`space-y-3 ${loading
-                                    ? "opacity-50 pointer-events-none"
-                                    : ""
+                                className="fixed inset-0 z-40"
+                                onClick={() => closeMembersPopup()}
+                              />
+                              <div className="absolute top-full right-1 z-50 bg-white rounded-lg shadow-xl border border-gray-200 p-4 w-86 max-h-96 overflow-y-auto">
+                                <h4 className="text-sm font-semibold mb-4 text-center">
+                                  Giao nhiệm vụ cho thành viên
+                                </h4>
+
+                                {/* Overlay loading toàn popup khi đang assign */}
+                                {loading && (
+                                  <div className="absolute inset-0 bg-white/50 rounded-lg flex items-center justify-center z-50">
+                                    <div className="flex flex-col items-center gap-3">
+                                      <div className="w-10 h-10 border-4 border-orange-400 border-t-transparent rounded-full animate-spin"></div>
+                                      <p className="text-sm text-gray-700 font-medium">
+                                        Đang giao nhiệm vụ...
+                                      </p>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Danh sách thành viên */}
+                                <div
+                                  className={`space-y-3 ${
+                                    loading
+                                      ? "opacity-50 pointer-events-none"
+                                      : ""
                                   }`}
-                              >
-                                {boardMembers.map((member) => {
-                                  const isAssigned =
-                                    member.assignStatus === true;
+                                >
+                                  {boardMembers.map((member) => {
+                                    const isAssigned =
+                                      member.assignStatus === true;
 
-                                  return (
-                                    <div
-                                      key={member._id}
-                                      onClick={() =>
-                                        !isAssigned &&
-                                        assignMemberToCheckItem(
-                                          item._id,
-                                          member._id
-                                        )
-                                      }
-                                      className={`relative p-4 rounded-xl transition-all border ${isAssigned
-                                          ? "bg-orange-50 border-orange-200 shadow-sm cursor-default"
-                                          : "cursor-pointer hover:bg-gray-50 hover:shadow-md hover:border-blue-200 border-transparent"
-                                        } ${loading ? "cursor-not-allowed" : ""}`}
-                                    >
-                                      {/* Nội dung thành viên giữ nguyên */}
-                                      <div className="flex items-start gap-3">
-                                        <div
-                                          className={`flex-shrink-0 rounded-full overflow-hidden ring-3 ${isAssigned
-                                              ? "ring-orange-400 w-12 h-12"
-                                              : "ring-transparent hover:ring-blue-400 w-11 h-11"
-                                            } transition-all`}
-                                        >
-                                          <Avatar
-                                            user={member}
-                                            size={
+                                    return (
+                                      <div
+                                        key={member._id}
+                                        onClick={() =>
+                                          !isAssigned &&
+                                          assignMemberToCheckItem(
+                                            item._id,
+                                            member._id
+                                          )
+                                        }
+                                        className={`relative p-4 rounded-xl transition-all border ${
+                                          isAssigned
+                                            ? "bg-orange-50 border-orange-200 shadow-sm cursor-default"
+                                            : "cursor-pointer hover:bg-gray-50 hover:shadow-md hover:border-blue-200 border-transparent"
+                                        } ${
+                                          loading ? "cursor-not-allowed" : ""
+                                        }`}
+                                      >
+                                        {/* Nội dung thành viên giữ nguyên */}
+                                        <div className="flex items-start gap-3">
+                                          <div
+                                            className={`flex-shrink-0 rounded-full overflow-hidden ring-3 ${
                                               isAssigned
-                                                ? "w-12 h-12"
-                                                : "w-11 h-11"
-                                            }
-                                          />
-                                        </div>
+                                                ? "ring-orange-400 w-12 h-12"
+                                                : "ring-transparent hover:ring-blue-400 w-11 h-11"
+                                            } transition-all`}
+                                          >
+                                            <Avatar
+                                              user={member}
+                                              size={
+                                                isAssigned
+                                                  ? "w-12 h-12"
+                                                  : "w-11 h-11"
+                                              }
+                                            />
+                                          </div>
 
-                                        <div className="flex-1 min-w-0">
-                                          <div className="flex items-center gap-2 mb-1">
-                                            <p className="font-semibold text-base text-gray-900">
-                                              {member.fullName}
+                                          <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 mb-1">
+                                              <p className="font-semibold text-base text-gray-900">
+                                                {member.fullName}
+                                              </p>
+                                              {isAssigned && (
+                                                <span className="text-xs bg-orange-500 text-white px-3 py-1 rounded-full font-medium">
+                                                  Đã giao
+                                                </span>
+                                              )}
+                                            </div>
+                                            <p className="text-sm text-gray-600 mb-3 truncate">
+                                              {member.email}
                                             </p>
-                                            {isAssigned && (
-                                              <span className="text-xs bg-orange-500 text-white px-3 py-1 rounded-full font-medium">
-                                                Đã giao
-                                              </span>
+
+                                            {member.skills?.length > 0 ? (
+                                              <div className="flex flex-wrap gap-2">
+                                                {member.skills.map((s) => (
+                                                  <span
+                                                    key={s._id}
+                                                    className={`inline-block px-3 py-1.5 text-xs font-medium rounded-full ${
+                                                      isAssigned
+                                                        ? "text-amber-800 bg-amber-200"
+                                                        : "text-blue-800 bg-blue-100"
+                                                    }`}
+                                                  >
+                                                    {s.skill}
+                                                  </span>
+                                                ))}
+                                              </div>
+                                            ) : (
+                                              <p className="text-xs text-gray-400 italic">
+                                                Chưa có kỹ năng
+                                              </p>
                                             )}
                                           </div>
-                                          <p className="text-sm text-gray-600 mb-3 truncate">
-                                            {member.email}
-                                          </p>
 
-                                          {member.skills?.length > 0 ? (
-                                            <div className="flex flex-wrap gap-2">
-                                              {member.skills.map((s) => (
-                                                <span
-                                                  key={s._id}
-                                                  className={`inline-block px-3 py-1.5 text-xs font-medium rounded-full ${isAssigned
-                                                      ? "text-amber-800 bg-amber-200"
-                                                      : "text-blue-800 bg-blue-100"
-                                                    }`}
-                                                >
-                                                  {s.skill}
-                                                </span>
-                                              ))}
-                                            </div>
-                                          ) : (
-                                            <p className="text-xs text-gray-400 italic">
-                                              Chưa có kỹ năng
-                                            </p>
-                                          )}
-                                        </div>
-
-                                        {/* Tick + Nút Xóa khi đang được giao */}
-                                        {isAssigned && (
-                                          <div className="flex items-center gap-2 flex-shrink-0 mt-1">
-                                            {/* Tick icon */}
-                                            <svg
-                                              className="w-7 h-7 text-orange-600"
-                                              fill="currentColor"
-                                              viewBox="0 0 20 20"
-                                            >
-                                              <path
-                                                fillRule="evenodd"
-                                                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                                clipRule="evenodd"
-                                              />
-                                            </svg>
-
-                                            {/* Nút Xóa (hủy giao) */}
-                                            <button
-                                              onClick={(e) => {
-                                                e.stopPropagation(); // ngăn trigger click assign của div cha
-                                                handleDeleteMember(
-                                                  item._id,
-                                                  member._id
-                                                );
-                                              }}
-                                              disabled={loading}
-                                              className="p-1.5 rounded-full hover:bg-red-100 transition-all group"
-                                              title="Hủy giao nhiệm vụ"
-                                            >
+                                          {/* Tick + Nút Xóa khi đang được giao */}
+                                          {isAssigned && (
+                                            <div className="flex items-center gap-2 flex-shrink-0 mt-1">
+                                              {/* Tick icon */}
                                               <svg
-                                                className="w-5 h-5 text-gray-500 group-hover:text-red-600 transition-colors"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
+                                                className="w-7 h-7 text-orange-600"
+                                                fill="currentColor"
+                                                viewBox="0 0 20 20"
                                               >
                                                 <path
-                                                  strokeLinecap="round"
-                                                  strokeLinejoin="round"
-                                                  strokeWidth={2}
-                                                  d="M6 18L18 6M6 6l12 12"
+                                                  fillRule="evenodd"
+                                                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                                  clipRule="evenodd"
                                                 />
                                               </svg>
-                                            </button>
-                                          </div>
-                                        )}
+
+                                              {/* Nút Xóa (hủy giao) */}
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation(); // ngăn trigger click assign của div cha
+                                                  handleDeleteMember(
+                                                    item._id,
+                                                    member._id
+                                                  );
+                                                }}
+                                                disabled={loading}
+                                                className="p-1.5 rounded-full hover:bg-red-100 transition-all group"
+                                                title="Hủy giao nhiệm vụ"
+                                              >
+                                                <svg
+                                                  className="w-5 h-5 text-gray-500 group-hover:text-red-600 transition-colors"
+                                                  fill="none"
+                                                  stroke="currentColor"
+                                                  viewBox="0 0 24 24"
+                                                >
+                                                  <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M6 18L18 6M6 6l12 12"
+                                                  />
+                                                </svg>
+                                              </button>
+                                            </div>
+                                          )}
+                                        </div>
                                       </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-
-                              {/* Không có thành viên */}
-                              {boardMembers.length === 0 && !loading && (
-                                <div className="text-center py-10 text-gray-500">
-                                  <p className="text-sm">
-                                    Không có thành viên nào trong bảng
-                                  </p>
+                                    );
+                                  })}
                                 </div>
-                              )}
 
-                              {/* Nút đóng - vẫn click được khi loading */}
-                              <div className="mt-6 pt-4 border-t border-gray-200 flex justify-end">
-                                <button
-                                  onClick={() => closeMembersPopup()}
-                                  disabled={loading}
-                                  className={`px-6 py-2.5 text-sm font-medium rounded-lg transition ${loading
-                                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                {/* Không có thành viên */}
+                                {boardMembers.length === 0 && !loading && (
+                                  <div className="text-center py-10 text-gray-500">
+                                    <p className="text-sm">
+                                      Không có thành viên nào trong bảng
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Nút đóng - vẫn click được khi loading */}
+                                <div className="mt-6 pt-4 border-t border-gray-200 flex justify-end">
+                                  <button
+                                    onClick={() => closeMembersPopup()}
+                                    disabled={loading}
+                                    className={`px-6 py-2.5 text-sm font-medium rounded-lg transition ${
+                                      loading
+                                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                                     }`}
-                                >
-                                  Đóng
-                                </button>
+                                  >
+                                    Đóng
+                                  </button>
+                                </div>
+                              </div>
+                            </>
+                          )}
+
+                          {/* Popup xóa mục việc cần làm */}
+                          {itemIdDelete === item._id && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-40 pointer-events-none"
+                                onClick={() => handleCloseDeleteItemPopup()}
+                              />
+                            <div className="absolute top-full right-1 z-50 bg-white rounded-xl shadow-xl border border-gray-200 p-4 w-82 max-h-96">
+                              <div className="flex flex-col items-center gap-3">
+                                <div className="mt-2 rounded-full bg-red-50 w-12 h-12 flex items-center justify-center">
+                                  <Trash2 className="text-red-500" />
+                                </div>
+                                <p className="text-xl font-bold">
+                                  Xóa việc cần làm
+                                </p>
+                                <p className="text-md font-bold text-center">
+                                  "{itemTitleDelete}"
+                                </p>
+                                <p className="text-gray-500 text-center text-sm">
+                                  Việc cần làm này sẽ được xóa vĩnh viễn và
+                                  không thể khôi phục lại được. Bạn có chắc chắn
+                                  muốn tiếp tục không?
+                                </p>
+
+                                {/* Button */}
+                                <div className="flex items-center gap-5 mt-4 mb-2">
+                                  {/* Nút Hủy */}
+                                  <button
+                                    disabled={loading}
+                                    onClick={handleCloseDeleteItemPopup}
+                                    className={`
+      rounded-xl w-35 h-12 font-semibold
+      transition
+      ${
+        loading
+          ? "bg-gray-300 cursor-not-allowed text-gray-500"
+          : "bg-gray-200 cursor-pointer text-black hover:bg-gray-300"
+      }
+    `}
+                                  >
+                                    Hủy
+                                  </button>
+
+                                  {/* Nút Xóa */}
+                                  <button
+                                    disabled={loading}
+                                    onClick={deleteCheckItem}
+                                    className={`
+      rounded-xl w-35 h-12 font-semibold text-white cursor-pointer
+      flex items-center justify-center gap-2
+      transition
+      ${
+        loading
+          ? "bg-red-400 cursor-not-allowed"
+          : "bg-red-500 hover:bg-red-600 shadow-xl"
+      }
+    `}
+                                  >
+                                    {loading ? (
+                                      <>
+                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                        Đang xóa...
+                                      </>
+                                    ) : (
+                                      "Xóa"
+                                    )}
+                                  </button>
+                                </div>
                               </div>
                             </div>
+                            </>
                           )}
                         </div>
                       )}

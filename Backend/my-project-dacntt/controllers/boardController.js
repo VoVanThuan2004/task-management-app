@@ -568,16 +568,6 @@ const shareBoard = async (req, res) => {
     const frontendUrl = process.env.FE_URL;
     const boardLink = `${frontendUrl}/boards/${boardId}/${existingBoard.title}`;
 
-    // for (const user of invitedUsers) {
-    //   await sendShareBoardEmail(
-    //     user.email,
-    //     inviterName,
-    //     existingBoard.title,
-    //     message,
-    //     boardLink
-    //   );
-    // }
-
     await emailQueue.add("shareBoardEmail", {
       inviterName,
       userIds,

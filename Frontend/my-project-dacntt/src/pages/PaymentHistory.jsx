@@ -74,7 +74,7 @@ const PaymentHistory = () => {
       <div className="max-w-4xl mx-auto">
         {/* Nút Quay trở lại */}
         <button
-          onClick={() => window.history.back()}
+          onClick={() => navigate("/home")}
           className="mb-6 flex items-center gap-2 px-5 py-3 rounded-xl bg-white border border-gray-200 shadow-sm hover:bg-gray-50 hover:shadow transition-all text-gray-700 font-medium group"
         >
           <ArrowLeft

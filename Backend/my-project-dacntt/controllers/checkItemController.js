@@ -392,7 +392,8 @@ const toggleCheckItemComplete = async (req, res) => {
 
     // 4. Gửi lên socket realtime
     const io = getIO();
-    io.to(checkItem.taskId.toString()).emit("checkItemCompleted", {
+    console.log(checkItem.taskId.toString());
+    io.to(checkItem.taskId._id.toString()).emit("checkItemCompleted", {
       _id: checkItem._id,
       title: checkItem.title,
       position: checkItem.position,
@@ -632,7 +633,7 @@ const updateDeadlineCheckItem = async (req, res) => {
     }
 
     // 3.1 Thông báo trạng thái gần tới hạn
-    // Job: Gần tới hạn (10 phút trước)
+    // Job: Gần tới hạn (5 phút trước)
     const now = Date.now();
     const dueTime = checkItem.dueDate.getTime();
 
@@ -647,7 +648,7 @@ const updateDeadlineCheckItem = async (req, res) => {
           jobId: `${checkItem._id}-nearDeadline`,
         }
       );
-      console.log(`⏳ Đã lên lịch markNearDeadline sau ${nearDeadlineDelay}ms`);
+      console.log(`Đã lên lịch markNearDeadline checkItem sau ${nearDeadlineDelay}ms`);
     }
 
     // Job: Quá hạn

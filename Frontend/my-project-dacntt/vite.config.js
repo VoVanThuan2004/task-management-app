@@ -1,10 +1,59 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react-swc'
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react-swc'; // Giữ nguyên plugin bạn đang dùng
+import { VitePWA } from 'vite-plugin-pwa';
 
-// https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    VitePWA({
+      registerType: 'autoUpdate', // Tự động update service worker khi có thay đổi
+      devOptions: {
+        enabled: true // Bật PWA ngay cả trong dev mode (localhost)
+      },
+      includeAssets: [
+        'favicon.ico',
+        'apple-touch-icon.png',
+        'mask-icon.svg'
+      ],
+      manifest: {
+        name: 'Hệ thống Quản lý Công việc',
+        short_name: 'QuanLyCV',
+        description: 'Ứng dụng quản lý công việc, nhiệm vụ hàng ngày',
+        theme_color: '#ffffff', // Bạn có thể thay bằng màu thương hiệu, ví dụ: '#007bff'
+        background_color: '#ffffff',
+        display: 'standalone',
+        scope: '/',
+        start_url: '/',
+        orientation: 'portrait-primary',
+        icons: [
+          {
+            src: 'pwa-64x64.png',
+            sizes: '64x64',
+            type: 'image/png'
+          },
+          {
+            src: 'pwa-192x192.png',
+            sizes: '192x192',
+            type: 'image/png'
+          },
+          {
+            src: 'pwa-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any'
+          },
+          {
+            src: 'maskable-icon-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable'
+          }
+        ]
+      }
+    })
+  ],
   server: {
-    port: 3000, // 👈 cổng bạn muốn
-  },
-})
+    port: 3000, // Giữ nguyên port 3000 như config cũ của bạn
+    host: true  // (Tùy chọn) Cho phép truy cập từ mạng nội bộ (dùng khi test trên mobile cùng wifi)
+  }
+});

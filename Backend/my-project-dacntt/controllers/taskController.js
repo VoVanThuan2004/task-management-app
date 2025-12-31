@@ -36,7 +36,7 @@ const addTask = async (req, res) => {
     // 1. Kiểm tra column, user
     const [column, user] = await Promise.all([
       Column.findById(columnId),
-      User.findById(userId).select("fullName avatar"),
+      User.findById(userId).select("fullName avatar").lean(),
     ]);
 
     if (!column) {
@@ -59,7 +59,7 @@ const addTask = async (req, res) => {
     const boardId = column.boardId;
 
     // 3. Lấy danh sách tasks trong column
-    const tasks = await Task.find({ columnId, isArchived: false }).sort({
+    const tasks = await Task.find({ columnId }).sort({
       position: 1,
     });
 
@@ -89,26 +89,16 @@ const addTask = async (req, res) => {
       title,
       position,
       isCompleted: task.isCompleted,
+      
     });
 
     // 7. Gửi lên Socket - thông báo
-    const activityLog = await createActivityLogTask({
+    await activityLogQueue.add("activityLog", {
       userId,
       boardId: task.boardId,
       taskId: task._id,
       action: "TASK_CREATE",
       target: task.title,
-    });
-
-    io.to(task._id.toString()).emit("activityLogTask", {
-      userId,
-      fullName: user.fullName,
-      avatar: user.avatar,
-      taskId: activityLog.taskId,
-      boardId: activityLog.boardId,
-      action: activityLog.action,
-      description: activityLog.description,
-      createdAt: activityLog.createdAt,
     });
 
     return res.status(201).json({
@@ -1342,7 +1332,7 @@ const deleteTask = async (req, res) => {
 
     // 2. TaskAssignee
     await TaskAssignee.deleteMany({ taskId }).session(session);
-    
+
     // 3. Attachment
     const attachments = await Attachment.find({ taskId }).session(session);
     if (attachments.length > 0) {

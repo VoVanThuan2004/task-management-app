@@ -1,4 +1,4 @@
-import { CheckIcon, Signal } from "lucide-react";
+import { X, Signal } from "lucide-react";
 import { useState, useEffect } from "react";
 import axios from "axios";
 
@@ -13,7 +13,7 @@ const TaskHeader = ({
   onEditTitle,
   onClose,
   totalCheckItems,
-  completedCheckItems
+  completedCheckItems,
 }) => {
   const [aiPriority, setAiPriority] = useState(null);
 
@@ -48,16 +48,12 @@ const TaskHeader = ({
     return "bg-green-500";
   };
 
-  const isChecklistComplete = totalCheckItems > 0 && totalCheckItems === completedCheckItems;
+  const isChecklistComplete =
+    totalCheckItems > 0 && totalCheckItems === completedCheckItems;
 
   return (
     <div className="flex justify-between items-start p-6 border-b border-gray-200">
       <div className="flex-1 flex items-start gap-4">
-        {/* Icon check */}
-        <div className="mt-1 p-1 bg-gray-100 rounded">
-          <CheckIcon className="w-6 h-6 text-gray-500" />
-        </div>
-
         <div className="flex-1">
           {isEditingTitle ? (
             <input
@@ -81,7 +77,9 @@ const TaskHeader = ({
               {/* AI Priority Badge - Hide if task completed OR checklist 100% completed */}
               {aiPriority && !isCompleted && !isChecklistComplete && (
                 <span
-                  className={`px-2.5 py-0.5 rounded-full text-xs font-bold text-white shadow-sm flex items-center gap-1 cursor-help ${getPriorityColor(aiPriority.priorityLabel)}`}
+                  className={`px-2.5 py-0.5 rounded-full text-xs font-bold text-white shadow-sm flex items-center gap-1 cursor-help ${getPriorityColor(
+                    aiPriority.priorityLabel
+                  )}`}
                   title={`Điểm ưu tiên AI: ${aiPriority.priorityScore}/100`}
                 >
                   <Signal className="w-3 h-3" />
@@ -90,14 +88,15 @@ const TaskHeader = ({
               )}
             </div>
           )}
-          <p className="text-sm text-gray-500 mt-1 pl-1">
-            Trong danh sách <span className="underline decoration-dotted">Việc cần làm</span>
-          </p>
         </div>
       </div>
 
-      <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-full transition-colors">
-        ✕
+      <button
+        onClick={onClose}
+        className="text-gray-500 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-full transition-colors"
+        aria-label="Đóng" // tốt cho accessibility
+      >
+        <X className="w-6 h-6" />
       </button>
     </div>
   );

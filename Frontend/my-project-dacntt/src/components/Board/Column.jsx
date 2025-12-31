@@ -121,6 +121,7 @@ const Column = React.memo(
                         onToggleComplete={onToggleTaskComplete}
                         onDeleteTask={onDeleteTask}
                         isReadOnly={isReadOnly}
+                        isMember={isMember}
                       />
                     ))}
                     {provided.placeholder}

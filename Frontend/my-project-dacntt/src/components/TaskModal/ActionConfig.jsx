@@ -54,22 +54,22 @@ export const ActionConfig = {
     icon: <PlusCircle size={16} className="text-cyan-600" />,
   },
   CHECKITEM_COMPLETE: {
-    label: "Hoàn thành mục checklist",
+    label: "Hoàn thành mục việc cần làm",
     color: "bg-green-50 border-green-200",
     icon: <CheckCircle2 size={16} className="text-green-600" />,
   },
   CHECKITEM_UNCOMPLETE: {
-    label: "Bỏ hoàn thành mục",
+    label: "Bỏ hoàn thành mục việc cần làm",
     color: "bg-gray-50 border-gray-300",
     icon: <CircleDashed size={16} className="text-gray-600" />,
   },
   CHECKITEM_DELETE: {
-    label: "Xóa mục checklist",
+    label: "Xóa mục việc cần làm",
     color: "bg-red-50 border-red-200",
     icon: <Trash2 size={16} className="text-red-600" />,
   },
   CHECKITEM_UPDATE_TITLE: {
-    label: "Sửa tiêu đề mục checklist",
+    label: "Sửa tiêu đề mục việc cần làm",
     color: "bg-blue-50 border-blue-200",
     icon: <Pencil size={16} className="text-blue-600" />,
   },

@@ -5,8 +5,7 @@ import {
   LayoutGrid,
   Users,
   Loader2,
-  User,
-  LogOut,
+  LogIn,
   Plus,
   X,
   CreditCard,
@@ -351,8 +350,10 @@ export default function HomePage() {
       {/* Main Content */}
       <main className="flex-1 p-4 md:p-8 overflow-y-auto">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-          <h1 className="text-xl md:text-2xl font-bold text-gray-800">
+        {/* Header - Đã tối ưu responsive cho mobile */}
+        <div className="flex items-center justify-between mb-6">
+          {/* Tiêu đề - chiếm hết không gian còn lại, căn trái */}
+          <h1 className="text-xl md:text-2xl font-bold text-gray-800 flex-1 truncate pr-4">
             {activeSection === "my"
               ? "Bảng của tôi"
               : activeSection === "invited"
@@ -360,13 +361,16 @@ export default function HomePage() {
               : "Nâng cấp tài khoản VIP"}
           </h1>
 
-          <Profile
-            isLoggedIn={isLoggedIn}
-            user={user}
-            setShowProfileMenu={setShowProfileMenu}
-            showProfileMenu={showProfileMenu}
-            handleLogout={handleLogout}
-          />
+          {/* Profile - luôn nằm bên phải, cả mobile lẫn desktop */}
+          <div className="flex-shrink-0">
+            <Profile
+              isLoggedIn={isLoggedIn}
+              user={user}
+              setShowProfileMenu={setShowProfileMenu}
+              showProfileMenu={showProfileMenu}
+              handleLogout={handleLogout}
+            />
+          </div>
         </div>
 
         {/* Nội dung chính theo activeSection */}
@@ -378,126 +382,129 @@ export default function HomePage() {
           ) : (
             <div className="flex items-center justify-center min-h-[80vh] px-4 py-8">
               <div className="w-full max-w-lg">
-                {" "}
-                {/* ← To hơn modal (max-w-md → max-w-lg ≈ 512px) */}
-                <div className="bg-white rounded-3xl shadow-2xl border border-gray-300 overflow-hidden">
-                  {/* Header VIP */}
-                  <div className="bg-orange-400 text-white p-10 text-center">
-                    <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-5">
-                      <Crown size={48} />
-                    </div>
-                    <h2 className="text-3xl font-extrabold">
-                      {vipStatus?.isVip
-                        ? "Bạn đang là thành viên VIP"
-                        : "Nâng cấp lên gói VIP"}
-                    </h2>
-                    <p className="text-white/90 mt-3 text-lg">
-                      Trải nghiệm không giới hạn với các tính năng cao cấp
-                    </p>
-                  </div>
-
-                  {/* Body */}
-                  <div className="p-8 space-y-8">
-                    {vipStatus?.isVip ? (
-                      /* ĐÃ LÀ VIP */
-                      <div className="text-center py-6">
-                        
-                        <p className="text-3xl font-semibold text-green-600 mb-5">
-                          Đã kích hoạt thành công!
-                        </p>
-                        <p className="text-xl text-gray-700 mb-3">
-                          Gói VIP của bạn sẽ hết hạn vào:
-                        </p>
-                        <p className="text-3xl font-extrabold text-orange-500 mb-8">
-                          {vipStatus.expirationDate
-                            ? new Date(
-                                vipStatus.expirationDate
-                              ).toLocaleDateString("vi-VN", {
-                                weekday: "long",
-                                day: "2-digit",
-                                month: "2-digit",
-                                year: "numeric",
-                              })
-                            : "Chưa xác định"}
-                        </p>
-
-                        <div className="bg-white-50 border-2 border-orange-200 rounded-3xl p-8">
-                          <p className="text-xl text-black font-semibold">
-                            Bạn đang sử dụng đầy đủ các tính năng cao cấp
-                          </p>
-                          <p className="text-black mt-3">
-                            Không giới hạn bảng, thẻ và AI gợi ý thông minh
-                          </p>
-                        </div>
+                {!accessToken ? (
+                  <h2 className="text-xl font-bold text-gray-800 text-center">
+                    Vui lòng đăng nhập
+                  </h2>
+                ) : (
+                  <div className="bg-white rounded-3xl shadow-2xl border border-gray-300 overflow-hidden">
+                    {/* Header VIP */}
+                    <div className="bg-orange-400 text-white p-10 text-center">
+                      <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-5">
+                        <Crown size={48} />
                       </div>
-                    ) : (
-                      /* CHƯA LÀ VIP */
-                      <>
-                        <div className="text-center">
-                          <p className="text-xl text-gray-700 leading-relaxed">
-                            Nâng cấp ngay để mở khóa toàn bộ sức mạnh của hệ
-                            thống!
-                          </p>
-                        </div>
+                      <h2 className="text-3xl font-extrabold">
+                        {vipStatus?.isVip
+                          ? "Bạn đang là thành viên VIP"
+                          : "Nâng cấp lên gói VIP"}
+                      </h2>
+                      <p className="text-white/90 mt-3 text-lg">
+                        Trải nghiệm không giới hạn với các tính năng cao cấp
+                      </p>
+                    </div>
 
-                        {/* Giá gói */}
-                        <div className="bg-gradient-to-br from-amber-50 to-orange-50 border-4 border-amber-300 rounded-3xl p-8 text-center">
-                          <p className="text-amber-600 font-bold uppercase tracking-widest mb-3">
-                            Gói VIP - 30 ngày
+                    {/* Body */}
+                    <div className="p-8 space-y-8">
+                      {vipStatus?.isVip ? (
+                        /* ĐÃ LÀ VIP */
+                        <div className="text-center py-6">
+                          <p className="text-3xl font-semibold text-green-600 mb-5">
+                            Đã kích hoạt thành công!
                           </p>
-                          <p className="text-6xl font-extrabold text-amber-700">
-                            100.000
-                            <span className="text-3xl font-normal"> VND</span>
+                          <p className="text-xl text-gray-700 mb-3">
+                            Gói VIP của bạn sẽ hết hạn vào:
                           </p>
-                        </div>
+                          <p className="text-3xl font-extrabold text-orange-500 mb-8">
+                            {vipStatus.expirationDate
+                              ? new Date(
+                                  vipStatus.expirationDate
+                                ).toLocaleDateString("vi-VN", {
+                                  weekday: "long",
+                                  day: "2-digit",
+                                  month: "2-digit",
+                                  year: "numeric",
+                                })
+                              : "Chưa xác định"}
+                          </p>
 
-                        {/* Lợi ích */}
-                        <div className="grid md:grid-cols-2 gap-6 mt-6">
-                          {[
-                            "Tạo không giới hạn số lượng bảng làm việc",
-                            "Mỗi bảng không giới hạn số lượng thẻ (task)",
-                            "Sử dụng AI gợi ý việc cần làm thông minh",
-                            "Ưu tiên hỗ trợ kỹ thuật & cập nhật tính năng mới",
-                          ].map((benefit, i) => (
-                            <div
-                              key={i}
-                              className="flex items-start gap-4 bg-gray-50 rounded-2xl p-5"
+                          <div className="bg-white-50 border-2 border-orange-200 rounded-3xl p-8">
+                            <p className="text-xl text-black font-semibold">
+                              Bạn đang sử dụng đầy đủ các tính năng cao cấp
+                            </p>
+                            <p className="text-black mt-3">
+                              Không giới hạn bảng, thẻ và AI gợi ý thông minh
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        /* CHƯA LÀ VIP */
+                        <>
+                          <div className="text-center">
+                            <p className="text-xl text-gray-700 leading-relaxed">
+                              Nâng cấp ngay để mở khóa toàn bộ sức mạnh của hệ
+                              thống!
+                            </p>
+                          </div>
+
+                          {/* Giá gói */}
+                          <div className="bg-gradient-to-br from-amber-50 to-orange-50 border-4 border-amber-300 rounded-3xl p-8 text-center">
+                            <p className="text-amber-600 font-bold uppercase tracking-widest mb-3">
+                              Gói VIP - 30 ngày
+                            </p>
+                            <p className="text-6xl font-extrabold text-amber-700">
+                              100.000
+                              <span className="text-3xl font-normal"> VND</span>
+                            </p>
+                          </div>
+
+                          {/* Lợi ích */}
+                          <div className="grid md:grid-cols-2 gap-6 mt-6">
+                            {[
+                              "Tạo không giới hạn số lượng bảng làm việc",
+                              "Mỗi bảng không giới hạn số lượng thẻ (task)",
+                              "Sử dụng AI gợi ý việc cần làm thông minh",
+                              "Ưu tiên hỗ trợ kỹ thuật & cập nhật tính năng mới",
+                            ].map((benefit, i) => (
+                              <div
+                                key={i}
+                                className="flex items-start gap-4 bg-gray-50 rounded-2xl p-5"
+                              >
+                                <Check
+                                  size={28}
+                                  className="text-green-600 flex-shrink-0 mt-0.5"
+                                />
+                                <p className="text-gray-800 font-medium">
+                                  {benefit}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Nút nâng cấp */}
+                          <div className="text-center mt-10">
+                            <button
+                              onClick={handleUpgradeVip}
+                              disabled={loadingPayment}
+                              className="inline-flex items-center gap-3 px-10 py-5 bg-orange-500 text-white text-xl font-bold rounded-3xl hover:bg-orange-600 transition-all shadow-xl disabled:opacity-70 disabled:cursor-not-allowed"
                             >
-                              <Check
-                                size={28}
-                                className="text-green-600 flex-shrink-0 mt-0.5"
-                              />
-                              <p className="text-gray-800 font-medium">
-                                {benefit}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Nút nâng cấp */}
-                        <div className="text-center mt-10">
-                          <button
-                            onClick={handleUpgradeVip}
-                            disabled={loadingPayment}
-                            className="inline-flex items-center gap-3 px-10 py-5 bg-orange-500 text-white text-xl font-bold rounded-3xl hover:bg-orange-600 transition-all shadow-xl disabled:opacity-70 disabled:cursor-not-allowed"
-                          >
-                            {loadingPayment ? (
-                              <>
-                                <Loader2 className="animate-spin" size={28} />
-                                Đang chuyển đến thanh toán...
-                              </>
-                            ) : (
-                              <>
-                                <CreditCard size={32} />
-                                Nâng cấp ngay
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      </>
-                    )}
+                              {loadingPayment ? (
+                                <>
+                                  <Loader2 className="animate-spin" size={28} />
+                                  Đang chuyển đến thanh toán...
+                                </>
+                              ) : (
+                                <>
+                                  <CreditCard size={32} />
+                                  Nâng cấp ngay
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           )

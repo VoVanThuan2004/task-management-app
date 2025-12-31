@@ -135,7 +135,7 @@ const LoginPage = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
         {/* Login Card */}
-        <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+        <div className="bg-white rounded-xl shadow-xl overflow-hidden">
           <div className="p-8">
             <div className="text-center mb-8">
               <h2 className="text-3xl font-bold text-gray-800 mb-2">

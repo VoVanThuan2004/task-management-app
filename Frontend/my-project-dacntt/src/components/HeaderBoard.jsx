@@ -23,7 +23,7 @@ import {
   Globe,
   Users,
   Lock,
-  LogOutIcon
+  LogOutIcon,
 } from "lucide-react";
 import { io } from "socket.io-client";
 import { motion as Motion, AnimatePresence } from "framer-motion";
@@ -980,86 +980,64 @@ const HeaderBoard = ({
 
       {/* Filter Panel - Trello Style */}
       {showFilter && (
-        <div className="fixed top-20 bottom-2 right-2 w-96 bg-white shadow-2xl border-l border-gray-200 z-50 flex flex-col">
-          {/* Header */}
-          <div className="flex items-center justify-between p-5 border-b border-gray-200">
-            <div className="flex items-center gap-3">
-              <Filter size={20} className="text-gray-600" />
-              <h3 className="text-lg font-semibold text-gray-900">Lọc</h3>
-            </div>
-            <button
-              onClick={() => setShowFilter(false)}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <X size={20} className="text-gray-600" />
-            </button>
-          </div>
-
-          {/* Body - Scrollable */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-7">
-            {/* Từ khóa tìm kiếm */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Từ khóa
-              </label>
-              <input
-                type="text"
-                value={filters.search}
-                onChange={(e) =>
-                  handleFilterChange({ ...filters, search: e.target.value })
-                }
-                placeholder="Nhập từ khóa..."
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-              />
-              <p className="text-xs text-gray-500 mt-2">
-                Tìm kiếm tiêu đề thẻ, mô tả, bình luận...
-              </p>
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setShowFilter(false)}
+          />
+          <div className="fixed top-20 bottom-2 right-2 w-96 bg-white shadow-2xl border-l border-gray-200 z-50 flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <Filter size={20} className="text-gray-600" />
+                <h3 className="text-lg font-semibold text-gray-900">Lọc</h3>
+              </div>
+              <button
+                onClick={() => setShowFilter(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X size={20} className="text-gray-600" />
+              </button>
             </div>
 
-            {/* Thành viên */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Thành viên
-              </label>
-              <div className="space-y-2">
-                <label className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition">
-                  <input
-                    type="checkbox"
-                    checked={filters.assignees.includes("none")}
-                    onChange={(e) => {
-                      let newAssignees = [...filters.assignees];
-                      if (e.target.checked) {
-                        newAssignees.push("none");
-                      } else {
-                        newAssignees = newAssignees.filter((a) => a !== "none");
-                      }
-                      handleFilterChange({
-                        ...filters,
-                        assignees: newAssignees,
-                      });
-                    }}
-                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-gray-700">
-                    Không có thành viên
-                  </span>
+            {/* Body - Scrollable */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-7">
+              {/* Từ khóa tìm kiếm */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Từ khóa
                 </label>
+                <input
+                  type="text"
+                  value={filters.search}
+                  onChange={(e) =>
+                    handleFilterChange({ ...filters, search: e.target.value })
+                  }
+                  placeholder="Nhập từ khóa..."
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                />
+                <p className="text-xs text-gray-500 mt-2">
+                  Tìm kiếm tiêu đề thẻ, mô tả, bình luận...
+                </p>
+              </div>
 
-                {boardMembersList.map((member) => (
-                  <label
-                    key={member._id}
-                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition"
-                  >
+              {/* Thành viên */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Thành viên
+                </label>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition">
                     <input
                       type="checkbox"
-                      checked={filters.assignees.includes(member._id)}
+                      checked={filters.assignees.includes("none")}
                       onChange={(e) => {
                         let newAssignees = [...filters.assignees];
                         if (e.target.checked) {
-                          newAssignees.push(member._id);
+                          newAssignees.push("none");
                         } else {
                           newAssignees = newAssignees.filter(
-                            (a) => a !== member._id
+                            (a) => a !== "none"
                           );
                         }
                         handleFilterChange({
@@ -1069,207 +1047,243 @@ const HeaderBoard = ({
                       }}
                       className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
                     />
-                    <Avatar user={member} size="w-8 h-8" />
-                    <span className="text-sm text-gray-700 truncate">
-                      {member.fullName}
+                    <span className="text-sm text-gray-700">
+                      Không có thành viên
                     </span>
                   </label>
-                ))}
+
+                  {boardMembersList.map((member) => (
+                    <label
+                      key={member._id}
+                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={filters.assignees.includes(member._id)}
+                        onChange={(e) => {
+                          let newAssignees = [...filters.assignees];
+                          if (e.target.checked) {
+                            newAssignees.push(member._id);
+                          } else {
+                            newAssignees = newAssignees.filter(
+                              (a) => a !== member._id
+                            );
+                          }
+                          handleFilterChange({
+                            ...filters,
+                            assignees: newAssignees,
+                          });
+                        }}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                      />
+                      <Avatar user={member} size="w-8 h-8" />
+                      <span className="text-sm text-gray-700 truncate">
+                        {member.fullName}
+                      </span>
+                    </label>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            {/* Số lượng task tối thiểu */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Số lượng task tối thiểu
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={filters.minTask}
-                onChange={(e) => {
-                  const value = parseInt(e.target.value) || 0;
-                  handleFilterChange({ ...filters, minTask: value });
-                }}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-              />
-            </div>
-
-            {/* Trạng thái task */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Trạng thái task
-              </label>
-              <div className="space-y-2">
-                <label className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition">
-                  <input
-                    type="checkbox"
-                    checked={filters.taskStatus === "completed"}
-                    onChange={(e) => {
-                      handleFilterChange({
-                        ...filters,
-                        taskStatus: e.target.checked ? "completed" : "", // nếu bỏ check → ""
-                      });
-                    }}
-                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-gray-700">Đã hoàn thành</span>
+              {/* Số lượng task tối thiểu */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Số lượng task tối thiểu
                 </label>
-
-                <label className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition">
-                  <input
-                    type="checkbox"
-                    checked={filters.taskStatus === "incomplete"}
-                    onChange={(e) => {
-                      handleFilterChange({
-                        ...filters,
-                        taskStatus: e.target.checked ? "incomplete" : "",
-                      });
-                    }}
-                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-gray-700">Chưa hoàn thành</span>
-                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={filters.minTask}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value) || 0;
+                    handleFilterChange({ ...filters, minTask: value });
+                  }}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                />
               </div>
-            </div>
 
-            {/* Deadline */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Ngày hết hạn
-              </label>
-              <div className="space-y-2">
-                {[
-                  { value: "noDeadline", label: "Không có ngày hết hạn" },
-                  { value: "overdue", label: "Quá hạn" },
-                  { value: "near", label: "Gần tới hạn" },
-                  { value: "tomorrow", label: "Sẽ hết hạn vào ngày mai" },
-                  { value: "nextWeek", label: "Sẽ hết hạn vào tuần sau" },
-                  { value: "nextMonth", label: "Sẽ hết hạn vào tháng sau" },
-                ].map((opt) => (
-                  <label
-                    key={opt.value}
-                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition"
-                  >
+              {/* Trạng thái task */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Trạng thái task
+                </label>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition">
                     <input
                       type="checkbox"
-                      checked={filters.deadline === opt.value}
+                      checked={filters.taskStatus === "completed"}
                       onChange={(e) => {
                         handleFilterChange({
                           ...filters,
-                          deadline: e.target.checked ? opt.value : "", // nếu bỏ check → ""
+                          taskStatus: e.target.checked ? "completed" : "", // nếu bỏ check → ""
                         });
                       }}
                       className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
                     />
-                    <span className="text-sm text-gray-700">{opt.label}</span>
+                    <span className="text-sm text-gray-700">Đã hoàn thành</span>
                   </label>
-                ))}
-              </div>
-            </div>
 
-            {/* Nhãn dán */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Nhãn dán
-              </label>
-              <div className="space-y-2">
-                <label className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition">
-                  <input
-                    type="checkbox"
-                    checked={filters.labels.includes("none")}
-                    onChange={(e) => {
-                      let newLabels = [...filters.labels];
-                      if (e.target.checked) {
-                        newLabels.push("none");
-                      } else {
-                        newLabels = newLabels.filter((l) => l !== "none");
-                      }
-                      handleFilterChange({ ...filters, labels: newLabels });
-                    }}
-                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-gray-700">Không có nhãn</span>
-                </label>
-
-                {labelsList.map((label) => (
-                  <label
-                    key={label._id}
-                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition"
-                  >
+                  <label className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition">
                     <input
                       type="checkbox"
-                      checked={filters.labels.includes(label._id)}
+                      checked={filters.taskStatus === "incomplete"}
+                      onChange={(e) => {
+                        handleFilterChange({
+                          ...filters,
+                          taskStatus: e.target.checked ? "incomplete" : "",
+                        });
+                      }}
+                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-700">
+                      Chưa hoàn thành
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Deadline */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Ngày hết hạn
+                </label>
+                <div className="space-y-2">
+                  {[
+                    { value: "noDeadline", label: "Không có ngày hết hạn" },
+                    { value: "overdue", label: "Quá hạn" },
+                    { value: "near", label: "Gần tới hạn" },
+                    { value: "tomorrow", label: "Sẽ hết hạn vào ngày mai" },
+                    { value: "nextWeek", label: "Sẽ hết hạn vào tuần sau" },
+                    { value: "nextMonth", label: "Sẽ hết hạn vào tháng sau" },
+                  ].map((opt) => (
+                    <label
+                      key={opt.value}
+                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={filters.deadline === opt.value}
+                        onChange={(e) => {
+                          handleFilterChange({
+                            ...filters,
+                            deadline: e.target.checked ? opt.value : "", // nếu bỏ check → ""
+                          });
+                        }}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700">{opt.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Nhãn dán */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Nhãn dán
+                </label>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                    <input
+                      type="checkbox"
+                      checked={filters.labels.includes("none")}
                       onChange={(e) => {
                         let newLabels = [...filters.labels];
                         if (e.target.checked) {
-                          newLabels.push(label._id);
+                          newLabels.push("none");
                         } else {
-                          newLabels = newLabels.filter((l) => l !== label._id);
+                          newLabels = newLabels.filter((l) => l !== "none");
                         }
                         handleFilterChange({ ...filters, labels: newLabels });
                       }}
                       className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
                     />
-                    <div
-                      className="w-6 h-6 rounded"
-                      style={{ backgroundColor: label.color }}
-                    />
-                    <span className="text-sm text-gray-700">{label.title}</span>
+                    <span className="text-sm text-gray-700">Không có nhãn</span>
                   </label>
-                ))}
+
+                  {labelsList.map((label) => (
+                    <label
+                      key={label._id}
+                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={filters.labels.includes(label._id)}
+                        onChange={(e) => {
+                          let newLabels = [...filters.labels];
+                          if (e.target.checked) {
+                            newLabels.push(label._id);
+                          } else {
+                            newLabels = newLabels.filter(
+                              (l) => l !== label._id
+                            );
+                          }
+                          handleFilterChange({ ...filters, labels: newLabels });
+                        }}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                      />
+                      <div
+                        className="w-6 h-6 rounded"
+                        style={{ backgroundColor: label.color }}
+                      />
+                      <span className="text-sm text-gray-700">
+                        {label.title}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Activity Log */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Hoạt động gần đây
+                </label>
+                <div className="space-y-2">
+                  {[
+                    { value: "", label: "Tất cả" },
+                    { value: "lastWeek", label: "Tuần qua" },
+                    { value: "last2Weeks", label: "2 tuần qua" },
+                    { value: "last3Weeks", label: "3 tuần qua" },
+                    { value: "thisMonth", label: "Tháng này" },
+                    { value: "noActivity", label: "Chưa có hoạt động" },
+                  ].map((opt) => (
+                    <label
+                      key={opt.value}
+                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={filters.activityLog === opt.value}
+                        onChange={(e) => {
+                          handleFilterChange({
+                            ...filters,
+                            activityLog: e.target.checked ? opt.value : "",
+                          });
+                        }}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700">{opt.label}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
             </div>
 
-            {/* Activity Log */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Hoạt động gần đây
-              </label>
-              <div className="space-y-2">
-                {[
-                  { value: "", label: "Tất cả" },
-                  { value: "lastWeek", label: "Tuần qua" },
-                  { value: "last2Weeks", label: "2 tuần qua" },
-                  { value: "last3Weeks", label: "3 tuần qua" },
-                  { value: "thisMonth", label: "Tháng này" },
-                  { value: "noActivity", label: "Chưa có hoạt động" },
-                ].map((opt) => (
-                  <label
-                    key={opt.value}
-                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={filters.activityLog === opt.value}
-                      onChange={(e) => {
-                        handleFilterChange({
-                          ...filters,
-                          activityLog: e.target.checked ? opt.value : "",
-                        });
-                      }}
-                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                    />
-                    <span className="text-sm text-gray-700">{opt.label}</span>
-                  </label>
-                ))}
-              </div>
+            {/* Footer */}
+            <div className="p-5 border-t border-gray-200 bg-gray-50">
+              <button
+                onClick={() => {
+                  clearFilters();
+                  // reset về không filter
+                }}
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium transition"
+              >
+                Xóa tất cả bộ lọc
+              </button>
             </div>
           </div>
-
-          {/* Footer */}
-          <div className="p-5 border-t border-gray-200 bg-gray-50">
-            <button
-              onClick={() => {
-                clearFilters();
-                // reset về không filter
-              }}
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium transition"
-            >
-              Xóa tất cả bộ lọc
-            </button>
-          </div>
-        </div>
+        </>
       )}
 
       {/* Modal Chia sẻ bảng */}
@@ -1975,11 +1989,11 @@ const HeaderBoard = ({
       {/* Modal quản lý nhãn dán */}
       {showLabelModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+          <div className="bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-purple-50">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-white">
               <div className="flex items-center gap-3">
-                <Tags size={28} className="text-indigo-600" />
+                <Tags size={28} className="text-blue-600" />
                 <div>
                   <h2 className="text-2xl font-bold text-gray-900">
                     Quản lý nhãn
@@ -2320,7 +2334,6 @@ const HeaderBoard = ({
       </AnimatePresence>
 
       {/* === POPUP CHẾ ĐỘ BẢNG - PHIÊN BẢN ĐƠN GIẢN (KHÔNG ANIMATION) === */}
-      {/* === POPUP CHẾ ĐỘ BẢNG - VỊ TRÍ NHƯ LỌC, MÀU BLUE === */}
       {showVisibilityPopup && (
         <>
           {/* Overlay mờ - đóng khi click ngoài */}
