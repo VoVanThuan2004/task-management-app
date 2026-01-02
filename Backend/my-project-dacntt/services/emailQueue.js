@@ -22,7 +22,7 @@ const connection = new Redis({
 const emailQueue = new Queue("emailQueue", {
   connection,
   defaultJobOptions: {
-    attempts: 5, // retry tối đa 5 lần
+    attempts: 2, // retry tối đa 5 lần
     backoff: {
       type: "exponential",
       delay: 2000, // bắt đầu từ 2s, tăng gấp đôi mỗi lần

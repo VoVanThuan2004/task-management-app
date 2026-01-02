@@ -12,6 +12,7 @@ import {
 import Avatar from "../components/Avatar";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import backgroundImg from "../images/logo2.jpg";
 
 const httpUrl = import.meta.env.VITE_API_URL;
 const accessToken = localStorage.getItem("accessToken");
@@ -44,7 +45,7 @@ export default function ProfilePage() {
         setFullName(user.fullName || "");
         setAvatarPreview(user.avatar || null);
       } catch (err) {
-        toast.error("Không thể tải thông tin cá nhân")
+        toast.error("Không thể tải thông tin cá nhân");
         console.log(err);
       } finally {
         setLoading(false);
@@ -53,15 +54,13 @@ export default function ProfilePage() {
     fetchProfile();
   }, []);
 
-  
-
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     // Kiểm tra kích thước (5MB)
     if (file.size > 5 * 1024 * 1024) {
-      toast.error("Ảnh không được vượt quá 5MB")
+      toast.error("Ảnh không được vượt quá 5MB");
       return;
     }
 
@@ -77,7 +76,7 @@ export default function ProfilePage() {
 
   const handleSave = async () => {
     if (!fullName.trim()) {
-      toast.error("Vui lòng nhập họ tên")
+      toast.error("Vui lòng nhập họ tên");
       return;
     }
 
@@ -104,8 +103,7 @@ export default function ProfilePage() {
       }));
 
       setSelectedFile(null);
-      toast.success("Cập nhật thông tin thành công!")
-      
+      toast.success("Cập nhật thông tin thành công!");
     } catch (err) {
       const msg = err.response?.data?.message || "Cập nhật thất bại";
       toast.error(msg);
@@ -149,55 +147,72 @@ export default function ProfilePage() {
         {/* Main Content */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
           {/* Avatar Section */}
-          <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-10 text-center">
-            <div className="relative inline-block">
-              <div className="relative group">
-                {avatarPreview ? (
-                  <img
-                    src={avatarPreview}
-                    alt="Avatar"
-                    className="w-32 h-32 rounded-full object-cover shadow-2xl border-4 border-white"
-                  />
-                ) : (
-                  <Avatar
-                    user={profile}
-                    size="w-32 h-32"
-                    className="border-4 border-white shadow-2xl text-4xl"
-                  />
-                )}
+          <div
+            className="p-10 text-center relative overflow-hidden"
+            style={{
+              backgroundImage: `url(${backgroundImg})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              backgroundRepeat: "no-repeat",
+            }}
+            
+          >
+            {/* Overlay tối nhẹ để chữ trắng nổi bật hơn (tùy chọn, khuyến nghị) */}
+            <div className="absolute inset-0 bg-black/20"></div>
 
-                {/* Nút đổi ảnh */}
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="absolute bottom-2 right-2 p-3 bg-white rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-110 opacity-0 group-hover:opacity-100"
-                >
-                  <Camera size={20} className="text-gray-700" />
-                </button>
+            {/* Nội dung - thêm relative + z-10 để nổi lên trên overlay */}
+            <div className="relative z-10">
+              <div className="relative inline-block">
+                <div className="relative group">
+                  {avatarPreview ? (
+                    <img
+                      src={avatarPreview}
+                      alt="Avatar"
+                      className="w-32 h-32 rounded-full object-cover shadow-2xl border-4 border-white"
+                    />
+                  ) : (
+                    <Avatar
+                      user={profile}
+                      size="w-32 h-32"
+                      className="border-4 border-white shadow-2xl text-4xl"
+                    />
+                  )}
 
-                {/* Nút xóa ảnh */}
-                {selectedFile && (
+                  {/* Nút đổi ảnh */}
                   <button
-                    onClick={handleRemoveAvatar}
-                    className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full shadow-lg hover:bg-red-600 transition-all"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="absolute bottom-2 right-2 p-3 bg-white rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-110 opacity-0 group-hover:opacity-100"
                   >
-                    <X size={16} />
+                    <Camera size={20} className="text-gray-700" />
                   </button>
-                )}
+
+                  {/* Nút xóa ảnh */}
+                  {selectedFile && (
+                    <button
+                      onClick={handleRemoveAvatar}
+                      className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full shadow-lg hover:bg-red-600 transition-all"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
               </div>
 
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-                className="hidden"
-              />
+              <h2 className="text-3xl font-bold text-white mt-6 drop-shadow-md">
+                {profile?.fullName || "Người dùng"}
+              </h2>
+              <p className="text-white text-lg drop-shadow-md">
+                {profile?.email}
+              </p>
             </div>
-
-            <h2 className="text-2xl font-bold text-white mt-6">
-              {profile?.fullName || "Người dùng"}
-            </h2>
-            <p className="text-white/80 text-lg">{profile?.email}</p>
           </div>
 
           {/* Form Section */}

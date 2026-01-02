@@ -6,6 +6,8 @@ const BoardMember = require("../models/boardMember");
 const { ObjectId } = require("mongodb");
 const ActivityLog = require("../models/activityLog");
 const { getIO } = require("../config/socket");
+const mongoose = require("mongoose");
+const columnDeleteQueue = require("../services/columnDeleteQueue");
 
 const addColumn = async (req, res) => {
   const { boardId, title } = req.body;
@@ -964,12 +966,15 @@ const moveToBoard = async (req, res) => {
 };
 
 const deleteColumn = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
     const columnId = req.params.columnId;
 
     // 1. Kiểm tra Column
-    const column = await Column.findById(columnId);
+    const column = await Column.findById(columnId).session(session);
     if (!column) {
+      await session.abortTransaction();
       return res.status(404).json({
         status: "error",
         code: 404,
@@ -977,35 +982,35 @@ const deleteColumn = async (req, res) => {
       });
     }
 
-    // 2. Xóa column - chuyển isArchived (true)
-    column.isArchived = true;
-    await column.save();
+    // 2. Xóa column
+    await Column.deleteOne({ _id: column._id }).session(session);
+
+    await session.commitTransaction();
 
     // 3. Gửi socket cập nhật data
     const io = getIO();
     io.to(column.boardId.toString()).emit("columnDeleted", {
       _id: column._id,
-      boardId: column.boardId,
-      title: column.title,
-      position: column.position,
-      createdAt: column.createdAt,
+    });
+
+    await columnDeleteQueue.add("deleteColumn", {
+      columnId: column._id,
     });
 
     return res.status(200).json({
       status: "success",
       code: 200,
       message: "Xóa column thành công",
-      data: {
-        boardId: column.boardId,
-        columnId: columnId,
-        title: column.title,
-      },
+      data: column._id
     });
   } catch (error) {
+    await session.abortTransaction();
     return res.status(500).json({
       status: "error",
       message: "Lỗi hệ thống: " + error.message,
     });
+  } finally {
+    await session.endSession();
   }
 };
 

@@ -21,7 +21,7 @@ router.put("/api/v1/columns/:columnId/position", auth, columnController.moveColu
 // Cập nhật - Chọn bảng làm việc khác + vị trí nằm trong bảng làm việc
 router.put("/api/v1/columns/:columnId/move-to-board", auth, columnController.moveToBoard);
 
-// Xóa column - ẩn đi
+// Xóa column
 router.delete("/api/v1/columns/:columnId", auth, columnController.deleteColumn);
 
 module.exports = router;

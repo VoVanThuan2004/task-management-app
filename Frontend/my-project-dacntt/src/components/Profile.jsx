@@ -57,7 +57,10 @@ const Profile = ({
 
           {/* Profile Menu Dropdown */}
           {showProfileMenu && (
-            <div ref={menuRef} className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden z-50">
+            <div
+              ref={menuRef}
+              className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden z-50"
+            >
               {/* Header */}
               <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-4 bg-gradient-to-r from-blue-50 to-indigo-50">
                 <Avatar
@@ -126,7 +129,7 @@ const Profile = ({
       ) : (
         <button
           onClick={handleLogin}
-          className="flex items-center gap-2 bg-blue-600 cursor-pointer text-white rounded-full px-6 py-2.5 shadow-lg hover:shadow-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 font-medium"
+          className="flex items-center gap-2 bg-blue-600 cursor-pointer text-white rounded-full px-6 py-2.5 shadow-lg hover:shadow-xl hover:bg-blue-700 transition-all duration-300 font-medium"
         >
           <LogIn size={18} />
           <span>Đăng nhập</span>

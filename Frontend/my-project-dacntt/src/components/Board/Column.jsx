@@ -47,7 +47,7 @@ const Column = React.memo(
               <div
                 // Chỉ cho kéo nếu là member
                 {...(isReadOnly ? {} : provided.dragHandleProps)}
-                className={`px-4 pt-4 flex items-center justify-between ${
+                className={`px-4 pt-4 flex items-center justify-between group ${
                   isReadOnly
                     ? "cursor-default"
                     : "cursor-grab active:cursor-grabbing"
@@ -86,13 +86,13 @@ const Column = React.memo(
                     </h3>
                     {!isReadOnly && (
                       <button
-                        onClick={() => onDeleteColumn(column._id)}
-                        className="p-2 opacity-0 group-hover:opacity-100 hover:bg-gray-200 rounded-lg transition"
+                        onClick={() => onDeleteColumn(column._id, column.title)}
+                        className="p-2 opacity-0 group-hover:opacity-100 hover:bg-red-50 rounded-lg transition"
                         title="Xóa danh sách"
                       >
                         <Trash2
                           size={16}
-                          className="text-gray-500 hover:text-red-600"
+                          className="text-red-500 hover:text-red-600"
                         />
                       </button>
                     )}
