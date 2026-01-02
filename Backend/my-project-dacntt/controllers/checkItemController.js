@@ -755,13 +755,13 @@ const assignCheckItem = async (req, res) => {
 
     // 4. Gửi email thông báo
     const fullName = req.user.fullName;
-    // await sendAssignCheckItemEmail(
-    //   user.email,
-    //   fullName,
-    //   task.boardId.title,
-    //   task.title,
-    //   checkItem.title
-    // );
+    await sendAssignCheckItemEmail(
+      user.email,
+      fullName,
+      task.boardId.title,
+      task.title,
+      checkItem.title
+    );
 
     return res.status(200).json({
       status: "success",

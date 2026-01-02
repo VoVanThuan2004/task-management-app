@@ -28,6 +28,7 @@ import {
 import { io } from "socket.io-client";
 import { motion as Motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 
 const HeaderBoard = ({
   board,
@@ -189,6 +190,10 @@ const HeaderBoard = ({
       setBoardMembers((prevMembers) =>
         prevMembers.filter((member) => member._id !== data.userId)
       );
+    });
+
+    newSocket.on("addMember", (data) => {
+      setBoardMembers((prev) => [...prev, data]);
     });
 
     return () => {
@@ -417,6 +422,7 @@ const HeaderBoard = ({
       );
 
       setShareSuccess("Đã gửi lời mời chia sẻ thành công!");
+      toast.success("Đã gửi lời mời chia sẻ thành công!");
       setSelectedUser(null);
       setInviteMessage("");
     } catch (error) {
@@ -424,6 +430,7 @@ const HeaderBoard = ({
         error.response?.data?.message ||
         "Không thể chia sẻ bảng. Vui lòng thử lại.";
       setShareError(msg);
+      toast.error("Không thể chia sẻ bảng. Vui lòng thử lại.");
     } finally {
       setLoadingShare(false);
     }
@@ -937,17 +944,7 @@ const HeaderBoard = ({
                             <span>Nhãn dán</span>
                           </button>
 
-                          {/* CÀI ĐẶT BẢNG */}
-                          <button
-                            onClick={() => {
-                              setShowBoardSettings(true);
-                              setShowMoreOptions(false);
-                            }}
-                            className="flex items-center gap-3 w-full px-5 py-3.5 text-gray-700 hover:bg-gray-50 transition-all"
-                          >
-                            <Settings size={18} className="text-gray-600" />
-                            <span>Cài đặt bảng</span>
-                          </button>
+                          
 
                           <div className="border-t border-gray-200 my-1"></div>
 

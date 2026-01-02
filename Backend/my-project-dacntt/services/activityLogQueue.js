@@ -6,12 +6,19 @@ require("dotenv").config();
 const User = require("../models/user");
 
 // Kết nối Redis
-const connection = new Redis({
-  host: process.env.REDIS_HOST,
-  port: process.env.REDIS_PORT,
-  maxRetriesPerRequest: null,
-  enableReadyCheck: false,
+// const connection = new Redis({
+//   host: process.env.REDIS_HOST,
+//   port: process.env.REDIS_PORT,
+//   maxRetriesPerRequest: null,
+//   enableReadyCheck: false,
+// });
+
+const connection = new Redis(process.env.REDIS_URL, {
+  maxRetriesPerRequest: null, // ← DÒNG QUAN TRỌNG NHẤT - BẮT BUỘC
+  enableReadyCheck: false,    // Tùy chọn, nhưng tốt nên thêm
 });
+
+connection.on("error", (err) => console.error("Redis Error:", err));
 
 // Queue
 const activityLogQueue = new Queue("activityLogQueue", {

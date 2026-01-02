@@ -8,6 +8,9 @@ const cloudinary = require("../config/cloudinary");
 const jwt = require("jsonwebtoken");
 const { ObjectId } = require("mongodb");
 const emailQueue = require("../services/emailQueue");
+const UserSkill = require("../models/userSkill");
+const taskAssigneeDeleteQueue = require("../services/taskAssgineeDeleteQueue");
+const columnDeleteQueue = require("../services/columnDeleteQueue");
 
 const createBoard = async (req, res) => {
   const userId = req.user.userId;
@@ -286,13 +289,16 @@ const deleteUploadedFileCloudinary = async (file) => {
 
 const deleteBoard = async (req, res) => {
   const userId = req.user.userId;
-
   const boardId = req.params.boardId;
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
   try {
     // 1. Kiểm tra board có tồn tại
-    const board = await Board.findById(boardId);
+    const board = await Board.findById(boardId).session(session);
     if (!board) {
+      await session.abortTransaction();
       return res.status(404).json({
         status: "error",
         code: 404,
@@ -301,7 +307,8 @@ const deleteBoard = async (req, res) => {
     }
 
     // 2. Kiểm tra có phải owner không -> nếu owner thì cho xóa
-    if (!board.ownerId.equals(userId)) {
+    if (!board.ownerId.toString().equals(userId)) {
+      await session.abortTransaction();
       return res.status(404).json({
         status: "error",
         code: 404,
@@ -309,21 +316,37 @@ const deleteBoard = async (req, res) => {
       });
     }
 
-    // 3. Xóa mềm board
+    // 3. Gửi queue redis - xóa dữ liệu tham chiếu đến board nếu có
+    // await boardDeleteQueue.add("deleteBoard", {
+    //   boardId,
+    // });
+
     board.isArchived = true;
     await board.save();
+
+    await session.commitTransaction();
+
+    // 4. Gửi socket xóa board
+    const io = getIO();
+    io.to(boardId.toString()).emit("deleteBoard", {
+      boardId,
+    });
 
     return res.status(200).json({
       status: "success",
       code: 200,
       message: "Xóa bảng thành công",
+      data: boardId,
     });
   } catch (error) {
+    await session.abortTransaction();
     return res.status(500).json({
       status: "error",
       code: 500,
       message: "Lỗi hệ thống: " + error.message,
     });
+  } finally {
+    await session.endSession();
   }
 };
 
@@ -546,8 +569,10 @@ const shareBoard = async (req, res) => {
 
     // 2️. Lặp qua từng userId để thêm vào board nếu chưa có
     const results = [];
+    const io = getIO();
     for (const uid of userIds) {
       let member = await BoardMember.findOne({ boardId, userId: uid }).lean();
+      const user = await User.findOne({ _id: uid }).lean();
       if (!member) {
         member = await BoardMember.create({
           boardId,
@@ -557,13 +582,22 @@ const shareBoard = async (req, res) => {
           status: "accepted",
           invitedAt: new Date(),
         });
+
+        // Gửi socket
+        io.to(boardId.toString()).emit("addMember", {
+          boardId,
+          _id: user._id,
+          fullName: user.fullName,
+          email: user.email,
+          avatar: user.avatar,
+          skills: [],
+        });
       }
       results.push(member);
     }
 
     // 3️. Gửi email mời
     const inviterName = req.user.fullName;
-    // const invitedUsers = await User.find({ _id: { $in: userIds } });
 
     const frontendUrl = process.env.FE_URL;
     const boardLink = `${frontendUrl}/boards/${boardId}/${existingBoard.title}`;
@@ -577,15 +611,6 @@ const shareBoard = async (req, res) => {
     });
 
     // Gửi lên Socket - thông báo realtime
-
-    // 4️. Ghi thông báo mời vào bảng notifications
-    // ===================================================
-    // Bạn có thể thêm Notification.create({
-    //   userId: uid,
-    //   type: "board_invite",
-    //   message: `${sharer.name} đã mời bạn tham gia bảng "${existingBoard.title}"`,
-    //   createdAt: new Date(),
-    // });
 
     return res.status(200).json({
       status: "success",
@@ -937,6 +962,9 @@ const deleteBoardMember = async (req, res) => {
     // 3. Xóa thành viên
     await BoardMember.deleteOne({ _id: boardMember._id });
 
+    // Xóa kỹ năng làm việc trong bảng
+    await UserSkill.deleteMany({ userId, boardId });
+
     // 4. Emit socket
     const io = getIO();
     io.to(board._id.toString()).emit("memberRemoved", {
@@ -945,10 +973,15 @@ const deleteBoardMember = async (req, res) => {
     });
 
     // 5. Gửi email thông báo đến thành viên đã xóa
-    // await sendRemoveFromBoardEmail(user.email, board.title);
     await emailQueue.add("removeMemberFromBoardEmail", {
       email: user.email,
       title: board.title,
+    });
+
+    // 6. Xóa TaskAssginee nếu có user này tham gia
+    await taskAssigneeDeleteQueue.add("removeMember", {
+      boardId,
+      userId,
     });
 
     return res.status(200).json({

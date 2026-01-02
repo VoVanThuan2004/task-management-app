@@ -27,10 +27,19 @@ export default function BoardDetail() {
   const [showTaskModal, setShowTaskModal] = useState(false);
   const accessToken = localStorage.getItem("accessToken");
   const [loading, setLoading] = useState(false);
+  const [loadingAddTask, setLoadingAddTask] = useState(false);
 
+  // State xóa task
   const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false);
   const [taskIdDelete, setTaskIdDelete] = useState("");
   const [taskTitleDelete, setTaskTitleDelete] = useState("");
+  const [loadingDeleteTask, setLoadingDeleteTask] = useState(false);
+
+  // State xóa column
+  const [showConfirmColumnDeleteModal, setShowConfirmColumnDeleteModal] =useState(false);
+  const [columnIdDelete, setColumnIdDelete] = useState("");
+  const [columnTitleDelete, setColumnTitleDelete] = useState("");
+  const [loadingDeleteColumn, setLoadingDeleteColumn] = useState(false);
 
   // Thêm ref để track drag state
   const isDraggingRef = useRef(false);
@@ -128,12 +137,10 @@ export default function BoardDetail() {
     });
 
     socket.on("columnAdded", (data) => {
-      console.log("➕ Column added:", data);
       setColumns((prev) => [...prev, data]);
     });
 
     socket.on("columnUpdated", (data) => {
-      console.log("✏️ Column updated:", data);
       setColumns((prev) =>
         prev.map((col) =>
           col._id === data._id ? { ...col, title: data.title } : col
@@ -142,7 +149,6 @@ export default function BoardDetail() {
     });
 
     socket.on("columnDeleted", (data) => {
-      console.log("🗑️ Column deleted:", data);
       setColumns((prev) => prev.filter((col) => col._id !== data._id));
     });
 
@@ -708,22 +714,22 @@ export default function BoardDetail() {
     }
   };
 
-  const handleDeleteColumn = async (columnId) => {
-    if (!window.confirm("Bạn có chắc chắn muốn xóa danh sách này?")) return;
-    try {
-      await axios.delete(`${httpUrl}/api/v1/columns/${columnId}`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-    } catch (err) {
-      console.error("❌ Lỗi khi xóa column:", err);
-    }
-  };
+  // const handleDeleteColumn = async (columnId) => {
+  //   if (!window.confirm("Bạn có chắc chắn muốn xóa danh sách này?")) return;
+  //   try {
+  //     await axios.delete(`${httpUrl}/api/v1/columns/${columnId}`, {
+  //       headers: { Authorization: `Bearer ${accessToken}` },
+  //     });
+  //   } catch (err) {
+  //     console.error("❌ Lỗi khi xóa column:", err);
+  //   }
+  // };
 
   // Task handlers
   const handleAddTask = async (columnId, taskTitle) => {
     if (!taskTitle.trim()) return;
     try {
-      setLoading(true);
+      setLoadingAddTask(true);
       await axios.post(
         `${httpUrl}/api/v1/tasks/${columnId}`,
         { title: taskTitle },
@@ -736,7 +742,7 @@ export default function BoardDetail() {
     } catch (err) {
       console.error("Lỗi khi thêm task:", err);
     } finally {
-      setLoading(false);
+      setLoadingAddTask(false);
     }
   };
 
@@ -782,7 +788,7 @@ export default function BoardDetail() {
 
   const handleDeleteTask = async () => {
     if (!taskIdDelete) return;
-    setLoading(true);
+    setLoadingDeleteTask(true);
     try {
       const res = await axios.delete(
         `${httpUrl}/api/v1/tasks/${taskIdDelete}`,
@@ -804,10 +810,57 @@ export default function BoardDetail() {
       console.log(error);
       alert("Lỗi hệ thống!!");
     } finally {
-      setLoading(false);
+      setLoadingDeleteTask(false);
       setShowConfirmDeleteModal(false);
       setTaskIdDelete("");
       setTaskTitleDelete("");
+    }
+  };
+
+  const closeTaskDeleteModal = () => {
+    setShowConfirmDeleteModal(false);
+    setTaskIdDelete("");
+    setTaskTitleDelete("");
+  };
+
+  // === Xóa column ===
+  const openColumnDeleteModal = (columnId, title) => {
+    setShowConfirmColumnDeleteModal(true);
+    setColumnIdDelete(columnId);
+    setColumnTitleDelete(title);
+  };
+
+  const closeColumnDeleteModal = () => {
+    setShowConfirmColumnDeleteModal(false);
+    setColumnIdDelete("");
+    setColumnTitleDelete("");
+  };
+
+  const handleDeleteColumn = async () => {
+    if (!columnIdDelete) return;
+    setLoadingDeleteColumn(true);
+    try {
+      const res = await axios.delete(
+        `${httpUrl}/api/v1/columns/${columnIdDelete}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      const columnId = res.data.data;
+      setColumns((prevColumns) =>
+        prevColumns.filter((c) => c._id !== columnId)
+      );
+    } catch (error) {
+      console.log(error);
+      alert("Lỗi hệ thống!!");
+    } finally {
+      setLoadingDeleteColumn(false);
+      setShowConfirmColumnDeleteModal(false);
+      setColumnIdDelete("");
+      setColumnTitleDelete("");
     }
   };
 
@@ -1023,14 +1076,14 @@ export default function BoardDetail() {
                       onStartEdit={startEditColumn}
                       onEditTitle={setEditTitle}
                       onUpdateColumn={() => handleUpdateColumn(col._id)}
-                      onDeleteColumn={handleDeleteColumn}
+                      onDeleteColumn={openColumnDeleteModal}
                       newTaskTitle={newTaskTitles[col._id]}
                       onNewTaskChange={handleTaskTitleChange}
                       onAddTask={handleAddTask}
                       onToggleTaskComplete={handleToggleTaskComplete}
                       onTaskClick={handleTaskClick}
                       isMember={isMember}
-                      loading={loading}
+                      loading={loadingAddTask}
                       onDeleteTask={openDeleteModal}
                     />
                   ))}
@@ -1039,7 +1092,7 @@ export default function BoardDetail() {
               )}
             </Droppable>
 
-            {/* === NÚT THÊM COLUMN - NẰM CÙNG HÀNG VỚI CÁC COLUMN === */}
+            {/* === NÚT THÊM COLUMN === */}
             <div className="flex-shrink-0">
               <AddColumnButton
                 isAdding={isAddingColumn}
@@ -1161,7 +1214,7 @@ export default function BoardDetail() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-            onClick={() => setShowConfirmDeleteModal(false)}
+            onClick={() => closeTaskDeleteModal()}
           >
             <Motion.div
               initial={{ scale: 0.9, y: 20, opacity: 0 }}
@@ -1194,8 +1247,8 @@ export default function BoardDetail() {
               <div className="flex gap-4 p-6 pt-4 border-t border-gray-200">
                 {/* Nút Hủy */}
                 <button
-                  onClick={() => setShowConfirmDeleteModal(false)}
-                  disabled={loading} // Disable khi đang xóa
+                  onClick={() => closeTaskDeleteModal()}
+                  disabled={loadingDeleteTask} // Disable khi đang xóa
                   className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium disabled:opacity-70 disabled:cursor-not-allowed"
                 >
                   Hủy bỏ
@@ -1204,16 +1257,85 @@ export default function BoardDetail() {
                 {/* Nút Xóa */}
                 <button
                   onClick={handleDeleteTask}
-                  disabled={loading}
+                  disabled={loadingDeleteTask}
                   className="flex-1 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed transition font-medium shadow-lg flex items-center justify-center gap-2"
                 >
-                  {loading ? (
+                  {loadingDeleteTask ? (
                     <>
                       <Loader2 className="animate-spin" size={20} />
                       Đang xóa...
                     </>
                   ) : (
                     "Xóa task"
+                  )}
+                </button>
+              </div>
+            </Motion.div>
+          </Motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal xác nhận xóa task */}
+      <AnimatePresence>
+        {showConfirmColumnDeleteModal && (
+          <Motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            onClick={() => closeColumnDeleteModal()}
+          >
+            <Motion.div
+              initial={{ scale: 0.9, y: 20, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.9, y: 20, opacity: 0 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="bg-white rounded-lg shadow-2xl w-md overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="p-6 border-b border-gray-200">
+                <h3 className="text-xl font-bold text-gray-900 text-center">
+                  Xác nhận xóa danh sách
+                </h3>
+              </div>
+
+              {/* Body */}
+              <div className="p-6 text-center">
+                <p className="text-gray-900 leading-relaxed">
+                  Bạn có chắc chắn muốn xóa vĩnh viễn danh sách{" "}
+                  <strong>{columnTitleDelete}</strong>?
+                </p>
+                <p className="text-gray-700 mt-5">
+                  Hành động này không thể hoàn tác, các dữ liệu liên quan trong
+                  danh sách cũng sẽ bị xóa.
+                </p>
+              </div>
+
+              {/* Footer - Nút */}
+              <div className="flex gap-4 p-6 pt-4 border-t border-gray-200">
+                {/* Nút Hủy */}
+                <button
+                  onClick={() => closeColumnDeleteModal()}
+                  disabled={loadingDeleteColumn} // Disable khi đang xóa
+                  className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  Hủy bỏ
+                </button>
+
+                {/* Nút Xóa */}
+                <button
+                  onClick={handleDeleteColumn}
+                  disabled={loadingDeleteColumn}
+                  className="flex-1 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed transition font-medium shadow-lg flex items-center justify-center gap-2"
+                >
+                  {loadingDeleteColumn ? (
+                    <>
+                      <Loader2 className="animate-spin" size={20} />
+                      Đang xóa...
+                    </>
+                  ) : (
+                    "Xóa danh sách"
                   )}
                 </button>
               </div>
