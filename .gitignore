@@ -123,10 +123,10 @@ Backend/my-project-dacntt/ai_model/**/model.msgpack
 
 # Priority Model
 Backend/my-project-dacntt/ai_model/priority_model/
-backend/my-project-dacntt/ai_model/chat_model/
+Backend/my-project-dacntt/ai_model/chatbot_model/
 *.pkl
 *.joblib
 
-ai_model/
+# Ignore specific large model files but keep Python code
 *.safetensors
 *.bin
