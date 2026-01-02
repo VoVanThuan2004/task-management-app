@@ -106,6 +106,7 @@ export default function HomePage() {
     localStorage.removeItem("refreshToken");
     localStorage.removeItem("userId");
     localStorage.removeItem("roleName");
+    localStorage.removeItem("chatHistory"); // Xóa lịch sử chat
 
     setMyBoards([]);
     setInvitedBoards([]);
@@ -199,6 +200,7 @@ export default function HomePage() {
       localStorage.removeItem("refreshToken");
       localStorage.removeItem("userId");
       localStorage.removeItem("roleName");
+      localStorage.removeItem("chatHistory"); // Xóa lịch sử chat
       setUser(null);
 
       setMyBoards([]);
@@ -269,9 +271,8 @@ export default function HomePage() {
           <div>
             <div
               onClick={() => setActiveSection("my")}
-              className={`flex items-center gap-2 text-gray-600 font-medium mb-2 cursor-pointer hover:text-blue-600 transition-colors ${
-                activeSection === "my" ? "text-blue-600" : ""
-              }`}
+              className={`flex items-center gap-2 text-gray-600 font-medium mb-2 cursor-pointer hover:text-blue-600 transition-colors ${activeSection === "my" ? "text-blue-600" : ""
+                }`}
             >
               <LayoutGrid size={18} />
               <span>Cá nhân</span>
@@ -303,9 +304,8 @@ export default function HomePage() {
           <div className="mt-6">
             <div
               onClick={() => setActiveSection("invited")}
-              className={`flex items-center gap-2 text-gray-600 font-medium mb-2 cursor-pointer hover:text-blue-600 transition-colors ${
-                activeSection === "invited" ? "text-blue-600" : ""
-              }`}
+              className={`flex items-center gap-2 text-gray-600 font-medium mb-2 cursor-pointer hover:text-blue-600 transition-colors ${activeSection === "invited" ? "text-blue-600" : ""
+                }`}
             >
               <Users size={18} />
               <span>Được mời vào</span>
@@ -337,9 +337,8 @@ export default function HomePage() {
           <div className="mt-6">
             <div
               onClick={() => setActiveSection("vip")}
-              className={`flex items-center gap-2 text-gray-600 font-medium mb-2 cursor-pointer hover:text-blue-600 transition-colors ${
-                activeSection === "vip" ? "text-blue-600" : ""
-              }`}
+              className={`flex items-center gap-2 text-gray-600 font-medium mb-2 cursor-pointer hover:text-blue-600 transition-colors ${activeSection === "vip" ? "text-blue-600" : ""
+                }`}
             >
               <Wallet size={18} />
               <span>Nâng cấp tài khoản VIP</span>
@@ -357,8 +356,8 @@ export default function HomePage() {
             {activeSection === "my"
               ? "Bảng của tôi"
               : activeSection === "invited"
-              ? "Bảng được mời vào"
-              : "Nâng cấp tài khoản VIP"}
+                ? "Bảng được mời vào"
+                : "Nâng cấp tài khoản VIP"}
           </h1>
 
           {/* Profile - luôn nằm bên phải, cả mobile lẫn desktop */}
@@ -417,13 +416,13 @@ export default function HomePage() {
                           <p className="text-3xl font-extrabold text-orange-500 mb-8">
                             {vipStatus.expirationDate
                               ? new Date(
-                                  vipStatus.expirationDate
-                                ).toLocaleDateString("vi-VN", {
-                                  weekday: "long",
-                                  day: "2-digit",
-                                  month: "2-digit",
-                                  year: "numeric",
-                                })
+                                vipStatus.expirationDate
+                              ).toLocaleDateString("vi-VN", {
+                                weekday: "long",
+                                day: "2-digit",
+                                month: "2-digit",
+                                year: "numeric",
+                              })
                               : "Chưa xác định"}
                           </p>
 
@@ -546,10 +545,10 @@ export default function HomePage() {
                           board.background?.startsWith("#")
                             ? { backgroundColor: board.background }
                             : {
-                                backgroundImage: board.background,
-                                backgroundSize: "cover",
-                                backgroundPosition: "center",
-                              }
+                              backgroundImage: board.background,
+                              backgroundSize: "cover",
+                              backgroundPosition: "center",
+                            }
                         }
                       />
                       <div className="bg-white p-3 md:p-4">
@@ -584,27 +583,24 @@ export default function HomePage() {
         <div className="flex justify-around py-2">
           <button
             onClick={() => setActiveSection("my")}
-            className={`flex flex-col items-center p-2 rounded-lg transition-colors ${
-              activeSection === "my" ? "text-blue-600" : "text-gray-600"
-            }`}
+            className={`flex flex-col items-center p-2 rounded-lg transition-colors ${activeSection === "my" ? "text-blue-600" : "text-gray-600"
+              }`}
           >
             <LayoutGrid size={20} />
             <span className="text-xs mt-1">Cá nhân</span>
           </button>
           <button
             onClick={() => setActiveSection("invited")}
-            className={`flex flex-col items-center p-2 rounded-lg transition-colors ${
-              activeSection === "invited" ? "text-blue-600" : "text-gray-600"
-            }`}
+            className={`flex flex-col items-center p-2 rounded-lg transition-colors ${activeSection === "invited" ? "text-blue-600" : "text-gray-600"
+              }`}
           >
             <Users size={20} />
             <span className="text-xs mt-1">Mời vào</span>
           </button>
           <button
             onClick={() => setActiveSection("vip")}
-            className={`flex flex-col items-center p-2 rounded-lg transition-colors ${
-              activeSection === "vip" ? "text-blue-600" : "text-gray-600"
-            }`}
+            className={`flex flex-col items-center p-2 rounded-lg transition-colors ${activeSection === "vip" ? "text-blue-600" : "text-gray-600"
+              }`}
           >
             <Wallet size={20} />
             <span className="text-xs mt-1">Gói VIP</span>
@@ -689,11 +685,10 @@ export default function HomePage() {
                           onClick={() =>
                             setFormData({ ...formData, background: color })
                           }
-                          className={`w-12 aspect-square rounded-lg border-2 transition-all duration-200 shadow-sm hover:shadow-md hover:scale-105 ${
-                            formData.background === color
-                              ? "border-blue-500 ring-2 ring-blue-200"
-                              : "border-gray-300"
-                          }`}
+                          className={`w-12 aspect-square rounded-lg border-2 transition-all duration-200 shadow-sm hover:shadow-md hover:scale-105 ${formData.background === color
+                            ? "border-blue-500 ring-2 ring-blue-200"
+                            : "border-gray-300"
+                            }`}
                           style={{
                             background: color.startsWith("linear-gradient")
                               ? undefined

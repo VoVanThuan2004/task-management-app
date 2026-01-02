@@ -17,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from ai_pipeline import run_pipeline
 from chatbot_utils import parse_create_task, date_phrase_to_date
+from model_downloader import get_priority_model_path, get_chatbot_model_path
 
 app = FastAPI()
 
@@ -28,28 +29,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# =========================
+# LOAD MODELS FROM HF CACHE
+# =========================
+print("Loading models from Hugging Face...")
 
-# =========================
-# PRIORITY MODEL LOADING
-# =========================
-current_dir = os.path.dirname(os.path.abspath(__file__))
-# Navigate into task_priority_model folder
-priority_model_path = os.path.join(current_dir, "priority_model", "task_priority_model.pkl")
+# 1. PRIORITY MODEL
 priority_model = None
-
 try:
-    if os.path.exists(priority_model_path):
-        priority_model = joblib.load(priority_model_path)
-        print(f"✅ Loaded Priority Model from {priority_model_path}")
+    path = get_priority_model_path()
+    if path and os.path.exists(path):
+        priority_model = joblib.load(path)
+        print(f"Loaded Priority Model from {path}")
     else:
-        print(f"⚠️ Priority Model not found at {priority_model_path}")
-        # Try finding in root just in case
-        alt_path = os.path.join(current_dir, "task_priority_model.pkl")
-        if os.path.exists(alt_path):
-             priority_model = joblib.load(alt_path)
-             print(f"✅ Loaded Priority Model from {alt_path}")
+        print("Failed to resolve Priority Model path")
 except Exception as e:
-    print(f"❌ Error loading Priority Model: {e}")
+    print(f"Error loading Priority Model: {e}")
 
 # =========================
 # DATABASE CONNECTION
@@ -61,20 +56,18 @@ try:
 except:
     db = client.test
 
-# =========================
-# CHATBOT MODEL LOADING
-# =========================
-chatbot_model_path = os.path.join(current_dir, "chatbot_model", "intent_model.joblib")
+# 2. CHATBOT MODEL
 chatbot_model = None
 try:
-    if os.path.exists(chatbot_model_path):
-        payload = joblib.load(chatbot_model_path)
+    path = get_chatbot_model_path()
+    if path and os.path.exists(path):
+        payload = joblib.load(path)
         chatbot_model = payload["model"] if isinstance(payload, dict) and "model" in payload else payload
-        print(f"✅ Loaded Chatbot Model from {chatbot_model_path}")
+        print(f"Loaded Chatbot Model from {path}")
     else:
-        print(f"⚠️ Chatbot Model not found at {chatbot_model_path}")
+        print("Failed to resolve Chatbot Model path")
 except Exception as e:
-    print(f"❌ Error loading Chatbot Model: {e}")
+    print(f"Error loading Chatbot Model: {e}")
 
 
 # =========================

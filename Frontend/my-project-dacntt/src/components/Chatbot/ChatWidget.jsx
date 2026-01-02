@@ -118,6 +118,7 @@ const ChatWidget = () => {
     const [messages, setMessages] = useState(loadChatHistory);
     const [inputText, setInputText] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [lastUserId, setLastUserId] = useState(localStorage.getItem('userId'));
 
     const messagesEndRef = useRef(null);
 
@@ -139,6 +140,24 @@ const ChatWidget = () => {
     useEffect(() => {
         scrollToBottom();
     }, [messages, isOpen]);
+
+    // Check auth/user state on open
+    useEffect(() => {
+        const token = localStorage.getItem('accessToken');
+        const userId = localStorage.getItem('userId');
+
+        if (!token) {
+            setMessages([{ role: 'bot', text: 'Xin chào! Mình là trợ lý ảo AI. Vui lòng đăng nhập để sử dụng tính năng này.' }]);
+            localStorage.removeItem('chatHistory');
+            setLastUserId(null);
+        } else if (userId !== lastUserId) {
+            // User changed -> Reset chat
+            const initialMsg = [{ role: 'bot', text: 'Xin chào! Mình là trợ lý ảo AI. Mình có thể giúp gì cho bạn? (Tạo task, xem deadline...)' }];
+            setMessages(initialMsg);
+            localStorage.setItem('chatHistory', JSON.stringify(initialMsg));
+            setLastUserId(userId);
+        }
+    }, [isOpen]);
 
     // Save messages to localStorage whenever they change
     useEffect(() => {
