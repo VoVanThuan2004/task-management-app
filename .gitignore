@@ -123,6 +123,7 @@ Backend/my-project-dacntt/ai_model/**/model.msgpack
 
 # Priority Model
 Backend/my-project-dacntt/ai_model/priority_model/
+backend/my-project-dacntt/ai_model/chat_model/
 *.pkl
 *.joblib
 

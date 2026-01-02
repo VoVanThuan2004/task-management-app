@@ -3,9 +3,11 @@ uvicorn[standard]
 torch
 transformers==4.42.4
 sentencepiece
-numpy
-scikit-learn==1.2.2
 huggingface_hub
 pandas
-joblib
-
+scikit-learn==1.2.2
+numpy==1.24.4
+joblib==1.2.0
+motor
+python-dotenv
+aiohttp 

@@ -19,6 +19,7 @@ import PrivateRoute from "./components/PrivateRoutes";
 import UserPage from "./pages/admin/UserPage";
 import PaymentHistory from "./pages/PaymentHistory";
 import DashboardPage from "./pages/admin/DashboardPage";
+import ChatWidget from "./components/Chatbot/ChatWidget";
 import HeaderTest from "./pages/HeaderTest";
 
 function App() {
@@ -136,6 +137,7 @@ function App() {
               <Route path="dashboard" element={<DashboardPage />} />
             </Route>
           </Routes>
+          <ChatWidget />
         </Router>
       </UserProvider>
     </GoogleOAuthProvider>

@@ -17,6 +17,8 @@ services:
       - "8001:8001"
     volumes:
       - ./Backend/my-project-dacntt/ai_model:/app
+    environment:
+      - MONGO_URL=${MONGO_URL:-mongodb+srv://restaurantDB:dbRestaurant@cluster-thuan-tdtu.xvg1lgt.mongodb.net/}
     command: uvicorn api:app --host 0.0.0.0 --port 8001 --reload
     restart: unless-stopped
 
