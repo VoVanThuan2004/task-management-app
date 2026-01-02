@@ -36,7 +36,8 @@ export default function BoardDetail() {
   const [loadingDeleteTask, setLoadingDeleteTask] = useState(false);
 
   // State xóa column
-  const [showConfirmColumnDeleteModal, setShowConfirmColumnDeleteModal] =useState(false);
+  const [showConfirmColumnDeleteModal, setShowConfirmColumnDeleteModal] =
+    useState(false);
   const [columnIdDelete, setColumnIdDelete] = useState("");
   const [columnTitleDelete, setColumnTitleDelete] = useState("");
   const [loadingDeleteColumn, setLoadingDeleteColumn] = useState(false);
@@ -996,14 +997,27 @@ export default function BoardDetail() {
 
   const getBoardBackground = () => {
     if (!board) return { backgroundColor: "#f0f2f5" };
+
     const { background } = board;
-    if (background?.startsWith("#")) return { backgroundColor: background };
-    if (background)
+
+    // Màu hoặc gradient
+    if (
+      background?.startsWith("#") ||
+      background?.startsWith("linear-gradient")
+    ) {
+      return { background: background };
+    }
+
+    // URL ảnh
+    if (background?.startsWith("http")) {
       return {
-        backgroundImage: background,
+        backgroundImage: `url("${background}")`,
         backgroundSize: "cover",
         backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
       };
+    }
+
     return { backgroundColor: "#f0f2f5" };
   };
 
@@ -1040,7 +1054,7 @@ export default function BoardDetail() {
 
       {/* Tuyết rơi - phủ toàn màn hình, nhưng không che nội dung */}
       <Snowfall
-        snowflakeCount={115} // số lượng tuyết (tùy chỉnh 100-300)
+        snowflakeCount={100} // số lượng tuyết (tùy chỉnh 100-300)
         speed={[0.5, 2]} // tốc độ rơi chậm - nhanh
         wind={[-0.5, 2]} // gió thổi nhẹ ngang
         radius={[0.5, 4.0]} // kích thước tuyết nhỏ đến trung bình

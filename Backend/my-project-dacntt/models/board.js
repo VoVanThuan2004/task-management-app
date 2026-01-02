@@ -10,8 +10,8 @@ const boardSchema = new mongoose.Schema(
     },
     title: { type: String, required: true },
     background: { type: String },
-    backgroundPublicId: { type: String, default: null },  // dùng để xóa ảnh trên cloudinary
-    type: { type: String }, // quyền truy cập: public, private, workspace
+    backgroundPublicId: { type: String, default: null },  
+    type: { type: String }, 
     description: { type: String, default: null },
     isArchived: { type: Boolean, default: false },
   },

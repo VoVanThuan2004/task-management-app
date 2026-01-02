@@ -3,7 +3,7 @@ import React from "react";
 import { Draggable, Droppable } from "@hello-pangea/dnd";
 import TaskCard from "./TaskCard";
 import AddTaskForm from "./AddTaskForm";
-import { Trash2 } from "lucide-react";
+import iconDelete from "../../images/icon_delete.png";
 
 const Column = React.memo(
   ({
@@ -22,7 +22,7 @@ const Column = React.memo(
     onTaskClick,
     isMember = false,
     loading,
-    onDeleteTask
+    onDeleteTask,
   }) => {
     const isReadOnly = !isMember;
 
@@ -87,13 +87,15 @@ const Column = React.memo(
                     {!isReadOnly && (
                       <button
                         onClick={() => onDeleteColumn(column._id, column.title)}
-                        className="p-2 opacity-0 group-hover:opacity-100 hover:bg-red-50 rounded-lg transition"
+                        className="p-2 rounded-lg transition-all hover:bg-red-100"
                         title="Xóa danh sách"
                       >
-                        <Trash2
+                        {/* <Trash2
                           size={16}
                           className="text-red-500 hover:text-red-600"
-                        />
+                        /> */}
+                        <img src={iconDelete} alt="cancel"/>
+                        
                       </button>
                     )}
                   </>

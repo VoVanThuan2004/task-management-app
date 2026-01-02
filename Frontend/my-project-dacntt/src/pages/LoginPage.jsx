@@ -133,6 +133,33 @@ const LoginPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <button
+        onClick={() => navigate("/home")}
+        className="
+    absolute top-6 left-6
+    flex items-center gap-2
+    text-gray-600 hover:text-gray-900
+    font-medium
+    transition-colors
+    group
+  "
+      >
+        <svg
+          className="w-5 h-5 transition-transform group-hover:-translate-x-1"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M15 19l-7-7 7-7"
+          />
+        </svg>
+        <span className="hidden sm:inline">Quay trở lại</span>
+      </button>
+
       <div className="max-w-md w-full">
         {/* Login Card */}
         <div className="bg-white rounded-xl shadow-xl overflow-hidden">

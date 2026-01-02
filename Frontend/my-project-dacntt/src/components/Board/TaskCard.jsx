@@ -72,15 +72,13 @@ const TaskCard = React.memo(
             {isMember && (
               <button
                 onClick={(e) => {
-                  e.stopPropagation(); // Ngăn không kích hoạt onClick mở task
-                  onDeleteTask(task._id, task.title); // Hàm xóa bạn truyền từ parent
+                  e.stopPropagation();
+                  onDeleteTask(task._id, task.title);
                 }}
-                className="absolute top-2 right-2 z-10 p-1.5 rounded-lg bg-red-100 backdrop-blur 
-               opacity-0 group-hover:opacity-100 transition-all duration-200
-               hover:bg-red-200 hover:scale-110 shadow-sm border border-red-300"
+                className="absolute top-2 right-2 z-1 p-1 transition-transform duration-200 hover:scale-110 cursor-pointer"
                 title="Xóa task"
               >
-                <Trash2 size={13} className="text-red-600" />
+                <Trash2 size={14} className="text-red-500 hover:text-red-600" />
               </button>
             )}
 

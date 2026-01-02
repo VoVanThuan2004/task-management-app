@@ -93,6 +93,8 @@ const HeaderBoard = ({
   const [showVisibilityPopup, setShowVisibilityPopup] = useState(false);
   const visibilityButtonRef = useRef(null);
 
+  const [activeMember, setActiveMember] = useState(null);
+
   // Fetch visibility khi mở board
   useEffect(() => {
     const fetchVisibility = async () => {
@@ -743,6 +745,8 @@ const HeaderBoard = ({
     onApplyFilters(emptyFilters);
   };
 
+  const isMobile = window.innerWidth < 640;
+
   return (
     <>
       <header className="flex items-center justify-between p-4 bg-white/70 backdrop-blur-sm shadow-sm z-10">
@@ -753,83 +757,109 @@ const HeaderBoard = ({
           </h1>
         </div>
 
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-2 sm:gap-4">
           {/* Chỉ hiện khi là thành viên */}
           {isMember && boardMembers.length > 0 && (
-            <div className="flex items-center flex-wrap gap-2">
-              {/* Hiển thị tối đa 6 thành viên đầu tiên */}
-              {boardMembers.slice(0, 6).map((member) => (
+            <div className="flex items-center flex-wrap gap-1.5 sm:gap-2">
+              {boardMembers.slice(0, isMobile ? 3 : 6).map((member) => (
                 <div
                   key={member._id}
-                  className="relative group flex flex-col items-center"
+                  className="relative group"
+                  onClick={() => isMobile && setActiveMember(member)}
                 >
                   <Avatar
                     user={member}
-                    size="w-10 h-10"
-                    className="ring-4 ring-white shadow-xl transition-all duration-300 hover:scale-115 hover:z-50 hover:ring-blue-400"
+                    size="w-8 h-8 sm:w-10 sm:h-10"
+                    className="
+              ring-2 sm:ring-4 ring-white
+              shadow-md sm:shadow-xl
+              transition-transform
+              sm:hover:scale-110
+              cursor-pointer
+            "
                   />
 
-                  {/* Tooltip siêu đẹp - ClickUp Style */}
-                  <div className="absolute top-full left-1/2 -translate-x-1/2 mt-4 w-80 p-6 bg-white rounded-2xl shadow-2xl border border-gray-200 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-50">
-                    {/* Header: Avatar + Info */}
-                    <div className="flex items-center gap-4 mb-5">
+                  {/* Tooltip – CHỈ DESKTOP */}
+                  <div
+                    className="
+              hidden sm:block
+              absolute top-full left-1/2 -translate-x-1/2 mt-4
+              w-80 p-6 bg-white rounded-2xl
+              shadow-2xl border border-gray-200
+              opacity-0 group-hover:opacity-100
+              transition-all duration-300
+              pointer-events-none z-50
+            "
+                  >
+                    {/* Header */}
+                    <div className="flex items-center gap-4 mb-4">
                       <Avatar
                         user={member}
                         size="w-12 h-12"
-                        className="ring-4 ring-white shadow-2xl flex-shrink-0"
+                        className="ring-4 ring-white shadow-lg"
                       />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-bold text-gray-900 text-lg truncate">
+                      <div className="min-w-0">
+                        <p className="font-bold text-gray-900 truncate">
                           {member.fullName || "Không rõ tên"}
                         </p>
                         <p className="text-sm text-gray-500 truncate">
                           {member.email}
                         </p>
                         {member.role === "owner" && (
-                          <span className="inline-flex items-center gap-1 mt-1.5 px-3 py-1 rounded-full text-xs font-bold bg-yellow-100 text-yellow-800">
+                          <span className="inline-block mt-1 px-3 py-1 rounded-full text-xs font-bold bg-yellow-100 text-yellow-800">
                             Owner
                           </span>
                         )}
                       </div>
                     </div>
 
-                    {/* Skills Section */}
+                    {/* Skills */}
                     <div>
-                      <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-3">
-                        Kỹ năng trong dự án
+                      <p className="text-xs font-bold text-gray-600 uppercase mb-2">
+                        Kỹ năng
                       </p>
-                      {member.skills && member.skills.length > 0 ? (
+                      {member.skills?.length ? (
                         <div className="flex flex-wrap gap-2">
                           {member.skills.map((s, i) => (
                             <span
                               key={i}
-                              className="px-4 py-2 bg-gradient-to-r from-violet-100 via-indigo-100 to-purple-100 text-indigo-700 text-xs font-bold rounded-full border border-indigo-200 shadow-sm"
+                              className="px-3 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-full"
                             >
                               {s.skill}
                             </span>
                           ))}
                         </div>
                       ) : (
-                        <p className="text-sm text-gray-400 italic">
-                          Chưa khai báo kỹ năng
+                        <p className="text-sm italic text-gray-400">
+                          Chưa khai báo
                         </p>
                       )}
                     </div>
 
-                    {/* Mũi tên chỉ lên */}
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 -mb-2 w-0 h-0 border-8 border-transparent border-b-white"></div>
+                    {/* Arrow */}
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-8 border-transparent border-b-white"></div>
                   </div>
                 </div>
               ))}
 
-              {/* Nếu có nhiều hơn 6 người → nút "..." để mở popup xem thêm */}
-              {boardMembers.length > 6 && (
+              {/* MORE MEMBERS */}
+              {boardMembers.length > (isMobile ? 3 : 6) && (
                 <button
                   onClick={() => setShowAllMembers(true)}
-                  className="flex items-center justify-center w-11 h-11 rounded-full bg-gradient-to-br from-gray-600 to-gray-900 text-white text-sm font-bold shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-110"
-                  title={`Và ${boardMembers.length - 6} thành viên khác`}
+                  className="
+          flex items-center justify-center
+          w-8 h-8 sm:w-11 sm:h-11
+          rounded-full
+          bg-gray-200 sm:bg-gradient-to-br
+          sm:from-gray-600 sm:to-gray-900
+          text-gray-700 sm:text-white
+          font-bold
+          transition-transform
+          hover:scale-110
+        "
+                  title="Xem thêm thành viên"
                 >
-                  <span className="text-lg leading-none">...</span>
+                  …
                 </button>
               )}
             </div>
@@ -943,8 +973,6 @@ const HeaderBoard = ({
                             <Tag size={18} className="text-purple-600" />
                             <span>Nhãn dán</span>
                           </button>
-
-                          
 
                           <div className="border-t border-gray-200 my-1"></div>
 
@@ -2475,6 +2503,45 @@ const HeaderBoard = ({
             </div>
           </div>
         </>
+      )}
+
+      {activeMember && isMobile && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 flex items-end"
+          onClick={() => setActiveMember(null)}
+        >
+          <div
+            className="w-full bg-white rounded-t-3xl p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-4 mb-4">
+              <Avatar user={activeMember} size="w-14 h-14" />
+              <div>
+                <p className="font-bold text-lg">{activeMember.fullName}</p>
+                <p className="text-sm text-gray-500">{activeMember.email}</p>
+              </div>
+            </div>
+
+            <p className="text-xs font-bold text-gray-600 mb-2">Kỹ năng</p>
+            <div className="flex flex-wrap gap-2">
+              {activeMember.skills?.map((s, i) => (
+                <span
+                  key={i}
+                  className="px-3 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-full"
+                >
+                  {s.skill}
+                </span>
+              ))}
+            </div>
+
+            <button
+              className="mt-6 w-full py-3 rounded-xl bg-gray-100 font-semibold cursor-pointer"
+              onClick={() => setActiveMember(null)}
+            >
+              Đóng
+            </button>
+          </div>
+        </div>
       )}
     </>
   );
