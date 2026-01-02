@@ -4,17 +4,17 @@ const CheckItem = require("../models/checkItem");
 require("dotenv").config();
 const { getIO } = require("../config/socket");
 
-const connection = new Redis({
-  host: process.env.REDIS_HOST,
-  port: process.env.REDIS_PORT,
-  maxRetriesPerRequest: null,
-  enableReadyCheck: false,
-});
-
-// const connection = new Redis(process.env.REDIS_URL, {
-//   maxRetriesPerRequest: null, 
-//   enableReadyCheck: false,    
+// const connection = new Redis({
+//   host: process.env.REDIS_HOST,
+//   port: process.env.REDIS_PORT,
+//   maxRetriesPerRequest: null,
+//   enableReadyCheck: false,
 // });
+
+const connection = new Redis(process.env.REDIS_URL, {
+  maxRetriesPerRequest: null, 
+  enableReadyCheck: false,    
+});
 
 
 const checkItemReminderQueue = new Queue("checkItemReminderQueue", {
