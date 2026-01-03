@@ -34,7 +34,7 @@ const AdminPage = () => {
 
       {/* Main content */}
       <main
-        className={`flex-1 transition-all duration-300 overflow-y-auto
+        className={`flex-1 transition-margin duration-300 overflow-y-auto
           ${isCollapsed ? "ml-18" : "ml-64"}
         `}
       >

@@ -26,7 +26,6 @@ const TaskModal = ({
   task,
   isOpen,
   onClose,
-  onTaskUpdate,
   isMember = false,
 }) => {
   const isReadOnly = !isMember;
@@ -69,28 +68,30 @@ const TaskModal = ({
 
   // Khi task thay đổi => gọi API lấy chi tiết task
   useEffect(() => {
-    const fetchTaskDetail = async () => {
-      if (!task?._id || !isOpen) return;
+    // const fetchTaskDetail = async () => {
+    //   if (!task?._id || !isOpen) return;
 
-      setLoading(true);
-      try {
-        const response = await axios.get(
-          `${httpUrl}/api/v1/tasks/${task._id}`,
-          {
-            headers: { Authorization: `Bearer ${accessToken}` },
-          }
-        );
-        setEditedTask(response.data.data);
-      } catch (error) {
-        console.error("Lỗi tải chi tiết task:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+    //   setLoading(true);
+    //   try {
+    //     const response = await axios.get(
+    //       `${httpUrl}/api/v1/tasks/${task._id}`,
+    //       {
+    //         headers: { Authorization: `Bearer ${accessToken}` },
+    //       }
+    //     );
+    //     setEditedTask(response.data.data);
+    //   } catch (error) {
+    //     console.error("Lỗi tải chi tiết task:", error);
+    //   } finally {
+    //     setLoading(false);
+    //   }
+    // };
 
+    
+    setEditedTask(task);
     setStartDate(task?.startDate ? new Date(task?.startDate) : null);
     setDueDate(task?.dueDate ? new Date(task?.dueDate) : null);
-    fetchTaskDetail();
+    // fetchTaskDetail();
   }, [task, isOpen]);
 
   useEffect(() => {
@@ -107,7 +108,6 @@ const TaskModal = ({
     newSocket.emit("joinBoard", task.boardId);
 
     newSocket.on("descriptionTaskUpdated", (data) => {
-      console.log("📝 TaskModal received description update:", data);
       if (data._id === task._id) {
         setEditedTask((prev) =>
           prev ? { ...prev, description: data.description } : null
@@ -116,7 +116,6 @@ const TaskModal = ({
     });
 
     newSocket.on("taskTitleUpdated", (data) => {
-      console.log("TaskModal received title update:", data);
       if (data._id === task._id) {
         setEditedTask((prev) => (prev ? { ...prev, title: data.title } : null));
       }
@@ -300,7 +299,7 @@ const TaskModal = ({
     try {
       await updateTaskTitle(editedTask.title);
       setIsEditingTitle(false);
-      onTaskUpdate();
+      // onTaskUpdate();
     } catch (e) {
       console.error(e);
     } finally {
@@ -331,8 +330,6 @@ const TaskModal = ({
         }
       }
 
-      console.log("📝 Saving description:", descriptionContent);
-
       // Gọi API cập nhật
       await updateTaskDescription(descriptionContent || "");
 
@@ -343,7 +340,7 @@ const TaskModal = ({
       }));
 
       setIsEditingDescription(false);
-      onTaskUpdate();
+      // onTaskUpdate();
 
       toast.success("Mô tả đã được cập nhật");
     } catch (error) {
@@ -363,7 +360,7 @@ const TaskModal = ({
     setLoading(true);
     try {
       await deleteTask();
-      onTaskUpdate();
+      // onTaskUpdate();
       onClose();
     } catch (e) {
       console.error(e);
@@ -862,7 +859,7 @@ const TaskModal = ({
                         setShowAiModal(false);
                         // store created check items so CheckItemSection can append them
                         setAiCreatedItems(created || []);
-                        onTaskUpdate && onTaskUpdate();
+                        // onTaskUpdate && onTaskUpdate();
                       }}
                       boardId={editedTask?.boardId}
                     />

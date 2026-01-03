@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate, Outlet } from "react-router-dom";
 import { io } from "socket.io-client";
 import axios from "axios";
-import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+import { DragDropContext, Droppable } from "@hello-pangea/dnd";
 import TaskModal from "../components/TaskModal";
 import HeaderBoard from "../components/HeaderBoard";
 import Column from "../components/Board/Column";
@@ -23,11 +23,12 @@ export default function BoardDetail() {
   const [editTitle, setEditTitle] = useState("");
   const [isAddingColumn, setIsAddingColumn] = useState(false);
   const [newTaskTitles, setNewTaskTitles] = useState({});
-  const [selectedTask, setSelectedTask] = useState(null);
-  const [showTaskModal, setShowTaskModal] = useState(false);
+  // const [selectedTask, setSelectedTask] = useState(null);
+  // const [showTaskModal, setShowTaskModal] = useState(false);
   const accessToken = localStorage.getItem("accessToken");
   const [loading, setLoading] = useState(false);
   const [loadingAddTask, setLoadingAddTask] = useState(false);
+  const navigate = useNavigate();
 
   // State xóa task
   const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false);
@@ -155,8 +156,6 @@ export default function BoardDetail() {
 
     socket.on("columnMoved", (data) => {
       if (isDraggingRef.current) return;
-
-      console.log("🔄 Column moved:", data);
       setColumns((prevColumns) => {
         const newOrder = data.columns.map((col) => {
           const existing = prevColumns.find((c) => c._id === col.id);
@@ -174,7 +173,6 @@ export default function BoardDetail() {
     });
 
     socket.on("taskAdded", (data) => {
-      console.log("Task added:", data);
       setColumns((prevColumns) =>
         prevColumns.map((col) =>
           col._id === data.columnId
@@ -202,7 +200,6 @@ export default function BoardDetail() {
     });
 
     socket.on("taskTitleUpdated", (data) => {
-      console.log("Task title updated:", data);
       setColumns((prevColumns) =>
         prevColumns.map((col) => ({
           ...col,
@@ -214,7 +211,6 @@ export default function BoardDetail() {
     });
 
     socket.on("descriptionTaskUpdated", (data) => {
-      console.log("📝 Task description updated:", data);
       setColumns((prevColumns) =>
         prevColumns.map((col) => ({
           ...col,
@@ -241,7 +237,6 @@ export default function BoardDetail() {
     socket.on("taskMoved", (data) => {
       if (isDraggingRef.current) return;
 
-      console.log("Task moved:", data);
 
       setColumns((prev) => {
         return prev.map((col) => {
@@ -271,7 +266,6 @@ export default function BoardDetail() {
     });
 
     socket.on("taskCompletionUpdated", (data) => {
-      console.log("✅ Task completion updated:", data);
       setColumns((prevColumns) =>
         prevColumns.map((col) => ({
           ...col,
@@ -715,17 +709,6 @@ export default function BoardDetail() {
     }
   };
 
-  // const handleDeleteColumn = async (columnId) => {
-  //   if (!window.confirm("Bạn có chắc chắn muốn xóa danh sách này?")) return;
-  //   try {
-  //     await axios.delete(`${httpUrl}/api/v1/columns/${columnId}`, {
-  //       headers: { Authorization: `Bearer ${accessToken}` },
-  //     });
-  //   } catch (err) {
-  //     console.error("❌ Lỗi khi xóa column:", err);
-  //   }
-  // };
-
   // Task handlers
   const handleAddTask = async (columnId, taskTitle) => {
     if (!taskTitle.trim()) return;
@@ -867,18 +850,19 @@ export default function BoardDetail() {
 
   // Modal handlers
   const handleTaskClick = (task) => {
-    setSelectedTask(task);
-    setShowTaskModal(true);
+    // setSelectedTask(task);
+    // setShowTaskModal(true);
+    navigate(`/boards/${boardId}/${boardTitle}/${task._id}/${task.title}`);
   };
 
-  const handleCloseModal = () => {
-    setShowTaskModal(false);
-    setSelectedTask(null);
-  };
+  // const handleCloseModal = () => {
+  //   setShowTaskModal(false);
+  //   setSelectedTask(null);
+  // };
 
-  const handleTaskUpdate = () => {
-    fetchColumns();
-  };
+  // const handleTaskUpdate = () => {
+  //   fetchColumns();
+  // };
 
   // Drag & drop handlers
   const handleColumnMove = useCallback(
@@ -1123,14 +1107,16 @@ export default function BoardDetail() {
         </DragDropContext>
       </main>
 
-      <TaskModal
+      {/* <TaskModal
         key={selectedTask?._id}
         task={selectedTask}
         isOpen={showTaskModal}
         onClose={handleCloseModal}
-        onTaskUpdate={handleTaskUpdate}
+        // onTaskUpdate={handleTaskUpdate}
         isMember={isMember}
-      />
+      /> */}
+
+      <Outlet />
 
       {/* Modal Nâng cấp VIP */}
       <AnimatePresence>

@@ -21,6 +21,7 @@ import PaymentHistory from "./pages/PaymentHistory";
 import DashboardPage from "./pages/admin/DashboardPage";
 import ChatWidget from "./components/Chatbot/ChatWidget";
 import HeaderTest from "./pages/HeaderTest";
+import TaskDetail from "./components/TaskDetail";
 
 function App() {
   return (
@@ -113,7 +114,10 @@ function App() {
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/home" element={<HomePage />} />
-            <Route path="/boards/:boardId/:title" element={<BoardDetail />} />
+            <Route path="/boards/:boardId/:title" element={<BoardDetail />}>
+              {/* Child route cho task detail - URL con */}
+              <Route path=":taskId/:taskTitle" element={<TaskDetail />} />
+            </Route>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/recovery-password" element={<RecoveryPassword />} />
             <Route path="/register" element={<Register />} />

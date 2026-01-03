@@ -256,8 +256,8 @@ const UserPage = () => {
 
         {/* Table */}
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
+          <div className="overflow-x-auto min-w-full">
+            <table className="w-full min-w-[1000px]">
               <thead className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
                 <tr>
                   <th className="px-8 py-5 text-left text-sm font-semibold text-gray-700">

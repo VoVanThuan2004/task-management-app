@@ -7,12 +7,16 @@ import {
   Paperclip,
   X,
   Smile,
+  Edit2,
+  MoreHorizontal,
+  Trash2,
 } from "lucide-react";
 import axios from "axios";
 import Picker from "emoji-picker-react";
 import TaskActivityLog from "../TaskModal/TaskActivityLog";
 import Avatar from "../Avatar";
 import toast from "react-hot-toast";
+import { AnimatePresence, motion as Motion } from "framer-motion";
 
 const TABS = { COMMENTS: "comments", ACTIVITY: "activity" };
 
@@ -380,6 +384,8 @@ const TaskActivityPanel = ({
                       comment={comment}
                       onDelete={handleDeleteComment}
                       handleEmojiReaction={handleEmojiReaction}
+                      tinyApiKey={tinyApiKey}
+                      commentEditorConfig={commentEditorConfig}
                     />
                   </div>
                 ))
@@ -418,13 +424,24 @@ const TaskActivityPanel = ({
 };
 
 /* === Comment Item === */
-const CommentItem = ({ comment, onDelete, handleEmojiReaction }) => {
+const CommentItem = ({ comment, onDelete, handleEmojiReaction, tinyApiKey, commentEditorConfig }) => {
   const user = comment.user || {};
   const currentUserId = localStorage.getItem("userId");
   const isMyComment = comment.user._id === currentUserId;
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const pickerRef = useRef(null);
   const commentRef = useRef(null);
+  const [showActionsMenu, setShowActionsMenu] = useState(null);
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editMessage, setEditMessage] = useState(comment.message || "");
+  const [editFiles, setEditFiles] = useState([]); // file mới thêm khi edit
+  const [deletedFiles, setDeletedFiles] = useState([]); // publicId file muốn xóa
+  const [editing, setEditing] = useState(false);
+
+  const editorRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const httpUrl = import.meta.env.VITE_API_URL;
 
   const time = new Date(comment.createdAt).toLocaleString("vi-VN", {
     hour: "2-digit",
@@ -437,6 +454,12 @@ const CommentItem = ({ comment, onDelete, handleEmojiReaction }) => {
     handleEmojiReaction(comment._id, emojiData.emoji);
     setShowEmojiPicker(false);
   };
+
+  useEffect(() => {
+    const handleClickOutside = () => setShowActionsMenu(null);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Đóng emoji picker khi click ra ngoài
   useEffect(() => {
@@ -458,6 +481,70 @@ const CommentItem = ({ comment, onDelete, handleEmojiReaction }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showEmojiPicker]);
 
+  // Hàm xử lý cập nhật comment
+  const handleUpdateComment = async () => {
+    if (
+      !editMessage.trim() &&
+      editFiles.length === 0 &&
+      deletedFiles.length === 0
+    ) {
+      setIsEditing(false);
+      return;
+    }
+
+    setEditing(true);
+    try {
+      const formData = new FormData();
+      formData.append("message", editMessage);
+
+      if (deletedFiles.length > 0) {
+        formData.append("deletedFiles", JSON.stringify(deletedFiles));
+      }
+
+      editFiles.forEach((file) => {
+        formData.append("files", file);
+      });
+
+      const res = await axios.put(
+        `${httpUrl}/api/v1/comments/${comment._id}`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      if (res.data.status === "success") {
+        toast.success("Cập nhật bình luận thành công");
+        setIsEditing(false);
+      }
+    } catch (error) {
+      toast.error(
+        error.response?.data?.message || "Lỗi khi cập nhật bình luận"
+      );
+    } finally {
+      setEditing(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditMessage(comment.message || "");
+    setEditFiles([]);
+    setDeletedFiles([]);
+  };
+
+  // Xử lý xóa file khi đang edit
+  const handleRemoveExistingFile = (publicId) => {
+    setDeletedFiles((prev) => [...prev, publicId]);
+  };
+
+  const handleRemoveNewFile = (index) => {
+    setEditFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
   return (
     <div className="flex gap-3 group relative" ref={commentRef}>
       {/* Avatar */}
@@ -476,42 +563,203 @@ const CommentItem = ({ comment, onDelete, handleEmojiReaction }) => {
             </p>
 
             {isMyComment && (
-              <button
-                onClick={() => onDelete(comment._id)}
-                className="opacity-0 group-hover:opacity-100 transition-opacity text-xs text-red-500 hover:text-red-700"
-              >
-                Xóa
-              </button>
+              <div className="relative">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowActionsMenu(comment._id); // mở menu cho comment này
+                  }}
+                  className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                  title="Tùy chọn"
+                >
+                  <MoreHorizontal
+                    size={14}
+                    className="text-gray-500 hover:text-gray-700"
+                  />
+                </button>
+
+                {/* Popup menu nhỏ */}
+                <AnimatePresence>
+                  {showActionsMenu === comment._id && (
+                    <Motion.div
+                      initial={{ opacity: 0, scale: 0.95, y: -8 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: -8 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute right-0 top-full mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden z-10"
+                      onClick={(e) => e.stopPropagation()} // ngăn đóng khi click vào menu
+                    >
+                      {/* Nút Chỉnh sửa */}
+                      <button
+                        onClick={() => {
+                          setIsEditing(true);
+                          setShowActionsMenu(false);
+                          setTimeout(() => editorRef.current?.focus(), 100);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition"
+                      >
+                        <Edit2 size={15} />
+                        Chỉnh sửa
+                      </button>
+
+                      {/* Nút Xóa */}
+                      <button
+                        onClick={() => {
+                          onDelete(comment._id);
+                          setShowActionsMenu(null);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition"
+                      >
+                        <Trash2 size={15} />
+                        Xóa
+                      </button>
+                    </Motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             )}
           </div>
 
-          {/* Nội dung */}
-          <div
-            className="text-sm text-gray-700 prose prose-sm max-w-none"
-            dangerouslySetInnerHTML={{ __html: comment.message }}
-          />
+          {isEditing ? (
+            <div className="space-y-3">
+              <Editor
+                apiKey={tinyApiKey}
+                onInit={(evt, editor) => (editorRef.current = editor)}
+                value={editMessage}
+                onEditorChange={(content) => setEditMessage(content)}
+                init={{
+                  ...commentEditorConfig,
+                  height: 150,
+                  placeholder: "Chỉnh sửa bình luận...",
+                }}
+              />
 
-          {/* File đính kèm */}
-          {comment.attachments?.length > 0 && (
-            <div className="mt-3 space-y-2">
-              {comment.attachments.map((file) => (
-                <a
-                  key={file._id}
-                  href={file.fileUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 p-2 bg-gray-50 rounded border hover:bg-gray-100 transition-colors"
+              {/* File hiện tại - có thể xóa */}
+              {comment.attachments?.filter(
+                (f) => !deletedFiles.includes(f.filePublicId)
+              ).length > 0 && (
+                <div className="space-y-2">
+                  {comment.attachments
+                    .filter((f) => !deletedFiles.includes(f.filePublicId))
+                    .map((file) => (
+                      <div
+                        key={file._id}
+                        className="flex items-center justify-between bg-gray-50 p-2 rounded border"
+                      >
+                        <a
+                          href={file.fileUrl}
+                          target="_blank"
+                          className="text-xs text-blue-600 truncate max-w-[200px]"
+                        >
+                          {file.fileName}
+                        </a>
+                        <button
+                          onClick={() =>
+                            handleRemoveExistingFile(file.filePublicId)
+                          }
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                </div>
+              )}
+
+              {/* File mới thêm */}
+              {editFiles.length > 0 && (
+                <div className="space-y-2">
+                  {editFiles.map((file, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center justify-between bg-blue-50 p-2 rounded border"
+                    >
+                      <span className="text-xs text-blue-700 truncate max-w-[200px]">
+                        {file.name}
+                      </span>
+                      <button
+                        onClick={() => handleRemoveNewFile(i)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Nút thêm file + hành động */}
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-gray-500 hover:text-gray-700 p-1"
                 >
-                  <Paperclip size={14} className="text-gray-500" />
-                  <span className="text-xs text-blue-600 truncate max-w-[180px]">
-                    {file.fileName}
-                  </span>
-                  <span className="text-xs text-gray-500">
-                    ({(file.fileSize / 1024).toFixed(1)} KB)
-                  </span>
-                </a>
-              ))}
+                  <Paperclip size={18} />
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files) {
+                      setEditFiles((prev) => [
+                        ...prev,
+                        ...Array.from(e.target.files),
+                      ]);
+                    }
+                  }}
+                />
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleCancelEdit}
+                    className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    onClick={handleUpdateComment}
+                    disabled={editing}
+                    className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition flex items-center gap-2"
+                  >
+                    {editing && <Loader2 size={14} className="animate-spin" />}
+                    Lưu
+                  </button>
+                </div>
+              </div>
             </div>
+          ) : (
+            <>
+              {/* Nội dung bình luận bình thường */}
+              <div
+                className="text-sm text-gray-700 prose prose-sm max-w-none"
+                dangerouslySetInnerHTML={{ __html: comment.message }}
+              />
+
+              {/* File đính kèm */}
+              {comment.attachments?.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {comment.attachments.map((file) => (
+                    <a
+                      key={file._id}
+                      href={file.fileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 p-2 bg-gray-50 rounded border hover:bg-gray-100 transition"
+                    >
+                      <Paperclip size={14} className="text-gray-500" />
+                      <span className="text-xs text-blue-600 truncate max-w-[180px]">
+                        {file.fileName}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        ({(file.fileSize / 1024).toFixed(1)} KB)
+                      </span>
+                    </a>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
 

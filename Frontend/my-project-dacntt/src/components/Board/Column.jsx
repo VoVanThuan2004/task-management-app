@@ -90,10 +90,6 @@ const Column = React.memo(
                         className="p-2 rounded-lg transition-all hover:bg-red-100"
                         title="Xóa danh sách"
                       >
-                        {/* <Trash2
-                          size={16}
-                          className="text-red-500 hover:text-red-600"
-                        /> */}
                         <img src={iconDelete} alt="cancel"/>
                         
                       </button>

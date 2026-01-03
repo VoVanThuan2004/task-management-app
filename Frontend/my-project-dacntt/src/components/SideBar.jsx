@@ -53,16 +53,27 @@ const SideBar = ({ isCollapsed, setIsCollapsed, user, setUser }) => {
   ];
 
   const bottomActions = [
-    { label: "Thông tin cá nhân", icon: User, onClick: () => navigate("/profile") },
-    { label: "Thay đổi mật khẩu", icon: KeyRound, onClick: () => navigate("/change-password") },
+    {
+      label: "Thông tin cá nhân",
+      icon: User,
+      onClick: () => navigate("/profile"),
+    },
+    {
+      label: "Thay đổi mật khẩu",
+      icon: KeyRound,
+      onClick: () => navigate("/change-password"),
+    },
   ];
 
   return (
     <aside
-      className={`fixed inset-y-0 left-0 z-40 flex flex-col bg-gray-900 text-white
-      transition-all duration-300 ease-in-out
-      ${isCollapsed ? "w-18" : "w-64"}
-      overflow-y-auto`}
+      className={`
+    fixed inset-y-0 left-0 z-40 flex flex-col bg-gray-900 text-white
+    /* CHỈ animate width → nhẹ nhất có thể */
+    transition-width duration-300 ease-in-out
+    overflow-hidden  /* tránh scroll bar nhảy */
+    ${isCollapsed ? "w-18" : "w-64"}
+  `}
     >
       {/* Header + Toggle Button */}
       <div className="relative px-6 py-6 border-b border-gray-800">
