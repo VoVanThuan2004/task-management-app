@@ -1,9 +1,11 @@
 import SideBar from "../../components/SideBar";
 import { useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
+import { useUser } from "../../components/useUser";
 
 const AdminPage = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const { user, setUser } = useUser();
 
   // Tự collapse khi màn hình nhỏ
   useEffect(() => {
@@ -26,6 +28,8 @@ const AdminPage = () => {
       <SideBar
         isCollapsed={isCollapsed}
         setIsCollapsed={setIsCollapsed}
+        user={user}
+        setUser={setUser}
       />
 
       {/* Main content */}

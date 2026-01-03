@@ -1,10 +1,19 @@
-import { Users, LogOut, Menu, X, LayoutDashboardIcon } from "lucide-react";
+import {
+  Users,
+  LogOut,
+  Menu,
+  X,
+  LayoutDashboardIcon,
+  KeyRound,
+  User,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import Avatar from "./Avatar";
 
 const httpUrl = import.meta.env.VITE_API_URL;
 
-const SideBar = ({ isCollapsed, setIsCollapsed }) => {
+const SideBar = ({ isCollapsed, setIsCollapsed, user, setUser }) => {
   const navigate = useNavigate();
   const currentPath = window.location.pathname;
 
@@ -26,6 +35,7 @@ const SideBar = ({ isCollapsed, setIsCollapsed }) => {
       console.log(error);
     }
     localStorage.clear();
+    setUser(null);
     navigate("/");
   };
 
@@ -42,6 +52,11 @@ const SideBar = ({ isCollapsed, setIsCollapsed }) => {
     },
   ];
 
+  const bottomActions = [
+    { label: "Thông tin cá nhân", icon: User, onClick: () => navigate("/profile") },
+    { label: "Thay đổi mật khẩu", icon: KeyRound, onClick: () => navigate("/change-password") },
+  ];
+
   return (
     <aside
       className={`fixed inset-y-0 left-0 z-40 flex flex-col bg-gray-900 text-white
@@ -51,15 +66,22 @@ const SideBar = ({ isCollapsed, setIsCollapsed }) => {
     >
       {/* Header + Toggle Button */}
       <div className="relative px-6 py-6 border-b border-gray-800">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           {/* Logo */}
-          <h1
-            className={`font-bold flex items-center gap-3 transition-all duration-300 ${
-              isCollapsed ? "opacity-0 w-0" : "text-2xl"
-            }`}
-          >
-            <span>ADMIN PANEL</span>
-          </h1>
+          <div className="flex items-center gap-2">
+            <Avatar
+              user={user}
+              size="w-10 h-10"
+              className={`${isCollapsed ? "opacity-0 w-0" : ""}`}
+            />
+            <h1
+              className={`font-bold flex items-center gap-3 transition-all duration-300 ${
+                isCollapsed ? "opacity-0 w-0" : "text-2xl"
+              }`}
+            >
+              <span>{user?.fullName}</span>
+            </h1>
+          </div>
 
           {/* Toggle Button */}
           <button
@@ -67,7 +89,7 @@ const SideBar = ({ isCollapsed, setIsCollapsed }) => {
             className="p-2 rounded-lg hover:bg-gray-800 transition-colors absolute right-4"
             title={isCollapsed ? "Mở rộng menu" : "Thu nhỏ menu"}
           >
-            {isCollapsed ? <Menu size={22} /> : <X size={22} />}
+            <Menu size={22} />
           </button>
         </div>
       </div>
@@ -78,8 +100,9 @@ const SideBar = ({ isCollapsed, setIsCollapsed }) => {
           {menuItems.map((item) => (
             <li key={item.href} className="relative group">
               <a
-                href={item.href}
-                className={`flex items-center px-4 py-3 rounded-xl font-medium transition-all duration-300 ${
+                // href={item.href}
+                onClick={() => navigate(item.href)}
+                className={`flex items-center px-4 py-3 rounded-xl font-medium cursor-pointer transition-all duration-300 ${
                   isActive(item.href)
                     ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/20"
                     : "text-gray-300 hover:bg-gray-800 hover:text-white"
@@ -117,24 +140,51 @@ const SideBar = ({ isCollapsed, setIsCollapsed }) => {
         </ul>
       </nav>
 
-      {/* Logout - Bottom */}
-      <div className="px-4 pb-8">
+      {/* Đường phân cách */}
+      <hr className="my-4 border-gray-700" />
+
+      {/* Bottom Actions */}
+      <div className="px-3 pb-6 space-y-2">
+        {bottomActions.map((action, index) => (
+          <button
+            key={index}
+            onClick={action.onClick}
+            className={`
+              group flex items-center w-full px-4 py-3 rounded-xl font-medium text-gray-300
+              hover:bg-gray-800 hover:text-white transition-all duration-200
+              ${isCollapsed ? "justify-center" : "gap-4"}
+            `}
+            title={isCollapsed ? action.label : ""}
+          >
+            <action.icon
+              size={22}
+              className="flex-shrink-0 group-hover:text-indigo-400"
+            />
+            {!isCollapsed && (
+              <span className="whitespace-nowrap overflow-hidden">
+                {action.label}
+              </span>
+            )}
+          </button>
+        ))}
+
+        {/* Đăng xuất */}
         <button
           onClick={handleLogout}
-          className={`group flex items-center gap-4 w-full px-4 py-3 rounded-xl font-medium text-gray-300 hover:bg-red-900/50 hover:text-red-300 transition-all duration-200`}
+          className={`
+            group flex items-center w-full px-4 py-3 rounded-xl font-medium text-gray-300
+            hover:bg-red-900/50 hover:text-red-300 transition-all duration-200
+            ${isCollapsed ? "justify-center" : "gap-4"}
+          `}
           title={isCollapsed ? "Đăng xuất" : ""}
         >
           <LogOut
             size={22}
-            className="group-hover:text-red-400 flex-shrink-0"
+            className="flex-shrink-0 group-hover:text-red-400"
           />
-          <span
-            className={`transition-all duration-300 ${
-              isCollapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100"
-            }`}
-          >
-            Đăng xuất
-          </span>
+          {!isCollapsed && (
+            <span className="whitespace-nowrap overflow-hidden">Đăng xuất</span>
+          )}
         </button>
       </div>
     </aside>

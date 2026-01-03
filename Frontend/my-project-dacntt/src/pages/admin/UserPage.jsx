@@ -232,10 +232,11 @@ const UserPage = () => {
           {/* Nút Thêm người dùng */}
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-3 px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition shadow-md hover:shadow-lg"
+            className="flex items-center gap-3 px-6 py-3 bg-blue-600 text-white rounded-xl font-medium cursor-pointer hover:bg-blue-700 transition shadow-md hover:shadow-lg"
+            title="Thêm người dùng"
           >
             <PlusCircle size={22} />
-            Thêm người dùng
+            {/* Thêm người dùng */}
           </button>
         </div>
 
