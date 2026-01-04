@@ -25,7 +25,6 @@ const dashboardRouter = require("./routers/dashboardRouter.js");
 const path = require("path");
 const webpush = require("web-push");
 const PORT = process.env.PORT;
-const icon = require("./dist/pwa-192x192.png");
 
 app.use(cors());
 app.use(express.json());
@@ -91,7 +90,13 @@ app.post("/api/send-test-notification", (req, res) => {
   const payload = JSON.stringify({
     title: "Test Thành Công! 🚀",
     body: "Push notification đang hoạt động hoàn hảo.",
-    icon: icon,
+    icon: "./dist/pwa-192x192.png",
+    vibrate: [200, 100, 200], // Rung điện thoại (nếu hỗ trợ)
+    data: { url: "/" },
+    actions: [
+      { action: "open", title: "Mở app" },
+      { action: "close", title: "Đóng" },
+    ],
   });
 
   Promise.all(
