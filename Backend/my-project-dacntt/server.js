@@ -88,15 +88,10 @@ app.post("/api/subscribe", (req, res) => {
 // Test gửi thông báo
 app.post("/api/send-test-notification", (req, res) => {
   const payload = JSON.stringify({
-    title: "Test Thành Công! 🚀",
-    body: "Push notification đang hoạt động hoàn hảo.",
-    icon: "./dist/pwa-192x192.png",
-    vibrate: [200, 100, 200], // Rung điện thoại (nếu hỗ trợ)
-    data: { url: "/" },
-    actions: [
-      { action: "open", title: "Mở app" },
-      { action: "close", title: "Đóng" },
-    ],
+    title: "Test Push Notification 🚀",
+    body: "Nếu bạn thấy thông báo này là thành công 100%!",
+    icon: "/pwa-192x192.png", // Bắt buộc bắt đầu bằng /
+    badge: "/pwa-64x64.png", // Nếu có file này
   });
 
   Promise.all(
