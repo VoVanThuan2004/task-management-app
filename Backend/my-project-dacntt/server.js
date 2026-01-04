@@ -108,7 +108,7 @@ app.post("/api/send-test-notification", (req, res) => {
 });
 
 app.get("/*splat", (req, res) => {
-  res.sendFile(path.join(__dirname, "../my-project-dacntt/dist/index.html"));
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
 server.listen(PORT, () => {
