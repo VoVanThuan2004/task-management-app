@@ -9,6 +9,7 @@ const { getIO } = require("../config/socket");
 const mongoose = require("mongoose");
 const BoardMember = require("../models/boardMember");
 const activityLogQueue = require("../services/activityLogQueue");
+require("dotenv").config();
 
 const assignMember = async (req, res) => {
   try {
@@ -52,11 +53,13 @@ const assignMember = async (req, res) => {
     });
 
     // 3. Gửi thông báo email
+    const link = `${process.env.FE_URL}/boards/${task.boardId._id}/${task.boardId.title}/${taskId}/${task.title}`
     await sendAssignTaskEmail(
       user.email,
       task,
       task.boardId.title,
-      inviterName
+      inviterName,
+      link
     );
 
     // 4. Gửi socket - cập nhật realtime thông tin thành viên
@@ -107,8 +110,8 @@ const removeMember = async (req, res) => {
 
     // 1. Kiểm tra task, user
     const [task, user] = await Promise.all([
-      await Task.findById(taskId).populate("boardId"),
-      await User.findById(userId).lean(),
+      Task.findById(taskId).populate("boardId"),
+      User.findById(userId).lean(),
     ]);
     if (!task) {
       return res.status(404).json({

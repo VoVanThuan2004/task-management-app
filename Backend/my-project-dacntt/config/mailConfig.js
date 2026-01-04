@@ -122,7 +122,7 @@ const sendShareBoardEmail = async (
 // -----------------------------
 // 4️⃣ Assign task
 // -----------------------------
-const sendAssignTaskEmail = async (to, task, boardTitle, inviterName) => {
+const sendAssignTaskEmail = async (to, task, boardTitle, inviterName, link) => {
   const subject = `Bạn được chỉ định vào task "${task.title}"`;
 
   const contentBlocks = `
@@ -139,23 +139,52 @@ const sendAssignTaskEmail = async (to, task, boardTitle, inviterName) => {
 
     <div style="background: #f8fafc; padding: 20px; border-radius: 6px; margin: 30px 0;">
       <table style="width: 100%; font-size: 15px; color: #4b5563;">
-        ${
-          task.description
-            ? `<tr><td style="padding: 8px 0; font-weight: 600;">Mô tả:</td><td style="padding: 8px 0;">${task.description}</td></tr>`
-            : ""
-        }
-        <tr><td style="padding: 8px 0; font-weight: 600;">Bắt đầu:</td><td style="padding: 8px 0;">${
-          task.startDate || "Chưa có"
-        }</td></tr>
-        <tr><td style="padding: 8px 0; font-weight: 600;">Hạn:</td><td style="padding: 8px 0;">${
-          task.dueDate || "Chưa có"
-        }</td></tr>
+        <tr>
+        <td style="padding: 8px 0; font-weight: 600;">Bắt đầu:</td>
+        <td style="padding: 8px 0;">
+          ${
+            task.startDate
+              ? new Date(task.startDate).toLocaleString("vi-VN", {
+                  day: "2-digit",
+                  month: "2-digit",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : "Chưa có"
+          }
+        </td>
+      </tr>
+      <tr>
+        <td style="padding: 8px 0; font-weight: 600;">Hạn:</td>
+        <td style="padding: 8px 0;">
+          ${
+            task.dueDate
+              ? new Date(task.dueDate).toLocaleString("vi-VN", {
+                  day: "2-digit",
+                  month: "2-digit",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : "Chưa có"
+          }
+        </td>
+      </tr>
       </table>
     </div>
 
-    <div style="background: #f0fdfa; padding: 20px; border-radius: 6px; border-left: 4px solid #14b8a6; margin: 30px 0;">
-      <p style="margin: 0; color: #0f766e; font-size: 15px;">Hãy truy cập ứng dụng để xem chi tiết và thực hiện công việc.</p>
+    <!-- Nút CTA nổi bật + Link -->
+    <div style="text-align: center; margin: 40px 0;">
+      <a href="${link}" 
+         style="display: inline-block; padding: 14px 32px; background: #0079bf; color: white; font-size: 16px; font-weight: 600; text-decoration: none; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,121,191,0.3); transition: all 0.3s ease;">
+        Xem chi tiết & thực hiện task ngay
+      </a>
     </div>
+
+    <p style="font-size: 14px; color: #6b7280; text-align: center; margin-top: 40px;">
+      Email này được gửi tự động từ hệ thống. Nếu bạn không phải là người nhận, vui lòng bỏ qua.
+    </p>
   `;
 
   const html = getNotificationTemplate(
@@ -194,22 +223,30 @@ const sendRemoveMemberEmail = async (to, task, boardTitle, inviterName) => {
 // -----------------------------
 // 5️⃣ Nhắc deadline task
 // -----------------------------
-const sendTaskDeadlineEmail = async (to, task) => {
-  const subject = `Task "${task.title}" sắp hết hạn`;
+const sendTaskDeadlineEmail = async (to, task, link) => {
+  const subject = `Task "${task.title}" đã hết hạn`;
 
   const contentBlocks = `
     <p style="font-size: 16px; color: #374151; line-height: 1.7; margin-bottom: 30px;">
-      Task trên bảng <strong>"${task.boardId.title}"</strong> sẽ hết hạn trong <strong>${task.reminderTime} phút</strong>.
+      Task trên bảng <strong>"${task.boardId.title}"</strong> đã hết hạn.
     </p>
 
     <div style="background: #ffedd5; border-left: 4px solid #f97316; padding: 20px; border-radius: 6px; margin: 30px 0;">
-      <p style="margin: 0 0 8px 0; color: #f97316; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Task sắp hết hạn</p>
+      <p style="margin: 0 0 8px 0; color: #f97316; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Task đã hết hạn</p>
       <h2 style="margin: 0; color: #1e293b; font-size: 22px; font-weight: 600;">${task.title}</h2>
     </div>
 
-    <div style="background: #fef3c7; padding: 20px; border-radius: 6px; border-left: 4px solid #f59e0b; margin: 30px 0;">
-      <p style="margin: 0; color: #92400e; font-size: 15px;">Hãy hoàn thành task trước thời hạn để tránh trễ tiến độ.</p>
+    <!-- Nút CTA nổi bật -->
+    <div style="text-align: center; margin: 40px 0;">
+      <a href="${link}" 
+         style="display: inline-block; padding: 16px 36px; background: #f97316; color: white; font-size: 17px; font-weight: 600; text-decoration: none; border-radius: 10px; box-shadow: 0 6px 16px rgba(249, 115, 22, 0.3); transition: all 0.3s ease;">
+        Mở task ngay để hoàn thành
+      </a>
     </div>
+
+    <p style="font-size: 14px; color: #6b7280; text-align: center; margin-top: 40px;">
+      Email nhắc nhở được gửi tự động. Vui lòng không trả lời email này.
+    </p>
   `;
 
   const html = getNotificationTemplate("Nhắc nhở deadline", contentBlocks);
@@ -264,7 +301,8 @@ const sendAssignCheckItemEmail = async (
   inviterName,
   boardTitle,
   taskTitle,
-  checkItemTitle
+  checkItemTitle,
+  link
 ) => {
   const subject = `Bạn được giao mục việc: "${checkItemTitle}"`;
 
@@ -285,11 +323,17 @@ const sendAssignCheckItemEmail = async (
       </table>
     </div>
 
-    <div style="background: #f0fdfa; padding: 20px; border-radius: 6px; border-left: 4px solid #14b8a6; margin: 30px 0;">
-      <p style="margin: 0; color: #0f766e; font-size: 15px; line-height: 1.6;">
-        <strong>Lời khuyên:</strong> Vui lòng truy cập ứng dụng để đánh dấu hoàn thành khi xong.
-      </p>
+    <!-- Nút CTA nổi bật - Mở task ngay -->
+    <div style="text-align: center; margin: 40px 0;">
+      <a href="${link}" 
+         style="display: inline-block; padding: 16px 36px; background: #0079bf; color: white; font-size: 17px; font-weight: 600; text-decoration: none; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,121,191,0.3); transition: all 0.3s ease;">
+        Mở task để xem & hoàn thành
+      </a>
     </div>
+
+    <p style="font-size: 14px; color: #6b7280; text-align: center; margin-top: 40px;">
+      Email được gửi tự động từ hệ thống. Vui lòng không trả lời email này.
+    </p>
   `;
 
   const html = getNotificationTemplate(
@@ -318,20 +362,12 @@ const getVipSuccessTemplate = (
   });
 
   const contentBlocks = `
-    <div style="text-align: center; margin-bottom: 30px;">
-      <div style="display: inline-flex; align-items: center; justify-content: center; width: 80px; height: 80px; background: linear-gradient(135deg, #10b981, #059669); border-radius: 50%; box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M20 6L9 17l-5-5"></path>
-        </svg>
-      </div>
-    </div>
-
     <h2 style="font-size: 24px; color: #111827; text-align: center; margin: 30px 0 20px;">
       Chúc mừng bạn đã nâng cấp thành công gói <strong style="color: #0079bf;">VIP</strong>!
     </h2>
 
     <p style="font-size: 16px; color: #374151; line-height: 1.7; text-align: center; margin-bottom: 40px;">
-      Bạn giờ đây có thể sử dụng đầy đủ các tính năng cao cấp: tạo bảng không giới hạn, thẻ không giới hạn và đặc biệt là <strong>gợi ý checklist bằng AI thông minh</strong>.
+      Bạn giờ đây bạn có thể sử dụng đầy đủ các tính năng cao cấp: tạo bảng không giới hạn, thẻ không giới hạn và đặc biệt là <strong>gợi ý checklist bằng AI thông minh</strong>.
     </p>
 
     <!-- Thông tin đơn hàng -->
@@ -414,7 +450,7 @@ const sendRegisterVipEmail = async (
 // -----------------------------
 const getVipReminderTemplate = (expirationDate) => {
   const expDate = new Date(expirationDate);
-  
+
   const formattedExpiration = expDate.toLocaleDateString("vi-VN", {
     weekday: "long",
     day: "2-digit",
@@ -423,15 +459,6 @@ const getVipReminderTemplate = (expirationDate) => {
   });
 
   const contentBlocks = `
-    <div style="text-align: center; margin-bottom: 30px;">
-      <div style="display: inline-flex; align-items: center; justify-content: center; width: 80px; height: 80px; background: linear-gradient(135deg, #f59e0b, #d97706); border-radius: 50%; box-shadow: 0 8px 20px rgba(245, 158, 11, 0.3);">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"></circle>
-          <polyline points="12 6 12 12 16 14"></polyline>
-        </svg>
-      </div>
-    </div>
-
     <h2 style="font-size: 24px; color: #111827; text-align: center; margin: 30px 0 20px;">
       Gói <strong style="color: #0079bf;">VIP</strong> của bạn sắp hết hạn!
     </h2>
@@ -455,7 +482,7 @@ const getVipReminderTemplate = (expirationDate) => {
     </div>
 
     <div style="text-align: center; margin: 40px 0;">
-      <a href="${process.env.FE_URL}/payment-history" style="display: inline-block; background: linear-gradient(135deg, #0079bf 0%, #0065a5 100%); color: #ffffff; font-weight: 600; padding: 16px 36px; border-radius: 8px; text-decoration: none; font-size: 17px; box-shadow: 0 6px 16px rgba(0, 121, 191, 0.3);">
+      <a href="${process.env.FE_URL}/home" style="display: inline-block; background: linear-gradient(135deg, #0079bf 0%, #0065a5 100%); color: #ffffff; font-weight: 600; padding: 16px 36px; border-radius: 8px; text-decoration: none; font-size: 17px; box-shadow: 0 6px 16px rgba(0, 121, 191, 0.3);">
         Gia hạn VIP ngay (100.000 VND)
       </a>
     </div>
@@ -467,7 +494,7 @@ const getVipReminderTemplate = (expirationDate) => {
   `;
 
   return getNotificationTemplate(
-    "⏰ Nhắc nhở: Gói VIP sắp hết hạn",
+    "Nhắc nhở: Gói VIP sắp hết hạn",
     contentBlocks
   );
 };
@@ -493,15 +520,6 @@ const getVipExpiredTemplate = (expirationDate) => {
   });
 
   const contentBlocks = `
-    <div style="text-align: center; margin-bottom: 30px;">
-      <div style="display: inline-flex; align-items: center; justify-content: center; width: 80px; height: 80px; background: linear-gradient(135deg, #ef4444, #dc2626); border-radius: 50%; box-shadow: 0 8px 20px rgba(239, 68, 68, 0.3);">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 8v4l3 3"></path>
-          <circle cx="12" cy="12" r="10"></circle>
-        </svg>
-      </div>
-    </div>
-
     <h2 style="font-size: 24px; color: #111827; text-align: center; margin: 30px 0 20px;">
       Gói <strong style="color: #0079bf;">VIP</strong> của bạn đã hết hạn
     </h2>
@@ -525,7 +543,7 @@ const getVipExpiredTemplate = (expirationDate) => {
     </div>
 
     <div style="text-align: center; margin: 40px 0;">
-      <a href="${process.env.FE_URL}/vip" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; font-weight: 600; padding: 16px 36px; border-radius: 8px; text-decoration: none; font-size: 17px; box-shadow: 0 6px 16px rgba(16, 185, 129, 0.3);">
+      <a href="${process.env.FE_URL}/home" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; font-weight: 600; padding: 16px 36px; border-radius: 8px; text-decoration: none; font-size: 17px; box-shadow: 0 6px 16px rgba(16, 185, 129, 0.3);">
         Nâng cấp lại VIP ngay (100.000 VND)
       </a>
     </div>

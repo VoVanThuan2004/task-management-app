@@ -8,6 +8,7 @@ const { sendAssignCheckItemEmail } = require("../config/mailConfig");
 const { ObjectId } = require("mongodb");
 const Board = require("../models/board");
 const activityLogQueue = require("../services/activityLogQueue");
+require("dotenv").config();
 
 const addCheckItem = async (req, res) => {
   try {
@@ -648,7 +649,9 @@ const updateDeadlineCheckItem = async (req, res) => {
           jobId: `${checkItem._id}-nearDeadline`,
         }
       );
-      console.log(`Đã lên lịch markNearDeadline checkItem sau ${nearDeadlineDelay}ms`);
+      console.log(
+        `Đã lên lịch markNearDeadline checkItem sau ${nearDeadlineDelay}ms`
+      );
     }
 
     // Job: Quá hạn
@@ -725,12 +728,7 @@ const assignCheckItem = async (req, res) => {
       });
     }
 
-    const task = await Task.findById(checkItem.taskId)
-      .populate({
-        path: "boardId",
-        select: "title",
-      })
-      .lean();
+    const task = await Task.findById(checkItem.taskId).populate("boardId").lean();
 
     if (!task) {
       return res.status(404).json({
@@ -755,12 +753,14 @@ const assignCheckItem = async (req, res) => {
 
     // 4. Gửi email thông báo
     const fullName = req.user.fullName;
+    const link = `${process.env.FE_URL}/boards/${task.boardId._id}/${task.boardId.title}/${task._id}/${task.title}`;
     await sendAssignCheckItemEmail(
       user.email,
       fullName,
       task.boardId.title,
       task.title,
-      checkItem.title
+      checkItem.title,
+      link
     );
 
     return res.status(200).json({
