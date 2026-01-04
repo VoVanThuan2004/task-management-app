@@ -32,7 +32,7 @@ app.use(express.json());
 // ============================
 // Serve static files cho PWA
 // ============================
-app.use(express.static(path.join(__dirname, "../my-project-dacntt/dist")));
+app.use(express.static(path.join(__dirname, 'dist')));
 
 const server = http.createServer(app);
 initSocket(server); // Khởi tạo socket với server
