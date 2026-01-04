@@ -40,7 +40,7 @@ async function registerPush() {
 
     // Đăng ký subscription với Push service của browser
     const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true, // Bắt buộc hiển thị thông báo cho người dùng
+      userVisibleOnly: true, 
       applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
     });
 
