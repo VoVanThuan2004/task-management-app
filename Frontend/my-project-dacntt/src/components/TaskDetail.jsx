@@ -3,13 +3,14 @@ import { useParams, useNavigate } from "react-router-dom";
 import TaskModal from "./TaskModal";
 import axios from "axios";
 const httpUrl = import.meta.env.VITE_API_URL;
-const accessToken = localStorage.getItem("accessToken");
+
 
 const TaskDetail = () => {
   const { boardId, title, taskId } = useParams(); // lấy params từ URL
   const navigate = useNavigate();
   const [taskData, setTaskData] = useState(null);
   const [isMember, setIsMember] = useState(false);
+  const accessToken = localStorage.getItem("accessToken");
 
   useEffect(() => {
     const fetchBoardDetails = async () => {
