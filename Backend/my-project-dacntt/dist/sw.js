@@ -63,17 +63,3 @@ define(["./workbox-8c29f6e4"], function (e) {
       new e.NavigationRoute(e.createHandlerBoundToURL("index.html"))
     );
 });
-
-self.addEventListener("push", function (event) {
-  if (!event.data) return;
-
-  const data = event.data.json();
-
-  event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: data.icon,
-      badge: data.badge,
-    })
-  );
-});

@@ -244,9 +244,9 @@ const vnpayReturn = async (req, res) => {
       return res.redirect(`${process.env.FE_URL}/payment?status=success`);
     }
 
-    // 4. Tính ngày hết hạn: hôm nay + 31 ngày
+    // 4. Tính ngày hết hạn: hôm nay + 30 ngày
     const now = new Date();
-    const expirationDate = new Date(now.getTime() + 5 * 60 * 1000);
+    const expirationDate = new Date(now.getTime() + 10 * 60 * 1000);
 
     // 5. Cập nhật PaymentOrder
     paymentOrder.status = "paid";
@@ -294,7 +294,7 @@ const vnpayReturn = async (req, res) => {
         paymentMethod: paymentOrder.paymentMethod,
       });
 
-      // Schedule job nhắc nhở/gia hạn trước khi hết hạn (trước 1 ngày)
+      // Schedule job nhắc nhở/gia hạn trước khi hết hạn (trước 1 ngày) - test trước 3 phút
       const reminderDelay =
         expirationDate.getTime() - Date.now() - 3 * 60 * 1000;
       if (reminderDelay > 0) {

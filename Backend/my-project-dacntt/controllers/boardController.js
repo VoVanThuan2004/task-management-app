@@ -11,6 +11,7 @@ const emailQueue = require("../services/emailQueue");
 const UserSkill = require("../models/userSkill");
 const taskAssigneeDeleteQueue = require("../services/taskAssgineeDeleteQueue");
 const columnDeleteQueue = require("../services/columnDeleteQueue");
+const Column = require("../models/column");
 
 const createBoard = async (req, res) => {
   const userId = req.user.userId;
@@ -307,22 +308,43 @@ const deleteBoard = async (req, res) => {
     }
 
     // 2. Kiểm tra có phải owner không -> nếu owner thì cho xóa
-    if (!board.ownerId.toString().equals(userId)) {
+    if (!board.ownerId.equals(userId)) {
       await session.abortTransaction();
       return res.status(404).json({
         status: "error",
         code: 404,
         message: "Người dùng không có quyền xóa bảng này",
+        error: "ISMEMBER",
       });
     }
 
-    // 3. Gửi queue redis - xóa dữ liệu tham chiếu đến board nếu có
-    // await boardDeleteQueue.add("deleteBoard", {
-    //   boardId,
-    // });
+    // 3. Lấy danh sách columns có trong board
+    const columns = await Column.find({ boardId })
+      .select("_id")
+      .session(session);
+    for (const column of columns) {
+      await columnDeleteQueue.add("deleteColumn", {
+        columnId: column._id,
+      });
+    }
 
-    board.isArchived = true;
-    await board.save();
+    // 4. Lấy danh sách boardMembers hiện tại nếu có
+    const boardMembers = await BoardMember.find({ boardId }).session(session);
+    if (boardMembers.length > 0) {
+      await BoardMember.deleteMany({ boardId }).session(session);
+      await UserSkill.deleteMany({ boardId }).session(session);
+    }
+
+    // 5. Xóa thông tin board
+    // Nếu có background cũ, xóa trên Cloudinary
+    if (board.backgroundPublicId) {
+      try {
+        await cloudinary.uploader.destroy(board.backgroundPublicId);
+      } catch (cloudinaryError) {
+        console.error("Lỗi xóa ảnh cũ trên Cloudinary:", cloudinaryError);
+      }
+    }
+    await Board.deleteOne({ _id: boardId }).session(session);
 
     await session.commitTransaction();
 
@@ -630,22 +652,22 @@ const shareBoard = async (req, res) => {
 
 const getBoardDetail = async (req, res) => {
   try {
-    const boardId = req.params.boardId;
+    const { boardId } = req.params;
     let userId = null;
 
+    // ===== Decode token (optional login) =====
     const authHeader = req.headers.authorization;
-    if (authHeader) {
-      const token = authHeader.split(" ")[1];
+    if (authHeader?.startsWith("Bearer ")) {
       try {
+        const token = authHeader.split(" ")[1];
         const decoded = jwt.verify(token, process.env.SECRET_KEY);
         userId = decoded.userId;
       } catch (err) {
-        // Token sai → coi như khách vãng lai
         console.log("Token không hợp lệ:", err.message);
       }
     }
 
-    // 1. Tìm board
+    // ===== 1. Tìm board =====
     const board = await Board.findById(boardId);
     if (!board) {
       return res.status(404).json({
@@ -654,33 +676,32 @@ const getBoardDetail = async (req, res) => {
       });
     }
 
-    // 2. Kiểm tra quyền truy cập
-    const boardType = board.type || "private"; // mặc định là private nếu không có
+    const boardType = board.type || "private";
+    const isOwner = userId && board.ownerId.equals(userId);
 
-    // Kiểm tra người dùng có trong member hay không
     let isMember = false;
 
-    if (userId != null) {
-      const boardMember = await BoardMember.findOne({ boardId, userId });
-      isMember = boardMember ? true : false;
+    if (userId) {
+      const member = await BoardMember.findOne({
+        boardId,
+        userId,
+        status: { $in: ["accepted", "owner"] },
+      });
+      isMember = !!member;
     }
 
-    // Public → ai cũng xem được
+    // ===== 2. PUBLIC =====
     if (boardType === "public") {
-      if (board.ownerId.toString() === userId) {
-        isMember = true;
-      }
       return res.status(200).json({
         status: "success",
-        message: "Lấy chi tiết bảng làm việc thành công",
         data: {
-          isMember,
           board,
+          isMember: isOwner || isMember,
         },
       });
     }
 
-    // Nếu không phải public → phải đăng nhập
+    // ===== 3. PRIVATE / WORKSPACE cần login =====
     if (!userId) {
       return res.status(401).json({
         status: "error",
@@ -688,49 +709,44 @@ const getBoardDetail = async (req, res) => {
       });
     }
 
-    // Private → chỉ chủ sở hữu mới được xem
+    // ===== 4. PRIVATE =====
     if (boardType === "private") {
-      if (board.ownerId.toString() !== userId.toString()) {
+      if (!isOwner && !isMember) {
         return res.status(403).json({
           status: "error",
           message: "Bạn không có quyền truy cập bảng riêng tư này",
         });
       }
-      // Là owner → cho xem
+
       return res.status(200).json({
         status: "success",
-        code: 200,
         data: { board, isMember: true },
       });
     }
 
-    // Workspace → kiểm tra thành viên
+    // ===== 5. WORKSPACE =====
     if (boardType === "workspace") {
-      const member = await BoardMember.findOne({
-        boardId,
-        userId,
-        status: { $in: ["accepted", "owner"] },
-      });
-
-      if (!member) {
+      if (!isOwner && !isMember) {
         return res.status(403).json({
           status: "error",
           message: "Bạn không phải thành viên của bảng nhóm này",
         });
       }
-      // Là member → cho xem
+
       return res.status(200).json({
         status: "success",
         data: { board, isMember: true },
       });
     }
+
   } catch (error) {
     return res.status(500).json({
       status: "error",
-      message: "Lỗi hệ thống: " + error,
+      message: "Lỗi hệ thống: " + error.message,
     });
   }
 };
+
 
 const getAllBoardMembers = async (req, res) => {
   try {

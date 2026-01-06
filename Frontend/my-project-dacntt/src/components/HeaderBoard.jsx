@@ -36,6 +36,7 @@ const HeaderBoard = ({
   onBoardUpdate,
   isMember,
   onApplyFilters,
+  openDeleteBoardModal,
 }) => {
   const [showFilter, setShowFilter] = useState(false);
   const [showMoreOptions, setShowMoreOptions] = useState(false);
@@ -203,17 +204,6 @@ const HeaderBoard = ({
       newSocket.disconnect();
     };
   }, [board?._id, accessToken]);
-
-  const handleArchiveBoard = async () => {
-    if (window.confirm("Bạn có chắc muốn lưu trữ bảng này?")) {
-      try {
-        console.log("Archive board:", board?._id);
-        // await archiveBoard(board._id);
-      } catch (error) {
-        console.error("Archive board error:", error);
-      }
-    }
-  };
 
   // ===== UPDATE - DELETE BACKGROUND =====
   // Hàm xử lý chọn màu
@@ -751,7 +741,25 @@ const HeaderBoard = ({
     <>
       <header className="flex items-center justify-between p-4 bg-white/70 backdrop-blur-sm shadow-sm z-10">
         {/* Board Title */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-center gap-7">
+          <button
+            onClick={() => navigate("/home")}
+            className="cursor-pointer"
+          >
+            <svg
+              className="w-5 h-5 transition-transform group-hover:-translate-x-1"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
+            </svg>
+          </button>
           <h1 className="text-xl font-bold text-gray-800">
             {board?.title || boardTitle}
           </h1>
@@ -978,11 +986,13 @@ const HeaderBoard = ({
 
                           {/* LƯU TRỮ BẢNG */}
                           <button
-                            onClick={handleArchiveBoard}
+                            onClick={() =>
+                              openDeleteBoardModal(board?._id, board?.title)
+                            }
                             className="flex items-center gap-3 w-full px-5 py-3.5 text-red-600 hover:bg-red-50 transition-all font-medium"
                           >
                             <Archive size={18} className="text-red-600" />
-                            <span>Lưu trữ bảng</span>
+                            <span>Xóa bảng</span>
                           </button>
 
                           <button

@@ -43,6 +43,13 @@ export default function BoardDetail() {
   const [columnTitleDelete, setColumnTitleDelete] = useState("");
   const [loadingDeleteColumn, setLoadingDeleteColumn] = useState(false);
 
+  // State xóa column
+  const [showConfirmBoardDeleteModal, setShowConfirmBoardDeleteModal] =
+    useState(false);
+  const [boardIdDelete, setBoardIdDelete] = useState("");
+  const [boardTitleDelete, setBoardTitleDelete] = useState("");
+  const [loadingDeleteBoard, setLoadingDeleteBoard] = useState(false);
+
   // Thêm ref để track drag state
   const isDraggingRef = useRef(false);
   const [editingColumnId, setEditingColumnId] = useState(null);
@@ -236,7 +243,6 @@ export default function BoardDetail() {
     // Xử lý khi di chuyển task
     socket.on("taskMoved", (data) => {
       if (isDraggingRef.current) return;
-
 
       setColumns((prev) => {
         return prev.map((col) => {
@@ -855,15 +861,6 @@ export default function BoardDetail() {
     navigate(`/boards/${boardId}/${boardTitle}/${task._id}/${task.title}`);
   };
 
-  // const handleCloseModal = () => {
-  //   setShowTaskModal(false);
-  //   setSelectedTask(null);
-  // };
-
-  // const handleTaskUpdate = () => {
-  //   fetchColumns();
-  // };
-
   // Drag & drop handlers
   const handleColumnMove = useCallback(
     async (result) => {
@@ -1025,6 +1022,78 @@ export default function BoardDetail() {
     }
   };
 
+  // API xóa bảng
+  const handleDeleteBoard = async () => {
+    setLoadingDeleteBoard(true);
+    try {
+      const res = await axios.delete(
+        `${httpUrl}/api/v1/boards/${boardIdDelete}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      const boardId = res.data.data;
+      setBoard((prev) => prev.filter((b) => b._id !== boardId));
+      // Xóa thành công trở về trang home
+      navigate("/home");
+    } catch (error) {
+      console.log(error);
+      // Xử lý lỗi từ response của server
+      if (error.response) {
+        const { status, data } = error.response;
+
+        // Trường hợp cụ thể: không phải owner (ISMEMBER)
+        if (
+          data.error === "ISMEMBER" ||
+          data.message.includes("không có quyền")
+        ) {
+          toast.error("Bạn không có quyền xóa bảng này!");
+        }
+        // Các lỗi 404, 403, 401 phổ biến
+        else if (status === 404) {
+          toast.error("Không tìm thấy bảng để xóa.");
+        } else if (status === 401) {
+          toast.error("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.");
+          // Có thể redirect đến login nếu cần
+        } else if (status === 403) {
+          toast.error("Bạn không có quyền thực hiện hành động này.");
+        } else if (status >= 500) {
+          toast.error("Lỗi máy chủ. Vui lòng thử lại sau.");
+        } else {
+          // Lỗi khác: hiển thị message từ server nếu có
+          toast.error(data.message || "Xóa bảng thất bại. Vui lòng thử lại.");
+        }
+      }
+      // Lỗi mạng hoặc không có response
+      else if (error.request) {
+        toast.error("Không thể kết nối đến máy chủ. Kiểm tra kết nối mạng.");
+      }
+      // Lỗi khác (cấu hình axios, v.v.)
+      else {
+        toast.error("Đã xảy ra lỗi. Vui lòng thử lại.");
+      }
+    } finally {
+      setLoadingDeleteBoard(false);
+      setBoardIdDelete("");
+      setBoardTitleDelete("");
+    }
+  };
+
+  const openDeleteBoardModal = (boardId, title) => {
+    setShowConfirmBoardDeleteModal(true);
+    setBoardIdDelete(boardId);
+    setBoardTitleDelete(title);
+  };
+
+  const closeBoardDeleteModal = () => {
+    setShowConfirmBoardDeleteModal(false);
+    setBoardIdDelete("");
+    setBoardTitleDelete("");
+  };
+
   return (
     <div className="flex flex-col h-screen overflow-hidden">
       <HeaderBoard
@@ -1034,6 +1103,7 @@ export default function BoardDetail() {
         isMember={isMember}
         socket={socket}
         onApplyFilters={fetchColumns}
+        openDeleteBoardModal={openDeleteBoardModal}
       />
 
       {/* Tuyết rơi - phủ toàn màn hình, nhưng không che nội dung */}
@@ -1106,15 +1176,6 @@ export default function BoardDetail() {
           </div>
         </DragDropContext>
       </main>
-
-      {/* <TaskModal
-        key={selectedTask?._id}
-        task={selectedTask}
-        isOpen={showTaskModal}
-        onClose={handleCloseModal}
-        // onTaskUpdate={handleTaskUpdate}
-        isMember={isMember}
-      /> */}
 
       <Outlet />
 
@@ -1275,7 +1336,7 @@ export default function BoardDetail() {
         )}
       </AnimatePresence>
 
-      {/* Modal xác nhận xóa task */}
+      {/* Modal xác nhận xóa danh sách */}
       <AnimatePresence>
         {showConfirmColumnDeleteModal && (
           <Motion.div
@@ -1336,6 +1397,75 @@ export default function BoardDetail() {
                     </>
                   ) : (
                     "Xóa danh sách"
+                  )}
+                </button>
+              </div>
+            </Motion.div>
+          </Motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal xác nhận xóa bảng làm việc */}
+      <AnimatePresence>
+        {showConfirmBoardDeleteModal && (
+          <Motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            onClick={() => closeColumnDeleteModal()}
+          >
+            <Motion.div
+              initial={{ scale: 0.9, y: 20, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.9, y: 20, opacity: 0 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="bg-white rounded-lg shadow-2xl w-md overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="p-6 border-b border-gray-200">
+                <h3 className="text-xl font-bold text-gray-900 text-center">
+                  Xác nhận xóa bảng làm việc
+                </h3>
+              </div>
+
+              {/* Body */}
+              <div className="p-6 text-center">
+                <p className="text-gray-900 leading-relaxed">
+                  Bạn có chắc chắn muốn xóa vĩnh viễn bảng{" "}
+                  <strong>{boardTitleDelete}</strong>?
+                </p>
+                <p className="text-gray-700 mt-5">
+                  Hành động này không thể hoàn tác, các dữ liệu liên quan trong
+                  bảng cũng sẽ bị xóa.
+                </p>
+              </div>
+
+              {/* Footer - Nút */}
+              <div className="flex gap-4 p-6 pt-4 border-t border-gray-200">
+                {/* Nút Hủy */}
+                <button
+                  onClick={() => closeBoardDeleteModal()}
+                  disabled={loadingDeleteBoard} // Disable khi đang xóa
+                  className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  Hủy bỏ
+                </button>
+
+                {/* Nút Xóa */}
+                <button
+                  onClick={handleDeleteBoard}
+                  disabled={loadingDeleteBoard}
+                  className="flex-1 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed transition font-medium shadow-lg flex items-center justify-center gap-2"
+                >
+                  {loadingDeleteBoard ? (
+                    <>
+                      <Loader2 className="animate-spin" size={20} />
+                      Đang xóa...
+                    </>
+                  ) : (
+                    "Xóa bảng"
                   )}
                 </button>
               </div>

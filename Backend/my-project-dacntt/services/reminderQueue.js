@@ -7,17 +7,17 @@ require("dotenv").config();
 const { sendTaskDeadlineEmail } = require("../config/mailConfig");
 
 // Kết nối Redis
-// const connection = new Redis({
-//   host: process.env.REDIS_HOST,
-//   port: process.env.REDIS_PORT,
-//   maxRetriesPerRequest: null,
-//   enableReadyCheck: false,
-// });
-
-const connection = new Redis(process.env.REDIS_URL, {
-  maxRetriesPerRequest: null, 
-  enableReadyCheck: false,    
+const connection = new Redis({
+  host: process.env.REDIS_HOST,
+  port: process.env.REDIS_PORT,
+  maxRetriesPerRequest: null,
+  enableReadyCheck: false,
 });
+
+// const connection = new Redis(process.env.REDIS_URL, {
+//   maxRetriesPerRequest: null, 
+//   enableReadyCheck: false,    
+// });
 
 
 // Queue để thêm job
@@ -36,15 +36,18 @@ const worker = new Worker(
     switch (job.name) {
       // === 1️⃣ GỬI NHẮC NHỞ ===
       case "sendReminder":
-        console.log(`📩 [sendReminder] Gửi nhắc nhở cho task ${task.title}`);
+        console.log(`[sendReminder] Gửi nhắc nhở cho task ${task.title}`);
         if (task.isCompleted) return;
 
         const assignees = await TaskAssignee.find({ taskId }).populate(
           "userId"
         );
+
+        // Tạo link trỏ tới task
+        const link = `${process.env.FE_URL}/boards/${task.boardId._id}/${task.boardId.title}/${taskId}/${task.title}`;
         for (const a of assignees) {
           if (a.userId?.email) {
-            await sendTaskDeadlineEmail(a.userId.email, task);
+            await sendTaskDeadlineEmail(a.userId.email, task, link);
           }
           io.to(a.userId._id.toString()).emit("taskReminder", {
             taskId: task._id,
