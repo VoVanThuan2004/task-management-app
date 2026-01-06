@@ -22,12 +22,7 @@ import Avatar from "./Avatar";
 import { format } from "date-fns";
 import toast from "react-hot-toast";
 
-const TaskModal = ({
-  task,
-  isOpen,
-  onClose,
-  isMember = false,
-}) => {
+const TaskModal = ({ task, isOpen, onClose, isMember = false }) => {
   const isReadOnly = !isMember;
   const [editedTask, setEditedTask] = useState(null);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -87,7 +82,6 @@ const TaskModal = ({
     //   }
     // };
 
-    
     setEditedTask(task);
     setStartDate(task?.startDate ? new Date(task?.startDate) : null);
     setDueDate(task?.dueDate ? new Date(task?.dueDate) : null);
@@ -284,12 +278,12 @@ const TaskModal = ({
     return res.data;
   };
 
-  const deleteTask = async () => {
-    const res = await axios.delete(`${httpUrl}/api/v1/tasks/${task._id}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    return res.data;
-  };
+  // const deleteTask = async () => {
+  //   const res = await axios.delete(`${httpUrl}/api/v1/tasks/${task._id}`, {
+  //     headers: { Authorization: `Bearer ${accessToken}` },
+  //   });
+  //   return res.data;
+  // };
 
   // ============ HANDLERS ============
 
@@ -353,20 +347,6 @@ const TaskModal = ({
 
   const handleCancelDescription = () => {
     setIsEditingDescription(false);
-  };
-
-  const handleDeleteTask = async () => {
-    if (!window.confirm("Bạn có chắc chắn muốn xóa task này?")) return;
-    setLoading(true);
-    try {
-      await deleteTask();
-      // onTaskUpdate();
-      onClose();
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
   };
 
   // ===== Xử lý upload file =====
@@ -1374,24 +1354,6 @@ const TaskModal = ({
                   aiCreatedItems={aiCreatedItems}
                   onProgressChange={handleChecklistProgress}
                 />
-              </Motion.div>
-
-              {/* --- Hành động (Xóa) --- */}
-              <Motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.45, duration: 0.3 }}
-                className="mt-8 pt-4 border-t"
-              >
-                <Motion.button
-                  whileHover={{ backgroundColor: "#fee2e2" }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={handleDeleteTask}
-                  disabled={loading}
-                  className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-100 rounded transition-colors"
-                >
-                  🗑️ Xóa Task
-                </Motion.button>
               </Motion.div>
             </Motion.div>
 

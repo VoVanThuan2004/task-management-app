@@ -27,7 +27,7 @@ const TaskDetail = () => {
 
         setIsMember(isMember || false); 
 
-        // console.log(isMember);
+        console.log(isMember);
       } catch (err) {
         const status = err.response?.status;
         // Chỉ redirect khi thật sự không được phép
@@ -44,7 +44,7 @@ const TaskDetail = () => {
     };
 
     fetchBoardDetails();
-  }, [boardId, accessToken]);
+  }, [boardId, taskId, accessToken]);
 
   // Fetch task data dựa trên taskId 
   useEffect(() => {
