@@ -254,6 +254,75 @@ const sendTaskDeadlineEmail = async (to, task, link) => {
 };
 
 // -----------------------------
+// 🔔 Nhắc task sắp tới hạn
+// -----------------------------
+const sendTaskNearDeadlineEmail = async (
+  to,
+  task,
+  link,
+  reminderTime // số phút còn lại
+) => {
+  const remainingTimeText = formatRemainingTime(reminderTime);
+
+  const subject = `Task "${task.title}" sắp hết hạn`;
+
+  const contentBlocks = `
+    <p style="font-size: 16px; color: #374151; line-height: 1.7; margin-bottom: 30px;">
+      Task trên bảng <strong>"${task.boardId.title}"</strong> sắp tới hạn.
+    </p>
+
+    <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; border-radius: 6px; margin: 30px 0;">
+      <p style="margin: 0 0 8px 0; color: #f59e0b; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">
+        Task sắp hết hạn
+      </p>
+
+      <h2 style="margin: 0; color: #1e293b; font-size: 22px; font-weight: 600;">
+        ${task.title}
+      </h2>
+
+      <p style="margin-top: 12px; font-size: 15px; color: #92400e;">
+        Thời gian còn lại: <strong>${remainingTimeText}</strong>
+      </p>
+    </div>
+
+    <!-- CTA -->
+    <div style="text-align: center; margin: 40px 0;">
+      <a href="${link}"
+         style="display: inline-block; padding: 16px 36px; background: #f59e0b; color: white; font-size: 17px; font-weight: 600; text-decoration: none; border-radius: 10px; box-shadow: 0 6px 16px rgba(245, 158, 11, 0.35);">
+        Mở task để xử lý ngay
+      </a>
+    </div>
+
+    <p style="font-size: 14px; color: #6b7280; text-align: center; margin-top: 40px;">
+      Email nhắc nhở được gửi tự động. Vui lòng không trả lời email này.
+    </p>
+  `;
+
+  const html = getNotificationTemplate(
+    "Nhắc nhở task sắp tới hạn",
+    contentBlocks
+  );
+
+  await sendEmail(to, subject, html);
+};
+
+const formatRemainingTime = (minutes) => {
+  if (minutes < 60) {
+    return `${minutes} phút`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  if (remainingMinutes === 0) {
+    return `${hours} giờ`;
+  }
+
+  return `${hours} giờ ${remainingMinutes} phút`;
+};
+
+
+// -----------------------------
 // Xóa thành viên khỏi board
 // -----------------------------
 const sendRemoveFromBoardEmail = async (to, boardTitle) => {
@@ -571,6 +640,7 @@ module.exports = {
   sendShareBoardEmail,
   sendAssignTaskEmail,
   sendTaskDeadlineEmail,
+  sendTaskNearDeadlineEmail,
   sendRemoveMemberEmail,
   sendRemoveFromBoardEmail,
   sendAssignCheckItemEmail,

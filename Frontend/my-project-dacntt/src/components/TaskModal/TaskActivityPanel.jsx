@@ -148,6 +148,48 @@ const TaskActivityPanel = ({
       }
     };
 
+    // HÀM CẬP NHẬT TIN NHẮN MESSAGE
+    const handleUpdateComment = (data) => {
+      const {
+        commentId,
+        taskId: socketTaskId,
+        message,
+        isEdited,
+        newAttachments,
+        deletedFiles,
+      } = data;
+
+      // Chỉ update comment của task đang mở
+      if (socketTaskId !== taskId) return;
+
+      setComments((prev) =>
+        prev.map((comment) => {
+          if (comment._id?.toString() !== commentId?.toString()) {
+            return comment;
+          }
+
+          return {
+            ...comment,
+            message,
+            isEdited,
+
+            // Thêm file mới
+            attachments: [
+              ...(comment.attachments || []),
+              ...(newAttachments || []),
+            ],
+
+            // Xóa file bị delete
+            ...(deletedFiles?.length > 0 && {
+              attachments: (comment.attachments || []).filter(
+                (att) => !deletedFiles.includes(att.filePublicId)
+              ),
+            }),
+          };
+        })
+      );
+    };
+
     // NHẬN REACTION REALTIME
     const handleEmojiUpdated = (data) => {
       setComments((prev) =>
@@ -166,11 +208,15 @@ const TaskActivityPanel = ({
     };
 
     socket.on("comment:new", handleNewComment);
+    socket.on("comment:updated", handleUpdateComment);
+
     socket.on("comment:deleted", handleDeleteComment);
     socket.on("comment:emojiUpdated", handleEmojiUpdated);
 
     return () => {
       socket.off("comment:new", handleNewComment);
+      socket.off("comment:updated", handleUpdateComment);
+
       socket.off("comment:deleted", handleDeleteComment);
       socket.off("comment:emojiUpdated", handleEmojiUpdated);
       socket.emit("leaveBoard", boardId);
@@ -219,8 +265,8 @@ const TaskActivityPanel = ({
 
   // === XÓA COMMENT ===
   const handleDeleteComment = async (commentId) => {
-    if (!window.confirm("Bạn có chắc muốn xóa bình luận này?")) return;
-
+    if (!commentId) return;
+    
     try {
       await axios.delete(`${httpUrl}/api/v1/comments/${commentId}`, {
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -424,7 +470,13 @@ const TaskActivityPanel = ({
 };
 
 /* === Comment Item === */
-const CommentItem = ({ comment, onDelete, handleEmojiReaction, tinyApiKey, commentEditorConfig }) => {
+const CommentItem = ({
+  comment,
+  onDelete,
+  handleEmojiReaction,
+  tinyApiKey,
+  commentEditorConfig,
+}) => {
   const user = comment.user || {};
   const currentUserId = localStorage.getItem("userId");
   const isMyComment = comment.user._id === currentUserId;

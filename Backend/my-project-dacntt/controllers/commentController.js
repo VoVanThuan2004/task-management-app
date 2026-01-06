@@ -6,8 +6,6 @@ const EmojiReaction = require("../models/emojiReaction");
 const { getIO } = require("../config/socket");
 const mongoose = require("mongoose");
 const cloudinary = require("../config/cloudinary");
-const messaging = require("../config/firebaseAdmin");
-const BoardMembers = require("../models/boardMember");
 
 // Function xóa ảnh upload cloudinary
 const deleteUploadedFileCloudinary = async (file) => {

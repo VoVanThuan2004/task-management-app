@@ -12,11 +12,20 @@ const AttachmentItem = ({
   const isImage = file.fileType.startsWith("image/");
   const isPDF = file.fileType === "application/pdf";
   const isVideo = file.fileType.startsWith("video/");
-  const isPreviewable = isImage || isPDF || isVideo;
 
   const [previewOpen, setPreviewOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const containerRef = useRef(null);
+
+  const fileExt = file.fileName.split(".").pop().toLowerCase();
+
+  const isDoc = ["doc", "docx"].includes(fileExt);
+  const isExcel = ["xls", "xlsx"].includes(fileExt);
+  const isPPT = ["ppt", "pptx"].includes(fileExt);
+  const isText = ["txt"].includes(fileExt);
+
+  const isOffice = isDoc || isExcel || isPPT || isText;
+  const isPreviewable = isImage || isPDF || isVideo;
 
   const openPreview = (e) => {
     e.stopPropagation();
@@ -57,7 +66,6 @@ const AttachmentItem = ({
   return (
     <>
       {/* === Thumbnail === */}
-      {/* === Thumbnail === */}
       <div className="group relative rounded-lg overflow-hidden bg-gray-50 border hover:border-red-300 transition-colors">
         {/* NÚT XÓA (góc phải trên, không che nội dung) */}
         <button
@@ -76,7 +84,25 @@ const AttachmentItem = ({
         {/* NỘI DUNG FILE - CHỈ CLICK VÀO ĐÂY MỚI MỞ PREVIEW */}
         <div
           className="cursor-pointer h-full"
-          onClick={isPreviewable ? openPreview : undefined}
+          onClick={(e) => {
+            e.stopPropagation();
+
+            // Image / Video / PDF → mở preview
+            if (isPreviewable) {
+              openPreview(e);
+              return;
+            }
+
+            // Office → download
+            if (isOffice) {
+              const link = document.createElement("a");
+              link.href = file.fileUrl;
+              link.download = file.fileName;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            }
+          }}
         >
           {isImage ? (
             <img
@@ -113,7 +139,7 @@ const AttachmentItem = ({
           )}
         </div>
 
-        {/* Hover: xem trước (chỉ hiện khi KHÔNG click nút xóa) */}
+        {/* Hover: xem trước  */}
         {isPreviewable && (
           <div className="pointer-events-none absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
             <svg
@@ -180,20 +206,29 @@ const AttachmentItem = ({
               </video>
             )}
             {isPDF && (
-              <iframe
-                src={file.fileUrl}
-                className="w-[90vw] h-[85vh] rounded-lg bg-white"
-                title={file.fileName}
-              />
+              <div className="flex items-center justify-center w-[90vw] h-[85vh] bg-black/30 rounded-lg">
+                <iframe
+                  src={`${file.fileUrl}#view=FitH`}
+                  className="w-full h-full bg-white rounded-lg"
+                  title={file.fileName}
+                />
+              </div>
             )}
-            {!isPreviewable && (
-              <iframe
-                src={`https://docs.google.com/gview?url=${encodeURIComponent(
-                  file.fileUrl
-                )}&embedded=true`}
-                className="w-[90vw] h-[85vh] rounded-lg bg-white"
-                title={file.fileName}
-              />
+
+
+            {!isImage && !isVideo && !isPDF && !isOffice && (
+              <div className="flex flex-col items-center justify-center w-[90vw] h-[85vh] text-white">
+                {getFileIcon(file.fileName)}
+                <p className="mt-2">{file.fileName}</p>
+                <a
+                  href={file.fileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-4 px-4 py-2 bg-white text-black rounded-lg"
+                >
+                  Tải file
+                </a>
+              </div>
             )}
           </div>
         </div>

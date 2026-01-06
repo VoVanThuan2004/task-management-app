@@ -2,36 +2,27 @@ const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const cloudinary = require("./cloudinary");
 
 const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: {
-    folder: "DACNTT",
-    // Rất quan trọng: Tự động phát hiện loại file
-    resource_type: "auto",
-    access_mode: "public",
-    // Thêm các định dạng file văn phòng
-    allowed_formats: [
-      // Ảnh
-      "jpg",
-      "png",
-      "jpeg",
-      "webp",
-      "gif",
-      // Tài liệu
-      "pdf",
-      "doc",
-      "docx",
-      "txt",
-      // Powerpoint
-      "ppt",
-      "pptx",
-      // Excel
-      "xls",
-      "xlsx",
-      // Video/Audio
-      "mp4",
-      "mov",
-      "mp3",
-    ],
+  cloudinary,
+  params: async (req, file) => {
+    const rawTypes = [
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-powerpoint",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      "text/plain",
+    ];
+
+    const isRaw = rawTypes.includes(file.mimetype);
+
+    return {
+      folder: "DACNTT",
+      resource_type: isRaw ? "raw" : "auto",
+      access_mode: "public",
+      public_id: `${Date.now()}-${file.originalname}`,
+    };
   },
 });
 

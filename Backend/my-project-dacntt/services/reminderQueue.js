@@ -4,7 +4,7 @@ const Task = require("../models/task");
 const TaskAssignee = require("../models/taskAssignee");
 const { getIO } = require("../config/socket");
 require("dotenv").config();
-const { sendTaskDeadlineEmail } = require("../config/mailConfig");
+const { sendTaskDeadlineEmail, sendTaskNearDeadlineEmail } = require("../config/mailConfig");
 
 // Kết nối Redis
 const connection = new Redis({
@@ -15,10 +15,9 @@ const connection = new Redis({
 });
 
 // const connection = new Redis(process.env.REDIS_URL, {
-//   maxRetriesPerRequest: null, 
-//   enableReadyCheck: false,    
+//   maxRetriesPerRequest: null,
+//   enableReadyCheck: false,
 // });
-
 
 // Queue để thêm job
 const reminderQueue = new Queue("taskReminderQueue", { connection });
@@ -47,7 +46,7 @@ const worker = new Worker(
         const link = `${process.env.FE_URL}/boards/${task.boardId._id}/${task.boardId.title}/${taskId}/${task.title}`;
         for (const a of assignees) {
           if (a.userId?.email) {
-            await sendTaskDeadlineEmail(a.userId.email, task, link);
+            await sendTaskNearDeadlineEmail(a.userId.email, task, link, task.reminderTime);
           }
           io.to(a.userId._id.toString()).emit("taskReminder", {
             taskId: task._id,
@@ -75,8 +74,23 @@ const worker = new Worker(
 
       // === 3️⃣ ĐÁNH DẤU QUÁ HẠN ===
       case "markOverdue":
-        console.log(`⏰ [markOverdue] Task ${task.title} đã quá hạn`);
+        console.log(`[markOverdue] Task ${task.title} đã quá hạn`);
         if (!task.isCompleted && new Date() >= task.dueDate) {
+          if (task.reminderEnabled === true) {
+            const assignees = await TaskAssignee.find({ taskId }).populate(
+              "userId"
+            );
+
+            // Tạo link trỏ tới task
+            const link = `${process.env.FE_URL}/boards/${task.boardId._id}/${task.boardId.title}/${taskId}/${task.title}`;
+            for (const a of assignees) {
+              if (a.userId?.email) {
+                await sendTaskDeadlineEmail(a.userId.email, task, link);
+              }
+            }
+            task.reminderSent = true;
+          }
+
           task.status = "Quá hạn";
           await task.save();
 
@@ -88,7 +102,7 @@ const worker = new Worker(
         break;
 
       default:
-      console.log(`Job không xác định: ${job.name}`);
+        console.log(`Job không xác định: ${job.name}`);
     }
   },
   { connection }

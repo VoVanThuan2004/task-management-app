@@ -483,7 +483,7 @@ const updateDeadlineTask = async (req, res) => {
         { delay, jobId: `${task._id}-reminder` }
       );
 
-      console.log(`✅ Job nhắc task ${task._id} đã được thêm vào queue`);
+      console.log(`Job nhắc task ${task._id} đã được thêm vào queue`);
     }
 
     // ===== Thêm job cập nhật trạng thái task (gần tới hạn, quá hạn) =====
