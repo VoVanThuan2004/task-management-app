@@ -15,7 +15,7 @@ const userSchema = new mongoose.Schema(
     avatarId: { type: String },
     isActive: { type: Boolean },
     resetOtp: { type: String },
-    resetOtpExpired: { type: Date }
+    resetOtpExpired: { type: Date },
   },
   {
     timestamps: true,

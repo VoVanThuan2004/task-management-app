@@ -162,7 +162,7 @@ const SideBar = ({ isCollapsed, setIsCollapsed, user, setUser }) => {
             onClick={action.onClick}
             className={`
               group flex items-center w-full px-4 py-3 rounded-xl font-medium text-gray-300
-              hover:bg-gray-800 hover:text-white transition-all duration-200
+              hover:bg-gray-800 hover:text-white transition-all duration-200 cursor-pointer
               ${isCollapsed ? "justify-center" : "gap-4"}
             `}
             title={isCollapsed ? action.label : ""}
@@ -184,7 +184,7 @@ const SideBar = ({ isCollapsed, setIsCollapsed, user, setUser }) => {
           onClick={handleLogout}
           className={`
             group flex items-center w-full px-4 py-3 rounded-xl font-medium text-gray-300
-            hover:bg-red-900/50 hover:text-red-300 transition-all duration-200
+            hover:bg-red-900/50 hover:text-red-300 transition-all duration-200 cursor-pointer
             ${isCollapsed ? "justify-center" : "gap-4"}
           `}
           title={isCollapsed ? "Đăng xuất" : ""}

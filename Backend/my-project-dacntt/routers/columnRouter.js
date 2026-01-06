@@ -7,7 +7,7 @@ const { limitColumnsInBoard } = require("../middlewares/vipMiddleware");
 // Lấy danh sách columns tăng dần theo position
 router.get("/api/v1/columns/:boardId", auth, columnController.getAllColumns);
 
-router.get("/api/v2/columns/:boardId", auth, columnController.getAllColumnsAndFilter);
+router.get("/api/v2/columns/:boardId", columnController.getAllColumnsAndFilter);
 
 // Thêm column của 1 board 
 router.post("/api/v1/columns", auth, limitColumnsInBoard, columnController.addColumn);

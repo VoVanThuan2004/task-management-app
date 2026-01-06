@@ -21,7 +21,6 @@ router.get("/api/v1/users/search", auth, userController.searchEmailUser);
 // Lấy trạng thái tài khoản vip hiện tại
 router.get("/api/v1/users/vip", auth, userController.getUserVip);
 
-
 // ===== ADMIN ===== 
 // Khóa - mở người dùng
 router.put("/api/v1/users/:userId/toggle-lock", auth, userController.toggleLockUser);

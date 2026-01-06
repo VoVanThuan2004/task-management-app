@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import TaskModal from "./TaskModal";
 import axios from "axios";
+import toast from "react-hot-toast";
 const httpUrl = import.meta.env.VITE_API_URL;
-
 
 const TaskDetail = () => {
   const { boardId, title, taskId } = useParams(); // lấy params từ URL
@@ -14,10 +14,11 @@ const TaskDetail = () => {
 
   useEffect(() => {
     const fetchBoardDetails = async () => {
+
       try {
-        const headers = accessToken
-          ? { Authorization: `Bearer ${accessToken}` }
-          : {};
+        const headers = {
+          Authorization: `Bearer ${accessToken}`,
+        };
 
         const res = await axios.get(
           `${httpUrl}/api/v1/boards-detail/${boardId}`,
@@ -25,45 +26,54 @@ const TaskDetail = () => {
         );
 
         const { isMember } = res.data.data;
-
-        setIsMember(isMember || false); 
-
-        console.log(isMember);
+        setIsMember(isMember || false);
       } catch (err) {
         const status = err.response?.status;
-        // Chỉ redirect khi thật sự không được phép
+
         if (status === 401 || status === 403) {
-          // Nếu là public board → backend sẽ trả 200 + isMember=false → không vào đây
-          // Chỉ vào đây khi là private/workspace mà không có quyền
-          alert("Bạn không có quyền truy cập bảng này");
-          window.location.href = "/";
+          toast.error("Bạn không có quyền truy cập bảng này");
+          setTimeout(() => {
+            navigate("/");
+          }, 1500);
         } else if (status === 404) {
-          alert("Bảng không tồn tại");
-          window.location.href = "/";
+          toast.error("Bảng không tồn tại");
+          setTimeout(() => {
+            navigate("/");
+          }, 1500);
         }
       }
     };
 
     fetchBoardDetails();
-  }, [boardId, taskId, accessToken]);
+  }, [boardId, taskId, accessToken, navigate]);
 
-  // Fetch task data dựa trên taskId 
+  // Fetch task data dựa trên taskId
   useEffect(() => {
+    if (!accessToken) {
+      toast.error("Bạn cần đăng nhập để xem công việc này");
+      setTimeout(() => {
+        navigate("/");
+      }, 1500);
+      return;
+    }
+
     const fetchTask = async () => {
       try {
         const res = await axios.get(`${httpUrl}/api/v1/tasks/${taskId}`, {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+            Authorization: `Bearer ${accessToken}`,
           },
         });
         setTaskData(res.data.data);
       } catch (error) {
-        console.error(error);
-        navigate(-1); // nếu lỗi, back về board
+        toast.error("Không thể tải công việc");
+        navigate(-1);
+        console.log(error);
       }
     };
+
     fetchTask();
-  }, [taskId, navigate]);
+  }, [taskId, accessToken, navigate]);
 
   // Hàm đóng modal → back về board URL
   const handleClose = () => {

@@ -6,6 +6,8 @@ const EmojiReaction = require("../models/emojiReaction");
 const { getIO } = require("../config/socket");
 const mongoose = require("mongoose");
 const cloudinary = require("../config/cloudinary");
+const messaging = require("../config/firebaseAdmin");
+const BoardMembers = require("../models/boardMember");
 
 // Function xóa ảnh upload cloudinary
 const deleteUploadedFileCloudinary = async (file) => {
@@ -106,10 +108,8 @@ const sendMessage = async (req, res) => {
       totalComments,
     };
 
-    console.log(payload);
     io.to(task.boardId.toString()).emit("comment:new", payload);
 
-    // === HTTP RESPONSE ===
     return res.status(201).json({
       status: "success",
       code: 201,

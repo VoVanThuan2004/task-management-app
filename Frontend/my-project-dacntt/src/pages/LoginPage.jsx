@@ -65,7 +65,6 @@ const LoginPage = () => {
       localStorage.setItem("roleName", roleName);
 
       await fetchUser();
-
       if (roleName === "ADMIN") {
         navigate("/admin");
       } else if (roleName === "USER") {
@@ -111,7 +110,6 @@ const LoginPage = () => {
         localStorage.setItem("roleName", roleName);
 
         await fetchUser();
-
         if (roleName === "ADMIN") {
           navigate("/admin");
         } else if (roleName === "USER") {
