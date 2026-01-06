@@ -133,16 +133,37 @@ router.post("/chat", auth, async (req, res) => {
       if (!boardId) {
         finalReply = "Bạn cần vào một Board cụ thể để tạo task nhé! (Hãy mở Board lên và chat lại)";
       } else {
-        const { title, description, date_phrase, time } = action;
-        console.log("📅 CREATE_TASK Action Data:", { title, description, date_phrase, time });
-        // Find first column of the board
-        const column = await Column.findOne({ boardId, isArchived: false }).sort({ position: 1 });
+        const { title, description, date_phrase, time, column_name } = action;
+        console.log("📅 CREATE_TASK Action Data:", { title, description, date_phrase, time, column_name });
+
+        // Tìm cột theo tên hoặc lấy cột đầu tiên
+        let column;
+
+        if (column_name) {
+          // User chỉ định tên cột → tìm theo title (case-insensitive)
+          column = await Column.findOne({
+            boardId,
+            isArchived: false,
+            title: new RegExp(`^${column_name}$`, 'i')  // Case-insensitive match
+          });
+
+          if (!column) {
+            // Không tìm thấy cột với tên đó
+            finalReply = `Không tìm thấy cột "${column_name}" trong board này. Vui lòng kiểm tra lại tên cột!`;
+            return res.json({ data: { reply_text: finalReply, intent } });
+          }
+        } else {
+          // Không chỉ định → lấy cột đầu tiên
+          column = await Column.findOne({ boardId, isArchived: false }).sort({ position: 1 });
+        }
 
         if (!column) {
           finalReply = "Board này chưa có cột nào để tạo task!";
         } else {
-          // Calculate position (number of existing tasks in column + 1)
-          const existingTasksCount = await Task.countDocuments({ columnId: column._id });
+          // Calculate position - lấy max position hiện có + 1 để task mới ở cuối
+          const tasksInColumn = await Task.find({ columnId: column._id }).sort({ position: -1 }).limit(1);
+          const maxPosition = tasksInColumn.length > 0 ? tasksInColumn[0].position : -1;
+          const newPosition = maxPosition + 1;
 
           // Parse dueDate from date_phrase and time
           let startDate = null;
@@ -183,7 +204,7 @@ router.post("/chat", auth, async (req, res) => {
             columnId: column._id,
             boardId,
             userId,
-            position: existingTasksCount,
+            position: newPosition,  // Dùng max position + 1
             startDate: startDate,
             dueDate: dueDate,
             reminderEnabled: startDate ? true : false,
@@ -197,7 +218,7 @@ router.post("/chat", auth, async (req, res) => {
             $push: { taskIds: newTask._id }
           });
 
-          finalReply = `Đã tạo task "${title}" vào cột ${column.title}!`;
+          finalReply = `Đã tạo task "${title}" vào cột "${column.title}"!`;
 
           // Emit Socket
           try {

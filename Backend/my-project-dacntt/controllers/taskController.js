@@ -89,7 +89,7 @@ const addTask = async (req, res) => {
       title,
       position,
       isCompleted: task.isCompleted,
-      
+
     });
 
     // 7. Gửi lên Socket - thông báo
@@ -499,8 +499,7 @@ const updateDeadlineTask = async (req, res) => {
         { delay: nearDeadlineDelay, jobId: `${task._id}-nearDeadline` }
       );
       console.log(
-        `⏳ [markNearDeadline] Task ${task.title} (ID: ${
-          task._id
+        `⏳ [markNearDeadline] Task ${task.title} (ID: ${task._id
         }), dueDate: ${task.dueDate.toISOString()}, now: ${new Date(
           now
         ).toISOString()}, delay: ${nearDeadlineDelay} ms`
@@ -514,8 +513,7 @@ const updateDeadlineTask = async (req, res) => {
         { delay: overdueDelay, jobId: `${task._id}-overdue` }
       );
       console.log(
-        `⏳ [markOverdue] Task ${task.title} (ID: ${
-          task._id
+        `⏳ [markOverdue] Task ${task.title} (ID: ${task._id
         }), dueDate: ${task.dueDate.toISOString()}, now: ${new Date(
           now
         ).toISOString()}, delay: ${overdueDelay} ms`
@@ -686,9 +684,8 @@ const toggleLabelOnTask = async (req, res) => {
 
     return res.status(200).json({
       status: "success",
-      message: `Label ${
-        action === "added" ? "được gắn vào" : "bị gỡ khỏi"
-      } task thành công`,
+      message: `Label ${action === "added" ? "được gắn vào" : "bị gỡ khỏi"
+        } task thành công`,
       data: { taskId, labelId, title: label.title, color: label.color, action },
     });
   } catch (error) {
@@ -1284,13 +1281,13 @@ const getPrioritySuggestion = async (req, res) => {
           taskId: result.taskId,
           priorityScore: result.priorityScore,
           priorityLabel:
-            result.priorityScore >= 80
+            result.priorityScore >= 84
               ? "Critical"
-              : result.priorityScore >= 50
-              ? "High"
-              : result.priorityScore >= 20
-              ? "Medium"
-              : "Low",
+              : result.priorityScore >= 74
+                ? "High"
+                : result.priorityScore >= 40
+                  ? "Medium"
+                  : "Low",
         },
       });
     } else {
