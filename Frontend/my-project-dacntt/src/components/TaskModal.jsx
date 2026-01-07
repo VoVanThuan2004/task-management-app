@@ -83,8 +83,17 @@ const TaskModal = ({ task, isOpen, onClose, isMember = false }) => {
     // };
 
     setEditedTask(task);
-    setStartDate(task?.startDate ? new Date(task?.startDate) : null);
-    setDueDate(task?.dueDate ? new Date(task?.dueDate) : null);
+    setEditedTask(task);
+
+    // Check & Set Start Date
+    const sDate = task?.startDate ? new Date(task.startDate) : null;
+    const validSDate = sDate && !isNaN(sDate.getTime()) ? sDate : null;
+    setStartDate(validSDate);
+
+    // Check & Set Due Date
+    const dDate = task?.dueDate ? new Date(task.dueDate) : null;
+    const validDDate = dDate && !isNaN(dDate.getTime()) ? dDate : null;
+    setDueDate(validDDate);
     // fetchTaskDetail();
   }, [task, isOpen]);
 
@@ -121,13 +130,13 @@ const TaskModal = ({ task, isOpen, onClose, isMember = false }) => {
         setEditedTask((prev) =>
           prev
             ? {
-                ...prev,
-                startDate: data.startDate,
-                dueDate: data.dueDate,
-                status: data.status,
-                reminderEnabled: data.reminderEnabled,
-                reminderTime: data.reminderTime,
-              }
+              ...prev,
+              startDate: data.startDate,
+              dueDate: data.dueDate,
+              status: data.status,
+              reminderEnabled: data.reminderEnabled,
+              reminderTime: data.reminderTime,
+            }
             : null
         );
       }
@@ -713,11 +722,10 @@ const TaskModal = ({ task, isOpen, onClose, isMember = false }) => {
                   ref={dateButtonRef} // ← THÊM REF ĐỂ LẤY VỊ TRÍ
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className={`flex items-center gap-1 px-3 py-2 rounded text-sm transition ${
-                    isReadOnly
+                  className={`flex items-center gap-1 px-3 py-2 rounded text-sm transition ${isReadOnly
                       ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                       : "bg-gray-100 hover:bg-gray-200"
-                  }`}
+                    }`}
                   onClick={() => !isReadOnly && setShowPopup(true)} // ← mở popup, không toggle (tránh nháy)
                   disabled={isReadOnly}
                 >
@@ -729,11 +737,10 @@ const TaskModal = ({ task, isOpen, onClose, isMember = false }) => {
                   ref={labelsButtonRef}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className={`flex items-center gap-1 px-3 py-2 rounded text-sm transition ${
-                    isReadOnly
+                  className={`flex items-center gap-1 px-3 py-2 rounded text-sm transition ${isReadOnly
                       ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                       : "bg-gray-100 hover:bg-gray-200"
-                  }`}
+                    }`}
                   onClick={() => !isReadOnly && fetchLabelsForTask()} // ← Dùng hàm mới
                   disabled={isReadOnly}
                 >
@@ -747,11 +754,10 @@ const TaskModal = ({ task, isOpen, onClose, isMember = false }) => {
                   ref={membersButtonRef}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className={`flex items-center gap-1 px-3 py-2 rounded text-sm transition ${
-                    isReadOnly
+                  className={`flex items-center gap-1 px-3 py-2 rounded text-sm transition ${isReadOnly
                       ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                       : "bg-gray-100 hover:bg-gray-200"
-                  }`}
+                    }`}
                   onClick={() => !isReadOnly && handleOpenMembers()}
                   disabled={isReadOnly}
                 >
@@ -762,11 +768,10 @@ const TaskModal = ({ task, isOpen, onClose, isMember = false }) => {
                 <Motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className={`flex items-center gap-1 px-3 py-2 rounded text-sm transition ${
-                    isReadOnly
+                  className={`flex items-center gap-1 px-3 py-2 rounded text-sm transition ${isReadOnly
                       ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                       : "bg-gray-100 hover:bg-gray-200"
-                  }`}
+                    }`}
                   onClick={() => !isReadOnly && setShowAiModal(true)}
                   disabled={isReadOnly}
                 >
@@ -786,7 +791,7 @@ const TaskModal = ({ task, isOpen, onClose, isMember = false }) => {
                       style={{
                         top: dateButtonRef.current
                           ? dateButtonRef.current.getBoundingClientRect()
-                              .bottom + 8
+                            .bottom + 8
                           : 0,
                         left: dateButtonRef.current
                           ? dateButtonRef.current.getBoundingClientRect().left
@@ -895,11 +900,11 @@ const TaskModal = ({ task, isOpen, onClose, isMember = false }) => {
                         style={{
                           left: labelsButtonRef.current
                             ? labelsButtonRef.current.getBoundingClientRect()
-                                .left
+                              .left
                             : 0,
                           top: labelsButtonRef.current
                             ? labelsButtonRef.current.getBoundingClientRect()
-                                .bottom + 8
+                              .bottom + 8
                             : 0,
                         }}
                         // Quan trọng: ngăn sự kiện click lan ra overlay khi click vào popup
@@ -1002,18 +1007,17 @@ const TaskModal = ({ task, isOpen, onClose, isMember = false }) => {
                         }}
                         className={`
             text-xs px-3 py-1 rounded font-medium
-            ${
-              label.color &&
-              label.color.toLowerCase() !== "#ffffff" &&
-              label.color.toLowerCase() !== "#fff"
-                ? `bg-[${label.color}] text-white shadow-sm` // Dùng màu custom từ DB cho nền
-                : "bg-gray-200 text-gray-700" // Màu mặc định nếu không có màu hoặc màu trắng
-            }
+            ${label.color &&
+                            label.color.toLowerCase() !== "#ffffff" &&
+                            label.color.toLowerCase() !== "#fff"
+                            ? `bg-[${label.color}] text-white shadow-sm` // Dùng màu custom từ DB cho nền
+                            : "bg-gray-200 text-gray-700" // Màu mặc định nếu không có màu hoặc màu trắng
+                          }
           `}
                         style={
                           label.color &&
-                          label.color.toLowerCase() !== "#ffffff" &&
-                          label.color.toLowerCase() !== "#fff"
+                            label.color.toLowerCase() !== "#ffffff" &&
+                            label.color.toLowerCase() !== "#fff"
                             ? { backgroundColor: label.color }
                             : {}
                         }
@@ -1101,8 +1105,8 @@ const TaskModal = ({ task, isOpen, onClose, isMember = false }) => {
                 </h3>
 
                 <div className="flex flex-col gap-2 text-sm">
-                  {/* Ngày bắt đầu - chỉ hiển thị nếu có */}
-                  {editedTask.startDate && (
+                  {/* Ngày bắt đầu - chỉ hiển thị nếu có và hợp lệ */}
+                  {editedTask.startDate && !isNaN(new Date(editedTask.startDate).getTime()) && (
                     <div className="flex items-center gap-2">
                       <span className="text-gray-600 font-medium">
                         Bắt đầu:
@@ -1116,8 +1120,8 @@ const TaskModal = ({ task, isOpen, onClose, isMember = false }) => {
                     </div>
                   )}
 
-                  {/* Ngày kết thúc - luôn hiển thị nếu có */}
-                  {editedTask.dueDate && (
+                  {/* Ngày kết thúc - luôn hiển thị nếu có và hợp lệ */}
+                  {editedTask.dueDate && !isNaN(new Date(editedTask.dueDate).getTime()) && (
                     <div className="flex items-center gap-2">
                       <span className="text-gray-600 font-medium">
                         Kết thúc:
@@ -1148,15 +1152,14 @@ const TaskModal = ({ task, isOpen, onClose, isMember = false }) => {
                       transition={{ delay: 0.25, duration: 0.3 }}
                       className={`
           inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium
-          ${
-            editedTask.isCompleted === true
-              ? "bg-green-100 text-green-700"
-              : editedTask.status === "Quá hạn"
-              ? "bg-red-100 text-red-700"
-              : editedTask.status === "Gần tới hạn"
-              ? "bg-yellow-100 text-yellow-700"
-              : "bg-gray-100 text-gray-700"
-          }
+          ${editedTask.isCompleted === true
+                          ? "bg-green-100 text-green-700"
+                          : editedTask.status === "Quá hạn"
+                            ? "bg-red-100 text-red-700"
+                            : editedTask.status === "Gần tới hạn"
+                              ? "bg-yellow-100 text-yellow-700"
+                              : "bg-gray-100 text-gray-700"
+                        }
         `}
                     >
                       {editedTask.isCompleted === true && (
@@ -1248,11 +1251,10 @@ const TaskModal = ({ task, isOpen, onClose, isMember = false }) => {
                     <Motion.label
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
-                      className={`text-sm px-3 py-1.5 rounded transition-colors select-none cursor-pointer ${
-                        uploadingFile
+                      className={`text-sm px-3 py-1.5 rounded transition-colors select-none cursor-pointer ${uploadingFile
                           ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                           : "bg-gray-100 hover:bg-gray-200"
-                      }`}
+                        }`}
                     >
                       {uploadingFile ? "Đang tải lên..." : "Thêm"}
                       <input

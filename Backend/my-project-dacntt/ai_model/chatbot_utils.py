@@ -96,6 +96,14 @@ def find_date_phrase(raw_norm: str) -> Optional[str]:
     if m:
         return m.group(0) # Return "20/10" or "20-10"
 
+    # 1b. Check Verbose Date Pattern: "11 thang 2", "ngay 11 thang 2 nam 2026"
+    # Note: raw_norm is stripped accents so "tháng" -> "thang"
+    verbose_pattern = r'\b(?:ngay\s*)?([0-9]{1,2})\s*thang\s*([0-9]{1,2})(?:\s*nam\s*([0-9]{4}))?\b'
+    m_verbose = re.search(verbose_pattern, raw_norm)
+    if m_verbose:
+        return m_verbose.group(0)
+
+
     # 2. Check Relative Keywords
     # Priority: "ngày kia", "ngày mốt" -> "ngay kia"
     if "ngay kia" in raw_norm or "ngay mot" in raw_norm or "ngay mốt" in raw_norm:
@@ -198,6 +206,17 @@ def try_extract_title(raw: str, raw_norm: str) -> str:
         r'\d{1,2}\s*gio\b',
         r'luc\s+\d',
     ]
+    
+    # NEW: Cut at Specific Date Pattern (dd/mm or dd/mm/yyyy)
+    # Regex: dd/mm(-yyyy)? match
+    date_pattern_cut = r'\b(0?[1-9]|[12][0-9]|3[01])[\/\-](0?[1-9]|1[0-2])(?:[\/\-](\d{4}))?\b'
+    time_patterns.append(date_pattern_cut)
+    
+    # NEW: Cut at Verbose Date Pattern
+    verbose_date_cut = r'\b(?:ngay\s*)?([0-9]{1,2})\s*thang\s*([0-9]{1,2})(?:\s*nam\s*([0-9]{4}))?\b'
+    time_patterns.append(verbose_date_cut)
+
+
     cut_idx = len(t)
     for pattern in time_patterns:
         m = re.search(pattern, t)
@@ -245,6 +264,24 @@ def date_phrase_to_date(dp: Optional[str]) -> Optional[date]:
             return target
         except:
             return None
+
+    # Handle Verbose Date (ngay 11 thang 2 nam 2026)
+    # Regex must match regex in find_date_phrase
+    m_verbose = re.search(r'\b(?:ngay\s*)?(\d{1,2})\s*thang\s*(\d{1,2})(?:\s*nam\s*(\d{4}))?\b', dp)
+    if m_verbose:
+        try:
+            d = int(m_verbose.group(1))
+            m_month = int(m_verbose.group(2))
+            y = int(m_verbose.group(3)) if m_verbose.group(3) else today.year
+            
+            target = date(y, m_month, d)
+            # If no year and date passed -> year + 1
+            if not m_verbose.group(3) and target < today:
+                target = date(y + 1, m_month, d)
+            return target
+        except:
+             return None
+
 
     if dp == "hom nay": return today
     if dp == "ngay mai": return today + timedelta(days=1)

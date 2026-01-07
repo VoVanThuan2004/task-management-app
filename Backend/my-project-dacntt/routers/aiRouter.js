@@ -168,16 +168,34 @@ router.post("/chat", auth, async (req, res) => {
           // Parse dueDate from date_phrase and time
           let startDate = null;
           let dueDate = null;
-          if (date_phrase || time) {
+
+          if (action.iso_date) {
+            // NEW: Prioritize ISO Date from AI (e.g., "2026-01-11")
+            let baseDate = moment(action.iso_date, "YYYY-MM-DD");
+
+            if (time) {
+              const [hours, minutes] = time.split(':').map(Number);
+              baseDate.hours(hours).minutes(minutes || 0).seconds(0);
+              startDate = baseDate.toDate();
+              dueDate = moment(startDate).add(30, 'minutes').toDate();
+            } else {
+              // Có ngày nhưng không có giờ -> Set DueDate = cuối ngày
+              startDate = null;
+              dueDate = baseDate.endOf('day').toDate();
+            }
+
+          } else if (date_phrase || time) {
             let baseDate = moment();
 
-            // Parse date phrase
+            // Parse date phrase (Fallback legacy logic)
             if (date_phrase) {
               const normalized = date_phrase.toLowerCase().replace(/\s+/g, '');
               if (normalized.includes('homnay') || normalized === 'hom nay') {
                 baseDate = moment();
               } else if (normalized.includes('ngaymai') || normalized === 'ngay mai') {
                 baseDate = moment().add(1, 'day');
+              } else if (normalized.includes('ngaykia') || normalized === 'ngay kia' || normalized === 'mot') {
+                baseDate = moment().add(2, 'days');
               } else if (normalized.includes('tuannay') || normalized === 'tuan nay') {
                 baseDate = moment();
               } else if (normalized.includes('tuansau') || normalized === 'tuan sau') {
@@ -185,17 +203,17 @@ router.post("/chat", auth, async (req, res) => {
               }
             }
 
-            // Parse time if exists, default to 8 AM
+            // Parse time if exists
             if (time) {
               const [hours, minutes] = time.split(':').map(Number);
               baseDate.hours(hours).minutes(minutes || 0).seconds(0);
+              startDate = baseDate.toDate();
+              dueDate = moment(startDate).add(30, 'minutes').toDate();
             } else {
-              // Default to 8 AM if only date provided
-              baseDate.hours(8).minutes(0).seconds(0);
+              // Có ngày nhưng không có giờ -> Set DueDate = cuối ngày
+              startDate = null;
+              dueDate = baseDate.endOf('day').toDate();
             }
-
-            startDate = baseDate.toDate();
-            dueDate = moment(startDate).add(30, 'minutes').toDate();
           }
 
           const newTask = new Task({
@@ -218,7 +236,8 @@ router.post("/chat", auth, async (req, res) => {
             $push: { taskIds: newTask._id }
           });
 
-          finalReply = `Đã tạo task "${title}" vào cột "${column.title}"!`;
+
+          finalReply = `Đã tạo task "${title}" vào cột "${column.title}"!` + '\nBạn có muốn chuyển task này sang cột khác không?';
 
           // Emit Socket
           try {
@@ -226,6 +245,73 @@ router.post("/chat", auth, async (req, res) => {
             io.to(boardId.toString()).emit("taskAdded", newTask);
           } catch (e) {
             console.error("Socket emit error:", e);
+          }
+        }
+      }
+    }
+
+    // Handle Action (Move Task)
+    if (action && action.action === "move_task") {
+      if (!boardId) {
+        finalReply = "Bạn cần vào một Board cụ thể để di chuyển task!";
+      } else {
+        const { task_title, target_column } = action;
+
+        // Tìm task gần nhất của user với title tương ứng
+        const recentTask = await Task.findOne({
+          boardId,
+          userId,
+          title: new RegExp(task_title, 'i')
+        }).sort({ createdAt: -1 });
+
+        if (!recentTask) {
+          finalReply = `Không tìm thấy task "${task_title}"!`;
+        } else {
+          // Tìm cột đích theo tên
+          const targetCol = await Column.findOne({
+            boardId,
+            isArchived: false,
+            title: new RegExp(`^${target_column}$`, 'i')
+          });
+
+          if (!targetCol) {
+            finalReply = `Không tìm thấy cột "${target_column}" trong board này!`;
+          } else if (recentTask.columnId.toString() === targetCol._id.toString()) {
+            finalReply = `Task "${task_title}" đã ở trong cột "${target_column}" rồi!`;
+          } else {
+            // Di chuyển task
+            const oldColumnId = recentTask.columnId;
+
+            // Xóa task khỏi cột cũ
+            await Column.findByIdAndUpdate(oldColumnId, {
+              $pull: { taskIds: recentTask._id }
+            });
+
+            // Thêm task vào cột mới
+            await Column.findByIdAndUpdate(targetCol._id, {
+              $push: { taskIds: recentTask._id }
+            });
+
+            // Cập nhật task
+            recentTask.columnId = targetCol._id;
+            await recentTask.save();
+
+            finalReply = `Đã chuyển task "${task_title}" sang cột "${targetCol.title}"!`;
+
+            // Emit socket events using existing events that Frontend handles
+            try {
+              const io = getIO();
+              // 1. Emit deleteTask (not taskDeleted) to remove from old column UI
+              io.to(boardId.toString()).emit("deleteTask", {
+                taskId: recentTask._id,
+                columnId: oldColumnId
+              });
+
+              // 2. Emit taskAdded to add to new column UI
+              io.to(boardId.toString()).emit("taskAdded", recentTask);
+            } catch (e) {
+              console.error("Socket emit error:", e);
+            }
           }
         }
       }

@@ -71,6 +71,12 @@ except Exception as e:
 
 
 # =========================
+# USER SESSION STORAGE
+# =========================
+# Lưu trạng thái conversation (in-memory, sẽ mất khi restart service)
+user_sessions = {}
+
+# =========================
 # SCHEMA
 # =========================
 
@@ -234,6 +240,61 @@ async def chat_endpoint(request: ChatRequest):
         
         # Pattern: chưa xong, chưa làm
         unfinished_pattern = r'(chưa|chua)\s*(xong|làm|lam|hoàn thành)'
+        
+        # Pattern: Goodbye/Farewell
+        goodbye_pattern = r'\b(tạm biệt|tam biet|bye|hẹn gặp lại|hen gap lai|kết thúc|ket thuc|thôi|thoi)\b'
+        
+        # Check Goodbye first
+        if re.search(goodbye_pattern, text_norm):
+            reply_text = "Tạm biệt! Hẹn gặp lại bạn!"
+            # Clear session if any
+            user_sessions.pop(str(request.userId), None)
+            return {"data": {"reply_text": reply_text, "intent": "goodbye"}}
+        
+        # === CHECK SESSION STATE (multi-turn conversation) ===
+        user_id_str = str(request.userId)
+        session = user_sessions.get(user_id_str, {})
+        
+        # CASE 1: Đang chờ user trả lời có muốn di chuyển task không
+        if session.get("awaiting_move_confirm"):
+            # Check if user says yes
+            yes_pattern = r'\b(có|co|ok|được|duoc|oke|yes|chuyển|chuyen|di chuyển|di chuyen)\b'
+            no_pattern = r'\b(không|khong|no|thôi|thoi|không cần|khong can)\b'
+            
+            if re.search(yes_pattern, text_norm):
+                # User muốn di chuyển -> Hỏi tên cột
+                user_sessions[user_id_str] = {
+                    "awaiting_column_name": True,
+                    "task_title": session.get("task_title")
+                }
+                reply_text = "Bạn muốn chuyển task này sang cột nào?"
+                return {"data": {"reply_text": reply_text, "intent": "awaiting_input"}}
+            elif re.search(no_pattern, text_norm):
+                # User không muốn di chuyển -> Clear session
+                user_sessions.pop(user_id_str, None)
+                reply_text = "OK! Nếu cần gì cứ gọi mình nhé."
+                return {"data": {"reply_text": reply_text, "intent": "cancel"}}
+        
+        # CASE 2: Đang chờ user nhập tên cột
+        if session.get("awaiting_column_name"):
+            # Parse tên cột từ message
+            # User có thể nói: "Done", "cột Done", "chuyển sang Done", etc.
+            column_name = text.strip()
+            # Clean up common prefixes
+            column_name = re.sub(r'^(cột|sang|chuyển sang|di chuyển sang)\s+', '', column_name, flags=re.IGNORECASE).strip()
+            
+            if column_name:
+                # Clear session và trả về action move_task
+                task_title = session.get("task_title", "")
+                user_sessions.pop(user_id_str, None)
+                
+                reply_text = f"Đang di chuyển task sang cột '{column_name}'..."
+                action_data = {
+                    "action": "move_task",
+                    "task_title": task_title,
+                    "target_column": column_name
+                }
+                return {"data": {"reply_text": reply_text, "intent": "move_task", "action": action_data}}
         
         if re.match(deadline_pattern, text_norm):
             is_deadline_followup = True
@@ -612,7 +673,7 @@ async def chat_endpoint(request: ChatRequest):
                          completed = t.get("completedCheckItems", 0)
                          warning_str = ""
                          if total > 0 and completed >= total:
-                             warning_str = " ✅ (Xong checklist - chưa tick hoàn thành task)"
+                             warning_str = "  (Xong checklist - chưa tick hoàn thành task)"
                          
                          # Get Column Name
                          col_name = "Unknown"
@@ -671,17 +732,36 @@ async def chat_endpoint(request: ChatRequest):
                  
              title = slots.get("title")
              if title:
-                 reply_text = f"Đang tạo task: '{title}'..."
+                 # Convert date_phrase to ISO Date
+                 iso_date = None
+                 dp_str = slots.get("date_phrase")
+                 if dp_str:
+                     d_obj = date_phrase_to_date(dp_str)
+                     if d_obj:
+                         iso_date = d_obj.isoformat()
+
+                 reply_text = f"Đang tạo task: '{title}'"
+                 if iso_date:
+                     reply_text += f" (Hạn: {iso_date})"
+                 
                  action_data = {
                      "action": "create_task",
                      "title": title,
                      "description": slots.get("description"),
                      "date_phrase": slots.get("date_phrase"),
+                     "iso_date": iso_date, # New field for accurate date
                      "time": slots.get("time"),
                      "priority": slots.get("priority"),
                      "list": slots.get("list"),
                      "column_name": slots.get("column_name")
                  }
+                 
+                 # Lưu session để chờ user trả lời có muốn di chuyển task không
+                 user_sessions[str(request.userId)] = {
+                     "awaiting_move_confirm": True,
+                     "task_title": title
+                 }
+
              else:
                  reply_text = (
                      "Bạn muốn tạo task gì? Hãy nói rõ hơn, ví dụ:\n"

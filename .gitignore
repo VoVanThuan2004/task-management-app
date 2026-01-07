@@ -35,8 +35,6 @@ coverage/
 *.tsbuildinfo
 
 # Temporary files
-
-
 tmp/
 temp/
 .cache/
@@ -52,7 +50,6 @@ temp/
 uploads/
 public/uploads/
 backend/uploads/
-# firebase**
 
 # PM2 logs
 pids
