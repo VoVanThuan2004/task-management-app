@@ -1,5 +1,5 @@
 import React from "react";
-import { Plus, X, Loader2} from "lucide-react";
+import {X, Loader2} from "lucide-react";
 
 const AddTaskForm = React.memo(
   ({ columnId, value, onChange, onAdd, loading }) => {
@@ -12,7 +12,7 @@ const AddTaskForm = React.memo(
           onKeyPress={(e) =>
             e.key === "Enter" && value?.trim() && onAdd(columnId, value.trim())
           }
-          placeholder="Nhập tiêu đề thẻ..."
+          placeholder="Nhập tiêu đề task..."
           className="w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         {value && (

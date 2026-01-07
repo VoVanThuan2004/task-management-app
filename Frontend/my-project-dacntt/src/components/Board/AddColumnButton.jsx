@@ -76,7 +76,7 @@ const AddColumnButton = React.memo(
       <button
         onClick={onStartAdding}
         disabled={loading}
-        className="flex-shrink-0 w-72 p-6 bg-white/20 hover:bg-white/40 backdrop-blur rounded-xl text-gray-700 font-medium transition-all hover:scale-105 shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
+        className="flex-shrink-0 w-65 p-4 bg-white/20 hover:bg-white/40 backdrop-blur rounded-xl text-gray-700 font-medium transition-all hover:scale-105 shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
       >
         {loading ? (
           <>
@@ -86,7 +86,7 @@ const AddColumnButton = React.memo(
         ) : (
           <>
             <Plus size={20} className="inline" />
-            Thêm danh sách khác
+            Thêm cột khác
           </>
         )}
       </button>
