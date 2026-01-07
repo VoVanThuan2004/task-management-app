@@ -11,6 +11,7 @@ import Snowfall from "react-snowfall";
 import { AnimatePresence, motion as Motion } from "framer-motion";
 import toast from "react-hot-toast";
 import { CreditCard, Crown, Check, Loader2 } from "lucide-react";
+import { showCommentNotification } from "../utils/showCommentNotification";
 
 const httpUrl = import.meta.env.VITE_API_URL;
 
@@ -23,12 +24,11 @@ export default function BoardDetail() {
   const [editTitle, setEditTitle] = useState("");
   const [isAddingColumn, setIsAddingColumn] = useState(false);
   const [newTaskTitles, setNewTaskTitles] = useState({});
-  // const [selectedTask, setSelectedTask] = useState(null);
-  // const [showTaskModal, setShowTaskModal] = useState(false);
   const accessToken = localStorage.getItem("accessToken");
   const [loading, setLoading] = useState(false);
   const [loadingAddTask, setLoadingAddTask] = useState(false);
   const navigate = useNavigate();
+  const userId = localStorage.getItem("userId");
 
   // State xóa task
   const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false);
@@ -623,6 +623,16 @@ export default function BoardDetail() {
           };
         })
       );
+    });
+
+    socket.on("alert:new-comment", (data) => {
+      // Không hiện toast cho chính người gửi (tránh spam)
+      if (!userId) return;
+      if (data.sender.userId === userId) return;
+
+      // Hiển thị toast/notification
+      showCommentNotification(data);
+
     });
 
     return () => {

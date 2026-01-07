@@ -139,7 +139,7 @@ export default function AiChecklistModal({
         setVipModalData({
           message:
             errorResponse.message || "Bạn đã đạt giới hạn tạo bảng miễn phí.",
-          title: "Đạt giới hạn bảng miễn phí",
+          title: "Đạt giới hạn sử dụng tính năng miễn phí",
         });
         setShowVipModal(true);
       } else {

@@ -28,7 +28,11 @@ const sendMessage = async (req, res) => {
       });
     }
 
-    const task = await Task.findById(taskId);
+    const task = await Task.findById(taskId).populate({
+      path: "boardId",
+      select: "_id title",
+    });
+
     if (!task) {
       await deleteUploadedFileCloudinary(req.file);
       return res.status(404).json({
@@ -74,7 +78,7 @@ const sendMessage = async (req, res) => {
       io.to(task.boardId.toString()).emit("comment:attachment:new", {
         taskId,
         totalAttachments,
-        attachments
+        attachments,
       });
     }
 
@@ -94,7 +98,7 @@ const sendMessage = async (req, res) => {
           fullName: user.fullName,
           avatar: user.avatar,
         },
-        attachments: attachments.map(att => ({
+        attachments: attachments.map((att) => ({
           _id: att._id,
           fileName: att.fileName,
           fileUrl: att.fileUrl,
@@ -106,7 +110,35 @@ const sendMessage = async (req, res) => {
       totalComments,
     };
 
-    io.to(task.boardId.toString()).emit("comment:new", payload);
+    io.to(task.boardId._id.toString()).emit("comment:new", payload);
+
+    // emit socket thông báo khi có comment mới
+    io.to(task.boardId._id.toString()).emit("alert:new-comment", {
+      type: "new_comment",
+      taskId: taskId,
+      taskTitle: task.title,
+      boardId: task.boardId._id,
+      boardTitle: task.boardId.title,
+
+      message: message?.trim()
+        ? `${user.fullName} đã bình luận: "${message.trim()}"`
+        : `${user.fullName} đã gửi ${
+            attachments.length > 0
+              ? attachments.length === 1
+                ? "1 tệp đính kèm"
+                : `${attachments.length} tệp đính kèm`
+              : "một bình luận"
+          } trong task "${task.title}"`,
+
+      sender: {
+        userId: userId,
+        fullName: user.fullName,
+        avatar: user.avatar,
+      },
+
+      commentId: newComment._id,
+      createdAt: new Date(),
+    });
 
     return res.status(201).json({
       status: "success",
@@ -122,7 +154,7 @@ const sendMessage = async (req, res) => {
           createdAt: newComment.createdAt,
           isEdited: false,
         },
-        attachments: attachments.map(att => ({
+        attachments: attachments.map((att) => ({
           _id: att._id,
           fileName: att.fileName,
           fileUrl: att.fileUrl,
