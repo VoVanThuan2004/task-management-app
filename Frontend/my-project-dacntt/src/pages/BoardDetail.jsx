@@ -1117,7 +1117,7 @@ export default function BoardDetail() {
       />
 
       {/* Tuyết rơi - phủ toàn màn hình, nhưng không che nội dung */}
-      <Snowfall
+      {/* <Snowfall
         snowflakeCount={100} // số lượng tuyết (tùy chỉnh 100-300)
         speed={[0.5, 2]} // tốc độ rơi chậm - nhanh
         wind={[-0.5, 2]} // gió thổi nhẹ ngang
@@ -1131,7 +1131,7 @@ export default function BoardDetail() {
           pointerEvents: "none", // quan trọng: tuyết không block click chuột
           zIndex: 1, // dưới header và nội dung chính
         }}
-      />
+      /> */}
 
       <main className="flex-1 overflow-x-auto p-6" style={getBoardBackground()}>
         <DragDropContext onDragEnd={handleDragEnd}>

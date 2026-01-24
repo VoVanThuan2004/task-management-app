@@ -246,7 +246,7 @@ const vnpayReturn = async (req, res) => {
 
     // 4. Tính ngày hết hạn: hôm nay + 30 ngày
     const now = new Date();
-    const expirationDate = new Date(now.getTime() + 10 * 60 * 1000);
+    const expirationDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
     // 5. Cập nhật PaymentOrder
     paymentOrder.status = "paid";

@@ -30,7 +30,6 @@ module.exports = async (req, res, next) => {
     req.user = decoded; // Gán vào req.user để dùng ở route khác
 
     // Tích hợp Redis - kiểm tra tài khoản có khóa hay không
-    // const isBlacklisted = await redisClient.sIsMember("blacklisted_users", decoded.userId);
     const isBlacklisted = await redisClient.sismember("blacklisted_users", decoded.userId);
     if (isBlacklisted === 1) {
       return res.status(401).json({
