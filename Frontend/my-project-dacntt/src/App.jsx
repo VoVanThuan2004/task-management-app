@@ -23,6 +23,7 @@ import DashboardPage from "./pages/admin/DashboardPage";
 import ChatWidget from "./components/Chatbot/ChatWidget";
 import HeaderTest from "./pages/HeaderTest";
 import TaskDetail from "./components/TaskDetail";
+import LandingPage from "./pages/LandingPage";
 
 function App() {
   return (
@@ -164,7 +165,7 @@ function AppContent() {
       />
 
       <Routes>
-        <Route path="/" element={<HomePage />} />
+        <Route path="/" element={<LandingPage />} />
         <Route path="/home" element={<HomePage />} />
         <Route path="/boards/:boardId/:title" element={<BoardDetail />}>
           {/* Child route cho task detail - URL con */}

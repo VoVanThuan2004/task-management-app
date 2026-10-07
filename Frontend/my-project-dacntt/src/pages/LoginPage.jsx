@@ -25,7 +25,7 @@ const LoginPage = () => {
         if (roleName === "ADMIN") {
           navigate("/admin");
         } else if (roleName === "USER") {
-          navigate("/");
+          navigate("/home");
         }
       } catch {
         localStorage.removeItem("accessToken");
