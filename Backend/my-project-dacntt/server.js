@@ -22,7 +22,10 @@ const activityLogRouter = require("./routers/activityLogRouter.js");
 const userSkillRouter = require("./routers/userSkillRouter.js");
 const paymentOrderRouter = require("./routers/paymentOrderRouter.js");
 const dashboardRouter = require("./routers/dashboardRouter.js");
-const path = require("path");
+const {
+  notFoundHandler,
+  errorHandler,
+} = require("./middlewares/errorHandler");
 const PORT = process.env.PORT;
 
 app.use(cors());
@@ -61,6 +64,9 @@ app.use(activityLogRouter);
 app.use(userSkillRouter);
 app.use(paymentOrderRouter);
 app.use(dashboardRouter);
+
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 server.listen(PORT, () => {
   console.log(`http://localhost:${PORT}`);
