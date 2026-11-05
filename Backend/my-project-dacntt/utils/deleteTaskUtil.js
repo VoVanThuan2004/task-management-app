@@ -8,7 +8,7 @@ const Comment = require("../models/comment");
 const CheckItem = require("../models/checkItem");
 const mongoose = require("mongoose");
 const cloudinary = require("../config/cloudinary");
-const reminderQueue = require("../services/reminderQueue");
+const reminderQueue = require("../jobs/reminderQueue");
 
 async function deleteTaskUtil(taskId) {
   const session = await mongoose.startSession();

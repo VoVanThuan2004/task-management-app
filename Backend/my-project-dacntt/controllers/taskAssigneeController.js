@@ -8,7 +8,7 @@ const {
 const { getIO } = require("../config/socket");
 const mongoose = require("mongoose");
 const BoardMember = require("../models/boardMember");
-const activityLogQueue = require("../services/activityLogQueue");
+const activityLogQueue = require("../jobs/activityLogQueue");
 require("dotenv").config();
 
 const assignMember = async (req, res) => {

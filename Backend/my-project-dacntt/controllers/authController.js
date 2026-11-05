@@ -12,7 +12,7 @@ const mongoose = require("mongoose");
 const { OAuth2Client } = require("google-auth-library");
 const client = new OAuth2Client(process.env.CLIENT_ID);
 const SocialAccount = require("../models/socialAccount");
-const emailQueue = require("../services/emailQueue");
+const emailQueue = require("../jobs/emailQueue");
 
 const login = async (req, res) => {
   const { email, password } = req.body;

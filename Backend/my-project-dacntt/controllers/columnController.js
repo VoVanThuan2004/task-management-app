@@ -7,7 +7,7 @@ const { ObjectId } = require("mongodb");
 const ActivityLog = require("../models/activityLog");
 const { getIO } = require("../config/socket");
 const mongoose = require("mongoose");
-const columnDeleteQueue = require("../services/columnDeleteQueue");
+const columnDeleteQueue = require("../jobs/columnDeleteQueue");
 
 const addColumn = async (req, res) => {
   const { boardId, title } = req.body;

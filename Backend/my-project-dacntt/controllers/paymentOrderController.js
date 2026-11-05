@@ -11,8 +11,8 @@ const moment = require("moment");
 require("dotenv").config();
 const mongoose = require("mongoose");
 const VipSubscription = require("../models/vipSubscription");
-const emailQueue = require("../services/emailQueue");
-const vipSubscriptionQueue = require("../services/vipSubscriptionQueue");
+const emailQueue = require("../jobs/emailQueue");
+const vipSubscriptionQueue = require("../jobs/vipSubscriptionQueue");
 const User = require("../models/user");
 const { ObjectId } = require("mongodb");
 

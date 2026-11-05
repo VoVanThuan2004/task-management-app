@@ -3,11 +3,11 @@ const Task = require("../models/task");
 const BoardMember = require("../models/boardMember");
 const { getIO } = require("../config/socket");
 const User = require("../models/user");
-const checkItemReminderQueue = require("../services/checkItemReminderQueue");
+const checkItemReminderQueue = require("../jobs/checkItemReminderQueue");
 const { sendAssignCheckItemEmail } = require("../config/mailConfig");
 const { ObjectId } = require("mongodb");
 const Board = require("../models/board");
-const activityLogQueue = require("../services/activityLogQueue");
+const activityLogQueue = require("../jobs/activityLogQueue");
 require("dotenv").config();
 
 const addCheckItem = async (req, res) => {
