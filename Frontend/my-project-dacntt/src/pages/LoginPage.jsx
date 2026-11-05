@@ -132,7 +132,7 @@ const LoginPage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <button
-        onClick={() => navigate("/home")}
+        onClick={() => navigate("/")}
         className="
     absolute top-6 left-6
     flex items-center gap-2
