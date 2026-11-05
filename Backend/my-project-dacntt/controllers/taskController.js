@@ -1,7 +1,6 @@
 const Task = require("../models/task");
 const axios = require("axios");
 const Column = require("../models/column");
-const Label = require("../models/label");
 const TaskLabel = require("../models/taskLabel");
 const Attachment = require("../models/attachment");
 const Comment = require("../models/comment");
@@ -10,14 +9,16 @@ const CheckItem = require("../models/checkItem");
 const { getIO } = require("../config/socket");
 const cloudinary = require("../config/cloudinary");
 const { ObjectId } = require("mongodb");
-const reminderQueue = require("../services/reminderQueue");
+const reminderQueue = require("../jobs/reminderQueue");
 const createActivityLogTask = require("../utils/createActivityLogTask");
 const User = require("../models/user");
-const activityLogQueue = require("../services/activityLogQueue");
+const activityLogQueue = require("../jobs/activityLogQueue");
 const TaskAssignee = require("../models/taskAssignee");
 const EmojiReaction = require("../models/emojiReaction");
 const ActivityLog = require("../models/activityLog");
 const mongoose = require("mongoose");
+const catchAsync = require("../utils/catchAsync");
+const taskLabelService = require("../services/taskLabelService");
 
 const addTask = async (req, res) => {
   try {
@@ -633,158 +634,29 @@ const updateTaskDescription = async (req, res) => {
   }
 };
 
-const toggleLabelOnTask = async (req, res) => {
-  try {
-    const { taskId, labelId } = req.body;
-    if (!taskId || !labelId) {
-      return res.status(400).json({
-        status: "error",
-        code: 400,
-        message: "Vui lòng nhập taskId, labelId",
-      });
-    }
+const toggleLabelOnTask = catchAsync(async (req, res) => {
+  const { taskId, labelId } = req.body;
+  const data = await taskLabelService.toggleTaskLabel({ taskId, labelId });
 
-    // 1. Kiểm tra tồn tại
-    const [task, label] = await Promise.all([
-      Task.findById(taskId).lean(),
-      Label.findById(labelId).lean(),
-    ]);
+  return res.status(200).json({
+    status: "success",
+    message: `Label ${data.action === "added" ? "được gắn vào" : "bị gỡ khỏi"
+      } task thành công`,
+    data,
+  });
+});
 
-    if (!task || !label) {
-      return res.status(404).json({
-        status: "error",
-        code: 404,
-        message: "Task hoặc Label không tồn tại",
-      });
-    }
+const getAllTaskLabels = catchAsync(async (req, res) => {
+  const taskId = req.params.taskId;
+  const data = await taskLabelService.getTaskLabels({ taskId });
 
-    // 2️. Kiểm tra có gắn sẵn chưa
-    const existing = await TaskLabel.findOne({ taskId, labelId });
-
-    let action = "";
-    if (existing) {
-      // Nếu có rồi thì gỡ ra (toggle off)
-      await TaskLabel.deleteOne({ _id: existing._id });
-      action = "removed";
-    } else {
-      // Nếu chưa có thì gắn vào (toggle on)
-      await TaskLabel.create({ taskId, labelId });
-      action = "added";
-    }
-
-    // 3️. Phát socket cho mọi người trong board biết
-    const io = getIO();
-    io.to(task.boardId.toString()).emit("taskLabelUpdated", {
-      taskId,
-      labelId,
-      title: label.title,
-      color: label.color,
-      action,
-    });
-
-    return res.status(200).json({
-      status: "success",
-      message: `Label ${action === "added" ? "được gắn vào" : "bị gỡ khỏi"
-        } task thành công`,
-      data: { taskId, labelId, title: label.title, color: label.color, action },
-    });
-  } catch (error) {
-    return res.status(500).json({
-      status: "error",
-      code: 500,
-      message: "Lỗi hệ thống: " + error.message,
-    });
-  }
-};
-
-const getAllTaskLabels = async (req, res) => {
-  try {
-    const taskId = req.params.taskId;
-    if (!taskId) {
-      return res.status(400).json({
-        status: "error",
-        code: 400,
-        message: "Thiếu boardId",
-      });
-    }
-
-    // 1. Kiểm tra task
-    const task = await Task.findById(taskId)
-      .populate({
-        path: "columnId",
-        select: "boardId",
-      })
-      .lean();
-    if (!task) {
-      return res.status(404).json({
-        status: "error",
-        code: 404,
-        message: "Task không tồn tại",
-      });
-    }
-
-    // 2. Lấy danh sách labels
-    const labels = await Label.aggregate([
-      {
-        $match: {
-          boardId: new ObjectId(task.columnId.boardId), // hoặc new ObjectId(task.columnId.boardId)
-        },
-      },
-      {
-        $lookup: {
-          from: "tasklabels", // tên collection TaskLabel (thường là lowercase + s)
-          let: { labelId: "$_id" },
-          pipeline: [
-            {
-              $match: {
-                $expr: { $eq: ["$labelId", "$$labelId"] },
-                taskId: new ObjectId(taskId), // <-- task cụ thể bạn đang xem
-              },
-            },
-            { $limit: 1 }, // chỉ cần biết có tồn tại hay không
-          ],
-          as: "taskLabels",
-        },
-      },
-      {
-        $addFields: {
-          status: { $gt: [{ $size: "$taskLabels" }, 0] }, // true nếu có gắn, false nếu không
-        },
-      },
-      {
-        $project: {
-          taskLabels: 0, // ẩn field phụ không cần thiết
-        },
-      },
-      {
-        $sort: { createdAt: -1 }, // hoặc sort theo ý bạn
-      },
-
-      {
-        $project: {
-          _id: 1,
-          boardId: 1,
-          title: 1,
-          color: 1,
-          status: 1,
-        },
-      },
-    ]);
-
-    return res.status(200).json({
-      status: "success",
-      code: 200,
-      message: "Lấy danh sách task-labels",
-      data: labels,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      status: "error",
-      code: 500,
-      message: "Lỗi hệ thống: " + error.message,
-    });
-  }
-};
+  return res.status(200).json({
+    status: "success",
+    code: 200,
+    message: "Lấy danh sách task-labels",
+    data,
+  });
+});
 
 // Upload file đính kèm cho task
 const uploadFile = async (req, res) => {
