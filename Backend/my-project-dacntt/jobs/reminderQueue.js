@@ -1,5 +1,5 @@
 const { Queue, Worker } = require("bullmq");
-const { Redis } = require("ioredis");
+const createRedisConnection = require("../config/redisConnection");
 const Task = require("../models/task");
 const TaskAssignee = require("../models/taskAssignee");
 const { getIO } = require("../config/socket");
@@ -7,9 +7,7 @@ require("dotenv").config();
 const { sendTaskDeadlineEmail, sendTaskNearDeadlineEmail } = require("../config/mailConfig");
 
 // Kết nối Redis
-const connection = new Redis({
-  host: process.env.REDIS_HOST,
-  port: process.env.REDIS_PORT,
+const connection = createRedisConnection({
   maxRetriesPerRequest: null,
   enableReadyCheck: false,
 });

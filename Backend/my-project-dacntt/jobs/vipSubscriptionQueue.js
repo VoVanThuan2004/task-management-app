@@ -1,6 +1,6 @@
 require("dotenv").config();
 const { Queue, Worker } = require("bullmq");
-const { Redis } = require("ioredis");
+const createRedisConnection = require("../config/redisConnection");
 const {
   sendVipReminderEmail,
   sendVipExpiredEmail,
@@ -8,9 +8,7 @@ const {
 const User = require("../models/user");
 const VipSubscription = require("../models/vipSubscription");
 
-const connection = new Redis({
-  host: process.env.REDIS_HOST,
-  port: process.env.REDIS_PORT,
+const connection = createRedisConnection({
   maxRetriesPerRequest: null,
   enableReadyCheck: false,
 });

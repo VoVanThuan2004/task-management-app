@@ -1,12 +1,10 @@
 // listReminderJobs.js
 const { Queue } = require("bullmq");
-const { Redis } = require("ioredis");
+const createRedisConnection = require("./config/redisConnection");
 require("dotenv").config();
 
 // 🔌 Kết nối Redis
-const connection = new Redis({
-  host: process.env.REDIS_HOST,
-  port: process.env.REDIS_PORT,
+const connection = createRedisConnection({
   maxRetriesPerRequest: null,
   enableReadyCheck: false,
 });
