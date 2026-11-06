@@ -13,6 +13,8 @@ import Avatar from "../components/Avatar";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import backgroundImg from "../images/logo2.jpg";
+import { useDispatch } from "react-redux";
+import { updateProfileFields } from "../store/userSlice";
 
 const httpUrl = import.meta.env.VITE_API_URL;
 const accessToken = localStorage.getItem("accessToken");
@@ -26,6 +28,8 @@ export default function ProfilePage() {
   const [selectedFile, setSelectedFile] = useState(null);
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
+
+  const dispatch = useDispatch();
 
   useEffect(() => {
     if (!accessToken) {
@@ -103,6 +107,10 @@ export default function ProfilePage() {
       }));
 
       setSelectedFile(null);
+
+      // Cập nhật thông tin user (global state)
+      dispatch(updateProfileFields({ fullName: fullName.trim() }));
+
       toast.success("Cập nhật thông tin thành công!");
     } catch (err) {
       const msg = err.response?.data?.message || "Cập nhật thất bại";
@@ -125,12 +133,7 @@ export default function ProfilePage() {
       <div className="max-w-3xl mx-auto">
         {/* Nút Quay trở lại */}
         <button
-          onClick={() => {
-            window.history.back(); // quay lại route trước
-            setTimeout(() => {
-              window.location.reload(); // reload lại toàn trang
-            }, 10);
-          }}
+          onClick={() => navigate("/home")}
           className="
       mb-4 flex items-center gap-2 px-4 py-2
       rounded-xl bg-white border border-gray-200 shadow-sm
@@ -155,7 +158,6 @@ export default function ProfilePage() {
               backgroundPosition: "center",
               backgroundRepeat: "no-repeat",
             }}
-            
           >
             {/* Overlay tối nhẹ để chữ trắng nổi bật hơn (tùy chọn, khuyến nghị) */}
             <div className="absolute inset-0 bg-black/20"></div>

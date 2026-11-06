@@ -1,38 +1,17 @@
-import {
-  Route,
-  Routes,
-  Navigate,
-  BrowserRouter as Router,
-  useLocation,
-} from "react-router-dom";
-import LoginPage from "./pages/LoginPage";
-import HomePage from "./pages/HomePage";
-import { UserProvider } from "./components/UserProvider";
+import { BrowserRouter as Router, useLocation } from "react-router-dom";
+import AuthInitializer from "./components/AuthInitializer";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { Toaster } from "react-hot-toast";
-import BoardDetail from "./pages/BoardDetail";
-import RecoveryPassword from "./pages/RecoveryPassword";
-import Register from "./pages/Register";
-import ProfilePage from "./pages/ProfilePage";
-import ChangePassword from "./pages/ChangePassword";
-import AdminPage from "./pages/admin/AdminPage";
-import PrivateRoute from "./components/PrivateRoutes";
-import UserPage from "./pages/admin/UserPage";
-import PaymentHistory from "./pages/PaymentHistory";
-import DashboardPage from "./pages/admin/DashboardPage";
 import ChatWidget from "./components/Chatbot/ChatWidget";
-import HeaderTest from "./pages/HeaderTest";
-import TaskDetail from "./components/TaskDetail";
-import LandingPage from "./pages/LandingPage";
+import AppRoutes from "./routes/AppRoutes";
 
 function App() {
   return (
     <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
-      <UserProvider>
-        <Router>
-          <AppContent />
-        </Router>
-      </UserProvider>
+      <AuthInitializer />
+      <Router>
+        <AppContent />
+      </Router>
     </GoogleOAuthProvider>
   );
 }
@@ -164,36 +143,7 @@ function AppContent() {
         }}
       />
 
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/home" element={<HomePage />} />
-        <Route path="/boards/:boardId/:title" element={<BoardDetail />}>
-          {/* Child route cho task detail - URL con */}
-          <Route path=":taskId/:taskTitle" element={<TaskDetail />} />
-        </Route>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/recovery-password" element={<RecoveryPassword />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/change-password" element={<ChangePassword />} />
-        <Route path="/payment-history" element={<PaymentHistory />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-        <Route path="/test" element={<HeaderTest />} />
-
-        {/* ADMIN */}
-        <Route
-          path="/admin"
-          element={
-            <PrivateRoute allowedRoles={["ADMIN"]}>
-              <AdminPage />
-            </PrivateRoute>
-          }
-        >
-          <Route index element={<Navigate to="users" replace />} />
-          <Route path="users" element={<UserPage />} />
-          <Route path="dashboard" element={<DashboardPage />} />
-        </Route>
-      </Routes>
+      <AppRoutes />
       {/* Chỉ hiển thị ChatWidget khi KHÔNG ở các trang bị loại trừ */}
       {!shouldHideChatWidget && <ChatWidget />}
     </>
