@@ -127,3 +127,5 @@ Backend/my-project-dacntt/ai_model/chatbot_model/
 # Ignore specific large model files but keep Python code
 *.safetensors
 *.bin
+
+dist
