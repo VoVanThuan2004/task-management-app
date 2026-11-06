@@ -64,7 +64,7 @@ const login = async (req, res) => {
       process.env.SECRET_KEY,
       {
         expiresIn: "30d",
-      }
+      },
     );
 
     const refreshToken = jwt.sign(
@@ -76,7 +76,7 @@ const login = async (req, res) => {
       process.env.SECRET_KEY,
       {
         expiresIn: "60d",
-      }
+      },
     );
 
     await RefreshToken.create({
@@ -93,6 +93,8 @@ const login = async (req, res) => {
       message: "Đăng nhập thành công",
       data: {
         fullName: user.fullName,
+        avatar: user?.avatar,
+        email: user.email,
         accessToken,
         refreshToken,
       },
@@ -189,7 +191,7 @@ const loginSocialAccount = async (req, res) => {
       SECRET_KEY,
       {
         expiresIn: "30d",
-      }
+      },
     );
 
     // Tạo ra mã refreshToken
@@ -202,7 +204,7 @@ const loginSocialAccount = async (req, res) => {
       SECRET_KEY,
       {
         expiresIn: "60d",
-      }
+      },
     );
 
     await RefreshToken.create({
@@ -218,7 +220,9 @@ const loginSocialAccount = async (req, res) => {
       code: 200,
       message: "Đăng nhập tài khoản Google thành công",
       data: {
-        fullName: fullName,
+        fullName: user.fullName,
+        avatar: user.avatar,
+        email: user.email,
         accessToken: accessToken,
         refreshToken: refreshToken,
       },
