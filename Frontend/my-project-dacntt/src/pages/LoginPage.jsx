@@ -2,7 +2,8 @@ import axios from "axios";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
-import { useUser } from "../components/useUser";
+import { useDispatch } from "react-redux";
+import { loginSuccess } from "../store/userSlice";
 import { GoogleLogin } from "@react-oauth/google";
 
 const LoginPage = () => {
@@ -13,7 +14,7 @@ const LoginPage = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   const navigate = useNavigate();
-  const { fetchUser } = useUser();
+  const dispatch = useDispatch();
   const httpUrl = import.meta.env.VITE_API_URL;
 
   useEffect(() => {
@@ -48,7 +49,13 @@ const LoginPage = () => {
         { headers: { "Content-Type": "application/json" } }
       );
 
-      const { accessToken, refreshToken } = response.data.data;
+      const {
+        accessToken,
+        refreshToken,
+        fullName,
+        avatar,
+        email: userEmail,
+      } = response.data.data;
 
       if (!accessToken) {
         setError("Không tìm thấy token.");
@@ -64,7 +71,7 @@ const LoginPage = () => {
       localStorage.setItem("userId", userId);
       localStorage.setItem("roleName", roleName);
 
-      await fetchUser();
+      dispatch(loginSuccess({ fullName, avatar, email: userEmail }));
       if (roleName === "ADMIN") {
         navigate("/admin");
       } else if (roleName === "USER") {
@@ -99,7 +106,13 @@ const LoginPage = () => {
       );
 
       if (res.data.status === "success") {
-        const { accessToken, refreshToken } = res.data.data;
+        const {
+          accessToken,
+          refreshToken,
+          fullName,
+          avatar,
+          email: userEmail,
+        } = res.data.data;
         const decodedToken = jwtDecode(accessToken);
         const userId = decodedToken.userId;
         const roleName = decodedToken.roleName;
@@ -109,7 +122,7 @@ const LoginPage = () => {
         localStorage.setItem("userId", userId);
         localStorage.setItem("roleName", roleName);
 
-        await fetchUser();
+        dispatch(loginSuccess({ fullName, avatar, email: userEmail }));
         if (roleName === "ADMIN") {
           navigate("/admin");
         } else if (roleName === "USER") {

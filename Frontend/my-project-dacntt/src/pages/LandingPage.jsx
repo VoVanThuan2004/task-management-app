@@ -14,7 +14,8 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { useUser } from "../components/useUser";
+import { useSelector } from "react-redux";
+import { selectIsAuthenticated } from "../store/userSlice";
 
 const features = [
   {
@@ -174,8 +175,7 @@ function Footer() {
 }
 
 export default function LandingPage() {
-  const { user } = useUser();
-  const isAuthenticated = Boolean(user || localStorage.getItem("accessToken"));
+  const isAuthenticated = useSelector(selectIsAuthenticated);
 
   return <div className="min-h-screen overflow-x-clip bg-white font-sans text-slate-900"><Navbar isAuthenticated={isAuthenticated} /><main><HeroSection /><FeaturesSection /><HowItWorksSection /><ProductPreview /><AboutSection /><CTASection /></main><Footer /></div>;
 }

@@ -1,16 +1,18 @@
 import { useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
 import Avatar from "./Avatar";
 import { User, LogOut, LogIn, KeyRoundIcon, Wallet } from "lucide-react";
 import { useEffect, useRef } from "react";
+import { selectIsAuthenticated, selectUser } from "../store/userSlice";
 
 const Profile = ({
-  isLoggedIn,
-  user,
   setShowProfileMenu,
   showProfileMenu,
   handleLogout,
 }) => {
   const navigate = useNavigate();
+  const user = useSelector(selectUser);
+  const isLoggedIn = useSelector(selectIsAuthenticated);
 
   const menuRef = useRef(null);
 

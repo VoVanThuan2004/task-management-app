@@ -11,8 +11,10 @@ import {
   Crown,
   Check,
   Wallet,
+  ChevronRight,
 } from "lucide-react";
-import { useUser } from "../components/useUser";
+import { useDispatch, useSelector } from "react-redux";
+import { clearUser, selectIsAuthenticated } from "../store/userSlice";
 import { AnimatePresence, motion as Motion } from "framer-motion";
 import toast from "react-hot-toast";
 import Profile from "../components/Profile";
@@ -46,9 +48,9 @@ export default function HomePage() {
 
   const httpUrl = import.meta.env.VITE_API_URL;
   const accessToken = localStorage.getItem("accessToken");
-  const isLoggedIn = !!accessToken;
+  const isLoggedIn = useSelector(selectIsAuthenticated);
 
-  const { user, setUser } = useUser();
+  const dispatch = useDispatch();
   const navigate = useNavigate();
 
   const backgroundColors = [
@@ -109,7 +111,7 @@ export default function HomePage() {
 
     setMyBoards([]);
     setInvitedBoards([]);
-    setUser(null);
+    dispatch(clearUser());
 
     navigate("/");
   };
@@ -200,7 +202,7 @@ export default function HomePage() {
       localStorage.removeItem("userId");
       localStorage.removeItem("roleName");
       localStorage.removeItem("chatHistory"); // Xóa lịch sử chat
-      setUser(null);
+      dispatch(clearUser());
 
       setMyBoards([]);
       setInvitedBoards([]);
@@ -260,92 +262,178 @@ export default function HomePage() {
   return (
     <div className="flex min-h-screen bg-gray-50 pb-20 md:pb-0">
       {/* Sidebar - Ẩn trên mobile */}
-      <aside className="hidden md:block w-64 bg-white border-r border-gray-200 p-6 flex flex-col justify-between">
-        <div>
-          <h2 className="text-lg font-semibold mb-4 text-gray-700">
-            Không gian làm việc
-          </h2>
+      <aside className="hidden md:flex md:flex-col w-64 xl:w-72 shrink-0 bg-white border-r border-gray-200 sticky top-0 h-screen overflow-hidden">
+        <div className="shrink-0 px-5 pt-6 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-sm shadow-blue-500/20">
+              <LayoutGrid size={20} />
+            </div>
+            <div className="min-w-0">
+              <h2 className="truncate text-base font-semibold text-gray-900">
+                Không gian làm việc
+              </h2>
+              <p className="truncate text-xs text-gray-500">
+                {isLoggedIn
+                  ? `${myBoards.length + invitedBoards.length} bảng làm việc`
+                  : "Đăng nhập để bắt đầu"}
+              </p>
+            </div>
+          </div>
+        </div>
 
-          {/* Cá nhân */}
+        <nav className="flex-1 min-h-0 overflow-y-auto px-3 pb-4">
           <div>
-            <div
+            <button
+              type="button"
               onClick={() => setActiveSection("my")}
-              className={`flex items-center gap-2 text-gray-600 font-medium mb-2 cursor-pointer hover:text-blue-600 transition-colors ${
-                activeSection === "my" ? "text-blue-600" : ""
+              aria-current={activeSection === "my" ? "page" : undefined}
+              className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
+                activeSection === "my"
+                  ? "bg-blue-50 text-blue-700"
+                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
               }`}
             >
-              <LayoutGrid size={18} />
-              <span>Cá nhân</span>
-            </div>
-            <ul className="ml-6 space-y-1 text-gray-600">
+              <span
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                  activeSection === "my"
+                    ? "bg-blue-100 text-blue-600"
+                    : "bg-gray-100 text-gray-500 group-hover:bg-gray-200 group-hover:text-gray-700"
+                }`}
+              >
+                <LayoutGrid size={16} />
+              </span>
+              <span className="flex-1 truncate text-left">Cá nhân</span>
+              {isLoggedIn && myBoards.length > 0 && (
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                    activeSection === "my"
+                      ? "bg-blue-100 text-blue-700"
+                      : "bg-gray-100 text-gray-500"
+                  }`}
+                >
+                  {myBoards.length}
+                </span>
+              )}
+            </button>
+
+            <div className="ml-5 mt-1 space-y-0.5 border-l border-gray-100 pl-3">
               {!isLoggedIn ? (
-                <li className="text-sm text-gray-400 italic">
+                <p className="rounded-lg border border-dashed border-gray-200 px-3 py-2 text-xs text-gray-400">
                   Vui lòng đăng nhập
-                </li>
+                </p>
               ) : myBoards.length === 0 ? (
-                <li className="text-sm text-gray-400 italic">
+                <p className="rounded-lg border border-dashed border-gray-200 px-3 py-2 text-xs text-gray-400">
                   Không có bảng nào
-                </li>
+                </p>
               ) : (
                 myBoards.map((board) => (
-                  <li
+                  <button
+                    type="button"
                     key={board._id}
                     onClick={() => handleBoardClick(board)}
-                    className="hover:text-blue-600 cursor-pointer text-sm"
+                    title={board.title}
+                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900"
                   >
-                    {board.title}
-                  </li>
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-400" />
+                    <span className="truncate">{board.title}</span>
+                  </button>
                 ))
               )}
-            </ul>
+            </div>
           </div>
 
-          {/* Được mời vào */}
-          <div className="mt-6">
-            <div
+          <div className="my-3 border-t border-gray-100" />
+
+          <div>
+            <button
+              type="button"
               onClick={() => setActiveSection("invited")}
-              className={`flex items-center gap-2 text-gray-600 font-medium mb-2 cursor-pointer hover:text-blue-600 transition-colors ${
-                activeSection === "invited" ? "text-blue-600" : ""
+              aria-current={activeSection === "invited" ? "page" : undefined}
+              className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
+                activeSection === "invited"
+                  ? "bg-blue-50 text-blue-700"
+                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
               }`}
             >
-              <Users size={18} />
-              <span>Được mời vào</span>
-            </div>
-            <ul className="ml-6 space-y-1 text-gray-600">
+              <span
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                  activeSection === "invited"
+                    ? "bg-blue-100 text-blue-600"
+                    : "bg-gray-100 text-gray-500 group-hover:bg-gray-200 group-hover:text-gray-700"
+                }`}
+              >
+                <Users size={16} />
+              </span>
+              <span className="flex-1 truncate text-left">Được mời vào</span>
+              {isLoggedIn && invitedBoards.length > 0 && (
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                    activeSection === "invited"
+                      ? "bg-blue-100 text-blue-700"
+                      : "bg-gray-100 text-gray-500"
+                  }`}
+                >
+                  {invitedBoards.length}
+                </span>
+              )}
+            </button>
+
+            <div className="ml-5 mt-1 space-y-0.5 border-l border-gray-100 pl-3">
               {!isLoggedIn ? (
-                <li className="text-sm text-gray-400 italic">
+                <p className="rounded-lg border border-dashed border-gray-200 px-3 py-2 text-xs text-gray-400">
                   Vui lòng đăng nhập
-                </li>
+                </p>
               ) : invitedBoards.length === 0 ? (
-                <li className="text-sm text-gray-400 italic">
+                <p className="rounded-lg border border-dashed border-gray-200 px-3 py-2 text-xs text-gray-400">
                   Chưa có lời mời
-                </li>
+                </p>
               ) : (
                 invitedBoards.map((board) => (
-                  <li
+                  <button
+                    type="button"
                     key={board._id}
                     onClick={() => handleBoardClick(board)}
-                    className="hover:text-blue-600 cursor-pointer text-sm"
+                    title={board.title}
+                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900"
                   >
-                    {board.title}
-                  </li>
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-400" />
+                    <span className="truncate">{board.title}</span>
+                  </button>
                 ))
               )}
-            </ul>
-          </div>
-
-          {/* Nâng cấp VIP - thêm vào dưới "Được mời vào" */}
-          <div className="mt-6">
-            <div
-              onClick={() => setActiveSection("vip")}
-              className={`flex items-center gap-2 text-gray-600 font-medium mb-2 cursor-pointer hover:text-blue-600 transition-colors ${
-                activeSection === "vip" ? "text-blue-600" : ""
-              }`}
-            >
-              <Wallet size={18} />
-              <span>Nâng cấp tài khoản VIP</span>
             </div>
           </div>
+        </nav>
+
+        <div className="shrink-0 border-t border-gray-100 p-3">
+          <button
+            type="button"
+            onClick={() => setActiveSection("vip")}
+            aria-current={activeSection === "vip" ? "page" : undefined}
+            className={`group w-full rounded-2xl border p-3.5 text-left transition-all ${
+              activeSection === "vip"
+                ? "border-amber-300 bg-amber-100/70 ring-2 ring-amber-300/40"
+                : "border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 hover:border-amber-300 hover:shadow-sm"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-400 text-white shadow-sm">
+                <Crown size={18} />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-amber-900">
+                  Nâng cấp VIP
+                </p>
+                <p className="truncate text-xs text-amber-700/80">
+                  Mở khóa toàn bộ tính năng
+                </p>
+              </div>
+              <ChevronRight
+                size={16}
+                className="ml-auto shrink-0 text-amber-500 transition-transform group-hover:translate-x-0.5"
+              />
+            </div>
+          </button>
         </div>
       </aside>
 
@@ -365,8 +453,6 @@ export default function HomePage() {
           {/* Profile - luôn nằm bên phải, cả mobile lẫn desktop */}
           <div className="flex-shrink-0">
             <Profile
-              isLoggedIn={isLoggedIn}
-              user={user}
               setShowProfileMenu={setShowProfileMenu}
               showProfileMenu={showProfileMenu}
               handleLogout={handleLogout}

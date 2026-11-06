@@ -8,13 +8,17 @@ import {
   User,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
 import axios from "axios";
 import Avatar from "./Avatar";
+import { clearUser, selectUser } from "../store/userSlice";
 
 const httpUrl = import.meta.env.VITE_API_URL;
 
-const SideBar = ({ isCollapsed, setIsCollapsed, user, setUser }) => {
+const SideBar = ({ isCollapsed, setIsCollapsed }) => {
   const navigate = useNavigate();
+  const user = useSelector(selectUser);
+  const dispatch = useDispatch();
   const currentPath = window.location.pathname;
 
   const isActive = (href) =>
@@ -35,7 +39,7 @@ const SideBar = ({ isCollapsed, setIsCollapsed, user, setUser }) => {
       console.log(error);
     }
     localStorage.clear();
-    setUser(null);
+    dispatch(clearUser());
     navigate("/");
   };
 
