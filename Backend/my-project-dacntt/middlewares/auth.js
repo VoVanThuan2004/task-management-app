@@ -25,21 +25,9 @@ module.exports = async (req, res, next) => {
 
   const token = authHeader.split(" ")[1];
 
+  let decoded;
   try {
-    const decoded = jwt.verify(token, SECRET_KEY);
-    req.user = decoded; // Gán vào req.user để dùng ở route khác
-
-    // Tích hợp Redis - kiểm tra tài khoản có khóa hay không
-    const isBlacklisted = await redisClient.sismember("blacklisted_users", decoded.userId);
-    if (isBlacklisted === 1) {
-      return res.status(401).json({
-        status: "error",
-        code: 401,
-        message: "Tài khoản người dùng đã bị khóa",
-      });
-    }
-
-    next();
+    decoded = jwt.verify(token, SECRET_KEY);
   } catch (error) {
     if (error.name === "TokenExpiredError") {
       return res.status(401).json({
@@ -56,4 +44,29 @@ module.exports = async (req, res, next) => {
       error: error.message,
     });
   }
+
+  req.user = decoded; // Gán vào req.user để dùng ở route khác
+
+  // Tích hợp Redis - kiểm tra tài khoản có khóa hay không
+  try {
+    const isBlacklisted = await redisClient.sismember(
+      "blacklisted_users",
+      decoded.userId
+    );
+    if (isBlacklisted === 1) {
+      return res.status(401).json({
+        status: "error",
+        code: 401,
+        message: "Tài khoản người dùng đã bị khóa",
+      });
+    }
+  } catch (error) {
+    return res.status(503).json({
+      status: "error",
+      code: 503,
+      message: "Dịch vụ xác thực tạm thời không khả dụng. Vui lòng thử lại sau.",
+    });
+  }
+
+  next();
 };
