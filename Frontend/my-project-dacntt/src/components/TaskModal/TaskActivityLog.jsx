@@ -106,81 +106,66 @@ const TaskActivityLog = ({ taskId, socket, onTotalChange }) => {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center py-8">
-        <div className="animate-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+      <div className="space-y-5 py-1">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="flex animate-pulse gap-3">
+            <div className="h-8 w-8 shrink-0 rounded-full bg-gray-200" />
+            <div className="flex-1 space-y-2 pt-1">
+              <div className="h-3 w-3/4 rounded bg-gray-200" />
+              <div className="h-3 w-1/3 rounded bg-gray-100" />
+            </div>
+          </div>
+        ))}
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div>
       {activities.length > 0 ? (
         <>
-          {/* Timeline Header */}
-          {/* === HEADER – Lịch sử hoạt động === */}
-          {/* <div className="flex items-center justify-between mb-4 sticky top-0 bg-white z-20 py-3 border-b border-gray-100">
-            <div className="flex items-center gap-3 px-2">
-              <h3 className="font-semibold text-gray-800 flex items-center gap-2">
-                <Clock size={18} />
-                <span>Lịch sử hoạt động</span>
-              </h3>
-              <span className="text-xs bg-gray-200 text-gray-700 px-2.5 py-1 rounded-full text-xs">
-                {pagination.totalActivityLogs} sự kiện
-              </span>
-            </div>
-          </div> */}
+          <div className="relative">
+            <div
+              className="absolute left-4 top-2 bottom-2 w-px bg-gray-200"
+              aria-hidden="true"
+            />
 
-          {/* Timeline */}
-          <div className="relative mt-1">
-            {/* Timeline line */}
-            <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-gradient-to-b from-blue-400 to-purple-500"></div>
-
-            {/* Activity Items */}
-            <div className="space-y-5 relative z-10">
+            <div className="relative space-y-4">
               {activities.map((activity) => {
                 const config = ActionConfig[activity.action] || {};
+                const createdAt = new Date(activity.createdAt);
+                const actionLabel = config.label || activity.action;
 
                 return (
-                  <div
-                    key={activity._id}
-                    className={`ml-14 pb-3 border-l-4 pl-4 rounded-lg shadow-sm transition-all duration-200 hover:translate-x-1 ${
-                      config.color || "bg-gray-50 border-gray-200"
-                    }`}
-                  >
-                    {/* Header: Avatar + Name + Time */}
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex items-center gap-3 flex-1">
-                        {/* Avatar */}
-                        <Avatar user={activity} size="w-9 h-9 mt-1" />
-
-                        {/* Name */}
-                        <div className="flex flex-col">
-                          <p className="text-sm font-medium text-gray-800">
-                            {activity.fullName}
-                          </p>
-                          <span className="text-xs text-gray-500">
-                            {formatDistanceToNow(new Date(activity.createdAt), {
-                              addSuffix: true,
-                              locale: vi,
-                            })}
-                          </span>
-                        </div>
-                      </div>
+                  <div key={activity._id} className="flex gap-3">
+                    <div className="relative shrink-0">
+                      <Avatar user={activity} size="w-8 h-8" />
+                      <span
+                        className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-white ring-1 ring-gray-200"
+                        title={actionLabel}
+                        aria-label={actionLabel}
+                      >
+                        <span className="scale-[0.65]">{config.icon}</span>
+                      </span>
                     </div>
 
-                    {/* Action + Description */}
-                    <div className="flex items-start gap-3">
-                      <div className="mt-1">{config.icon}</div>
-
-                      <div className="flex-1">
-                        <span className="inline-block text-xs font-semibold text-gray-700 bg-white bg-opacity-60 px-2 py-0.5 rounded">
-                          {config.label || activity.action}
-                        </span>
-
-                        <p className="text-sm text-gray-700 mt-1">
-                          {activity.description}
-                        </p>
-                      </div>
+                    <div className="min-w-0 flex-1 pt-0.5">
+                      <p className="text-sm leading-5 text-gray-600 break-words">
+                        <span className="font-medium text-gray-900">
+                          {activity.fullName || "Người dùng"}
+                        </span>{" "}
+                        {activity.description}
+                      </p>
+                      <time
+                        dateTime={activity.createdAt}
+                        title={createdAt.toLocaleString("vi-VN")}
+                        className="mt-1 block text-xs text-gray-400"
+                      >
+                        {formatDistanceToNow(createdAt, {
+                          addSuffix: true,
+                          locale: vi,
+                        })}
+                      </time>
                     </div>
                   </div>
                 );
@@ -188,42 +173,38 @@ const TaskActivityLog = ({ taskId, socket, onTotalChange }) => {
             </div>
           </div>
 
-          {/* Load More Button */}
-          {page < pagination.totalPages && (
-            <div className="flex justify-center mt-6 pt-4 border-t border-gray-200">
+          {page < pagination.totalPages ? (
+            <div className="mt-5 flex justify-center border-t border-gray-100 pt-4">
               <button
                 onClick={handleLoadMore}
                 disabled={loadingMore}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {loadingMore ? (
                   <>
-                    <Loader2 size={16} className="animate-spin" />
+                    <Loader2 size={15} className="animate-spin" />
                     <span>Đang tải...</span>
                   </>
                 ) : (
                   <>
-                    <ChevronDown size={16} />
-                    <span>
-                      Xem thêm ({page}/{pagination.totalPages})
-                    </span>
+                    <ChevronDown size={15} />
+                    <span>Tải thêm hoạt động</span>
                   </>
                 )}
               </button>
             </div>
-          )}
-
-          {/* End of list indicator */}
-          {page === pagination.totalPages && activities.length > 0 && (
-            <div className="text-center py-4 text-gray-400 text-sm">
-              ✓ Bạn đã xem hết tất cả hoạt động
-            </div>
+          ) : (
+            <p className="mt-5 border-t border-gray-100 pt-4 text-center text-xs text-gray-400">
+              Đã hiển thị tất cả hoạt động
+            </p>
           )}
         </>
       ) : (
-        <div className="text-center py-8">
-          <Clock className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 text-sm">Chưa có hoạt động nào</p>
+        <div className="flex flex-col items-center justify-center py-10 text-center">
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-dashed border-gray-300 bg-gray-50">
+            <Clock size={20} className="text-gray-400" />
+          </div>
+          <p className="text-sm text-gray-500">Chưa có hoạt động nào</p>
         </div>
       )}
     </div>
