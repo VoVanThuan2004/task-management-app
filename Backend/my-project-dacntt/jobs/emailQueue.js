@@ -9,6 +9,7 @@ const {
   sendRegisterVipEmail,
 } = require("../config/mailConfig");
 const User = require("../models/user");
+const Role = require("../models/role");
 const bcrypt = require("bcrypt");
 
 const connection = createRedisConnection({
@@ -58,6 +59,11 @@ const worker = new Worker(
         }
       } else if (job.name === "createAccountEmail") {
         const { email } = job.data;
+
+        const role = await Role.findOne({ roleName: "USER" });
+        if (!role) {
+          throw new Error("Vai trò dành cho người dùng không tồn tại");
+        }
 
         // Tạo mã otp
         const OTP = Math.floor(100000 + Math.random() * 900000).toString();
